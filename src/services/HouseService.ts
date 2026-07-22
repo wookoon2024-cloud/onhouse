@@ -14,6 +14,27 @@ export const setSavedHouseCode = (code: string) => {
 // Fetch or initialize all maps for a given house code
 export const fetchHouseMaps = async (houseCode: string): Promise<Record<string, MapDefinition>> => {
   try {
+    // 1. Start with factory default maps
+    const loadedMaps: Record<string, MapDefinition> = { ...maps };
+
+    // 2. Load all local map edits stored in localStorage
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('on_house_map_')) {
+        const mapId = key.replace('on_house_map_', '');
+        try {
+          const val = localStorage.getItem(key);
+          if (val) {
+            const parsed = JSON.parse(val);
+            if (parsed && parsed.width && parsed.height && Array.isArray(parsed.baseLayer)) {
+              loadedMaps[mapId] = parsed;
+            }
+          }
+        } catch (e) {}
+      }
+    }
+
+    // 3. Fetch from Supabase DB and merge/override with cloud data
     const { data, error } = await supabase
       .from('house_maps')
       .select('map_id, map_data')
@@ -23,12 +44,13 @@ export const fetchHouseMaps = async (houseCode: string): Promise<Record<string, 
       console.warn('Supabase fetchHouseMaps warning:', error.message);
     }
 
-    const loadedMaps: Record<string, MapDefinition> = { ...maps };
-
     if (data && data.length > 0) {
       data.forEach((row: { map_id: string; map_data: MapDefinition }) => {
-        if (row.map_data) {
+        if (row.map_data && row.map_data.width && row.map_data.height) {
           loadedMaps[row.map_id] = row.map_data;
+          try {
+            localStorage.setItem('on_house_map_' + row.map_id, JSON.stringify(row.map_data));
+          } catch (e) {}
         }
       });
     }

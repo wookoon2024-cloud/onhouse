@@ -39,20 +39,24 @@ export default function App() {
 
   // 0. Active Maps (loads custom layouts from localStorage)
   const [activeMaps, setActiveMaps] = useState<Record<string, MapDefinition>>(() => {
-    const loadedMaps = { ...maps };
-    Object.keys(maps).forEach((mapId) => {
-      const saved = localStorage.getItem('on_house_map_' + mapId);
-      if (saved) {
+    const loadedMaps: Record<string, MapDefinition> = { ...maps };
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('on_house_map_')) {
+        const mapId = key.replace('on_house_map_', '');
         try {
-          const parsed = JSON.parse(saved);
-          if (parsed && parsed.width && parsed.height && Array.isArray(parsed.baseLayer)) {
-            loadedMaps[mapId] = parsed;
+          const saved = localStorage.getItem(key);
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed && parsed.width && parsed.height && Array.isArray(parsed.baseLayer)) {
+              loadedMaps[mapId] = parsed;
+            }
           }
         } catch (e) {
           console.error(`Failed to load custom map: ${mapId}`, e);
         }
       }
-    });
+    }
     return loadedMaps;
   });
 
