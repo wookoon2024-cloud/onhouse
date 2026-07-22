@@ -223,12 +223,22 @@ export default function App() {
         }));
       })
       .on('broadcast', { event: 'chat' }, ({ payload }) => {
-        if (!payload || payload.senderId === deviceId.current) return;
-        if (!payload.text.startsWith('/')) {
+        if (!payload || payload.id === deviceId.current) return;
+        if (payload.text && !payload.text.startsWith('/')) {
           setChatBubbles((prev) => ({
             ...prev,
             [payload.id]: { text: payload.text, time: Date.now() }
           }));
+
+          setChatLogs((prev) => [
+            ...prev,
+            {
+              id: 'chat_rec_' + Date.now() + Math.random(),
+              senderName: payload.senderName || '다른 플레이어',
+              text: payload.text,
+              time: Date.now()
+            }
+          ]);
         }
       })
       .on('broadcast', { event: 'map_update' }, ({ payload }) => {
@@ -688,7 +698,20 @@ export default function App() {
       }
     ]);
 
-    // Broadcast chat
+    // Broadcast chat via Supabase Realtime channel for cross-device users
+    try {
+      supabase.channel(`house:${houseCode}`).send({
+        type: 'broadcast',
+        event: 'chat',
+        payload: {
+          id: deviceId.current,
+          senderName: localPlayer.nickname,
+          text
+        }
+      });
+    } catch (e) {}
+
+    // Broadcast chat to other local tabs
     bcRef.current?.postMessage({
       type: 'chat',
       playerId: deviceId.current,
