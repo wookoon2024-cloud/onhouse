@@ -172,7 +172,8 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
   editLayer,
   onPaintTile,
   mapData,
-  brushSize
+  brushSize,
+  assetVersion = 0
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -328,7 +329,7 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
     return () => {
       window.removeEventListener('on_house_sprites_updated', loadAllAssets);
     };
-  }, []);
+  }, [assetVersion]);
 
   // Keyboard input listeners
   useEffect(() => {

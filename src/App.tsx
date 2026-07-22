@@ -170,6 +170,7 @@ export default function App() {
 
   // Mobile responsive detection
   const [isMobile, setIsMobile] = useState(false);
+  const [assetVersion, setAssetVersion] = useState<number>(0);
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
@@ -216,11 +217,17 @@ export default function App() {
 
     // 2. Load house custom assets from Supabase DB
     fetchHouseAssets(houseCode).then(({ mapTilesets, charSprites }) => {
+      let updated = false;
       if (mapTilesets.length > 0) {
         localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(mapTilesets));
+        updated = true;
       }
       if (charSprites.length > 0) {
         localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(charSprites));
+        updated = true;
+      }
+      if (updated) {
+        setAssetVersion((v) => v + 1);
       }
     });
 
@@ -278,6 +285,7 @@ export default function App() {
           if (!current.some((item: any) => item.id === assetData.id)) {
             const next = [...current, assetData];
             localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(next));
+            setAssetVersion((v) => v + 1);
           }
         } else if (assetType === 'char_sprite') {
           const saved = localStorage.getItem('on_house_custom_char_sprites');
@@ -285,6 +293,7 @@ export default function App() {
           if (!current.some((item: any) => item.id === assetData.id)) {
             const next = [...current, assetData];
             localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(next));
+            setAssetVersion((v) => v + 1);
           }
         }
       })
@@ -883,6 +892,7 @@ export default function App() {
         onPaintTile={() => {}}
         mapData={activeMaps[localPlayer.mapId] || activeMaps[availableMapIds[0]] || maps.room}
         brushSize={1}
+        assetVersion={assetVersion}
       />
 
       {/* 2. Map Selector (Top Left) */}
