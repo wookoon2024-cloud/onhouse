@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { CanvasGame } from './game/CanvasGame';
-import { type MapDefinition, maps } from './game/MapData';
+import { type MapDefinition, maps, PRESET_MAP_TEMPLATES, createCustomMap, getCharRowActions } from './game/MapData';
 import {
   type PlayerState,
   getOrCreateDeviceId,
@@ -17,8 +17,11 @@ import { Messenger } from './components/Messenger';
 import { StatusPicker } from './components/StatusPicker';
 import { MapSelector } from './components/MapSelector';
 import { MapEditorView } from './components/MapEditorView';
-import { Mail, Settings, User, Eye, Hammer } from 'lucide-react';
+import { Mail, Settings, User, Eye, Hammer, Home } from 'lucide-react';
 import { AssetViewer } from './components/AssetViewer';
+import { HouseJoinModal } from './components/HouseJoinModal';
+import { getSavedHouseCode, setSavedHouseCode, fetchHouseMaps, saveHouseMapToDB, fetchHouseAssets } from './services/HouseService';
+import { supabase } from './lib/supabase';
 
 interface ChatLogMessage {
   id: string;
@@ -29,6 +32,10 @@ interface ChatLogMessage {
 
 export default function App() {
   const deviceId = useRef(getOrCreateDeviceId());
+
+  // House Code (Multi-user sharing room ID)
+  const [houseCode, setHouseCodeState] = useState<string>(getSavedHouseCode);
+  const [showHouseModal, setShowHouseModal] = useState<boolean>(false);
 
   // 0. Active Maps (loads custom layouts from localStorage)
   const [activeMaps, setActiveMaps] = useState<Record<string, MapDefinition>>(() => {
@@ -47,6 +54,22 @@ export default function App() {
       }
     });
     return loadedMaps;
+  });
+
+  // 0.5. Available Map IDs displayed in top bar (1 to 4 maps)
+  const [availableMapIds, setAvailableMapIds] = useState<string[]>(() => {
+    const saved = localStorage.getItem('on_house_available_map_ids');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length >= 1 && parsed.length <= 4) {
+          return parsed;
+        }
+      } catch (e) {
+        console.error("Failed to parse availableMapIds", e);
+      }
+    }
+    return ['room', 'subway', 'park', 'apt'];
   });
 
   // 1. Local Player State
@@ -76,6 +99,13 @@ export default function App() {
       lastActive: Date.now()
     };
   });
+
+  useEffect(() => {
+    localStorage.setItem('on_house_available_map_ids', JSON.stringify(availableMapIds));
+    if (availableMapIds.length > 0 && !availableMapIds.includes(localPlayer.mapId)) {
+      setLocalPlayer((prev) => ({ ...prev, mapId: availableMapIds[0] }));
+    }
+  }, [availableMapIds, localPlayer.mapId]);
 
   // 2. Multi-player lists
   const [otherPlayers, setOtherPlayers] = useState<Record<string, PlayerState>>({});
@@ -153,7 +183,81 @@ export default function App() {
     localStorage.setItem('on_house_sprite', localPlayer.spriteType);
     localStorage.setItem('on_house_hue', localPlayer.hue.toString());
     localStorage.setItem('on_house_status', localPlayer.statusMessage);
-  }, [localPlayer]);
+
+    // Broadcast player update to Supabase Realtime channel
+    try {
+      supabase.channel(`house:${houseCode}`).send({
+        type: 'broadcast',
+        event: 'player_sync',
+        payload: localPlayer
+      });
+    } catch (e) {}
+  }, [localPlayer, houseCode]);
+
+  // Supabase House DB fetch & Realtime WebSocket Channel
+  useEffect(() => {
+    // 1. Load house maps from Supabase DB
+    fetchHouseMaps(houseCode).then((mapsData) => {
+      setActiveMaps(mapsData);
+    });
+
+    // 2. Load house custom assets from Supabase DB
+    fetchHouseAssets(houseCode).then(({ mapTilesets, charSprites }) => {
+      if (mapTilesets.length > 0) {
+        localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(mapTilesets));
+      }
+      if (charSprites.length > 0) {
+        localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(charSprites));
+      }
+    });
+
+    // 3. Connect Supabase Realtime channel for multi-device cross-pc sync
+    const channel = supabase.channel(`house:${houseCode}`);
+
+    channel
+      .on('broadcast', { event: 'player_sync' }, ({ payload }) => {
+        if (!payload || payload.id === deviceId.current) return;
+        setOtherPlayers((prev) => ({
+          ...prev,
+          [payload.id]: payload
+        }));
+      })
+      .on('broadcast', { event: 'chat' }, ({ payload }) => {
+        if (!payload || payload.senderId === deviceId.current) return;
+        if (!payload.text.startsWith('/')) {
+          setChatBubbles((prev) => ({
+            ...prev,
+            [payload.id]: { text: payload.text, time: Date.now() }
+          }));
+        }
+      })
+      .on('broadcast', { event: 'map_update' }, ({ payload }) => {
+        if (!payload || !payload.mapId || !payload.mapData) return;
+        setActiveMaps((prev) => ({
+          ...prev,
+          [payload.mapId]: payload.mapData
+        }));
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          channel.send({
+            type: 'broadcast',
+            event: 'player_sync',
+            payload: localPlayerRef.current
+          });
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [houseCode]);
+
+  const handleJoinHouse = (newCode: string) => {
+    const saved = setSavedHouseCode(newCode);
+    setHouseCodeState(saved);
+    setShowHouseModal(false);
+  };
 
   // Safety check: Teleport player back inside map ONLY if completely out of bounds (e.g. when map size shrinks)
   useEffect(() => {
@@ -259,11 +363,13 @@ export default function App() {
               }
             };
           });
-          // Add to speech bubble
-          setChatBubbles((prev) => ({
-            ...prev,
-            [msg.playerId]: { text: msg.text, time: Date.now() }
-          }));
+          // Add to speech bubble (Do NOT display slash commands starting with '/')
+          if (msg.text && !msg.text.startsWith('/')) {
+            setChatBubbles((prev) => ({
+              ...prev,
+              [msg.playerId]: { text: msg.text, time: Date.now() }
+            }));
+          }
           // Add to chat logs
           setChatLogs((prev) => [
             ...prev,
@@ -440,7 +546,8 @@ export default function App() {
 
   // 2. Map transitioner
   const handleMapChange = (mapId: string) => {
-    const spawn = maps[mapId].spawnPoints[0];
+    const targetMap = activeMaps[mapId] || maps[mapId];
+    const spawn = targetMap?.spawnPoints?.[0] || { x: 20, y: 15 };
     const newX = spawn.x * 16;
     const newY = spawn.y * 16;
 
@@ -470,10 +577,59 @@ export default function App() {
       {
         id: 'system_' + Date.now(),
         senderName: '🚀 시스템',
-        text: `[${maps[mapId].name}] 구역으로 이동하였습니다.`,
+        text: `[${targetMap?.name || mapId}] 구역으로 이동하였습니다.`,
         time: Date.now()
       }
     ]);
+  };
+
+  // 2.5. Add Map and Delete Map Handlers
+  const handleAddMap = (presetId?: string, customName?: string) => {
+    if (availableMapIds.length >= 4) {
+      alert("맵은 최대 4개까지만 설정할 수 있습니다.");
+      return;
+    }
+
+    let newMapId = '';
+    let newMapObj: MapDefinition;
+
+    if (presetId && PRESET_MAP_TEMPLATES[presetId]) {
+      newMapId = presetId;
+      const saved = localStorage.getItem('on_house_map_' + presetId);
+      if (saved) {
+        try {
+          newMapObj = JSON.parse(saved);
+        } catch {
+          newMapObj = PRESET_MAP_TEMPLATES[presetId].builder();
+        }
+      } else {
+        newMapObj = PRESET_MAP_TEMPLATES[presetId].builder();
+      }
+    } else {
+      const timestamp = Date.now();
+      newMapId = `custom_${timestamp}`;
+      const name = customName || `🎨 새 커스텀 맵 ${availableMapIds.length + 1}`;
+      newMapObj = createCustomMap(newMapId, name, 'outdoor');
+    }
+
+    setActiveMaps((prev) => ({ ...prev, [newMapId]: newMapObj }));
+    setAvailableMapIds((prev) => [...prev, newMapId]);
+    localStorage.setItem('on_house_map_' + newMapId, JSON.stringify(newMapObj));
+    handleMapChange(newMapId);
+  };
+
+  const handleDeleteMap = (mapId: string) => {
+    if (availableMapIds.length <= 1) {
+      alert("최소 1개의 맵은 항상 유지되어야 합니다.");
+      return;
+    }
+
+    const nextAvailable = availableMapIds.filter((id) => id !== mapId);
+    setAvailableMapIds(nextAvailable);
+
+    if (localPlayer.mapId === mapId) {
+      handleMapChange(nextAvailable[0]);
+    }
   };
 
   // 3. Status picker updater
@@ -497,11 +653,29 @@ export default function App() {
 
     const text = chatInput.trim();
 
-    // Trigger local speech bubble
-    setChatBubbles((prev) => ({
-      ...prev,
-      [deviceId.current]: { text, time: Date.now() }
-    }));
+    // Check for Slash Command Emotes (e.g., /환호, /공격, /댄스)
+    if (text.startsWith('/')) {
+      const commandName = text.slice(1).trim();
+      const charId = localPlayer.spriteType;
+      const rowActions = getCharRowActions(charId);
+      const foundRowIndex = rowActions.findIndex(act => act.toLowerCase() === commandName.toLowerCase());
+
+      if (foundRowIndex >= 0) {
+        setLocalPlayer((prev) => ({
+          ...prev,
+          currentEmote: commandName,
+          emoteUntil: Date.now() + 3500
+        }));
+      }
+    }
+
+    // Trigger local speech bubble (Do NOT display slash commands starting with '/')
+    if (!text.startsWith('/')) {
+      setChatBubbles((prev) => ({
+        ...prev,
+        [deviceId.current]: { text, time: Date.now() }
+      }));
+    }
 
     // Add to logs
     setChatLogs((prev) => [
@@ -614,13 +788,15 @@ export default function App() {
         selectedTile={0}
         editLayer="base"
         onPaintTile={() => {}}
-        mapData={activeMaps[localPlayer.mapId]}
+        mapData={activeMaps[localPlayer.mapId] || activeMaps[availableMapIds[0]] || maps.room}
         brushSize={1}
       />
 
       {/* 2. Map Selector (Top Left) */}
       <MapSelector
         currentMapId={localPlayer.mapId}
+        availableMapIds={availableMapIds}
+        activeMaps={activeMaps}
         onMapChange={handleMapChange}
       />
 
@@ -802,7 +978,7 @@ export default function App() {
                 color: showAssetViewer ? 'var(--accent)' : '#ccc',
                 cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px', borderRadius: '2px'
               }}
-              title="타일 에셋 뷰어"
+              title="픽셀 에디터"
             >
               <Eye size={14} />
             </button>
@@ -820,6 +996,22 @@ export default function App() {
               <Settings size={14} />
             </button>
 
+            {/* House Code Switcher Button */}
+            <button
+              onClick={() => setShowHouseModal(true)}
+              style={{
+                background: 'rgba(139, 92, 246, 0.2)',
+                border: '1px solid var(--accent)',
+                color: 'var(--accent)',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
+                padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold'
+              }}
+              title="하우스 번호 (클릭하여 변경 및 공유)"
+            >
+              <Home size={12} />
+              <span>{houseCode}</span>
+            </button>
+
             <div style={{ width: '1px', height: '14px', background: 'rgba(255,255,255,0.15)' }} />
 
             <div style={{ fontSize: '11px', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -834,6 +1026,9 @@ export default function App() {
       {showProfessionalEditor && (
         <MapEditorView
           activeMaps={activeMaps}
+          availableMapIds={availableMapIds}
+          onAddMap={handleAddMap}
+          onDeleteMap={handleDeleteMap}
           onSaveMap={(mapId, updatedMap) => {
             setActiveMaps((prev) => {
               const next = { ...prev, [mapId]: updatedMap };
@@ -849,7 +1044,19 @@ export default function App() {
               return next;
             });
 
-            // Broadcast full map update to other tabs!
+            // Save to Supabase DB for this House!
+            saveHouseMapToDB(houseCode, mapId, updatedMap);
+
+            // Broadcast to all devices in real-time!
+            try {
+              supabase.channel(`house:${houseCode}`).send({
+                type: 'broadcast',
+                event: 'map_update',
+                payload: { mapId, mapData: updatedMap }
+              });
+            } catch (e) {}
+
+            // Broadcast full map update to other local tabs!
             if (bcRef.current) {
               bcRef.current.postMessage({
                 type: 'map_full_update',
@@ -859,6 +1066,15 @@ export default function App() {
             }
           }}
           onClose={() => setShowProfessionalEditor(false)}
+        />
+      )}
+
+      {/* 9. House Join & Switcher Modal */}
+      {showHouseModal && (
+        <HouseJoinModal
+          currentHouseCode={houseCode}
+          onJoinHouse={handleJoinHouse}
+          onClose={() => setShowHouseModal(false)}
         />
       )}
     </div>

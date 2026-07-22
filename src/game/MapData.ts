@@ -10,6 +10,53 @@ export interface MapDefinition {
   spawnPoints: { x: number; y: number }[];
 }
 
+export const DEFAULT_CHAR_ROW_ACTIONS: Record<string, string[]> = {
+  ninja_blue: ['대기', '걷기1', '걷기2', '걷기3', '공격', '피격', '환호'],
+  samurai_blue: ['대기', '걷기1', '걷기2', '걷기3', '공격', '피격', '환호'],
+  samurai_green: ['대기', '걷기1', '걷기2', '걷기3', '공격', '피격', '환호'],
+  pig: ['대기', '걷기1'],
+};
+
+export function getCharRowActions(spriteType: string): string[] {
+  try {
+    const saved = localStorage.getItem('on_house_char_row_actions');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed[spriteType] && Array.isArray(parsed[spriteType])) {
+        return parsed[spriteType];
+      }
+    }
+  } catch (e) {
+    // fallback
+  }
+  return DEFAULT_CHAR_ROW_ACTIONS[spriteType] || ['대기', '걷기1', '걷기2', '걷기3', '공격', '피격', '환호'];
+}
+
+export function getCharGridDimensions(spriteType: string): { cols: number; rows: number } {
+  try {
+    const savedOverrides = localStorage.getItem('on_house_char_image_overrides');
+    if (savedOverrides) {
+      const overrides = JSON.parse(savedOverrides);
+      if (overrides[spriteType] && overrides[spriteType].cols && overrides[spriteType].rows) {
+        return { cols: overrides[spriteType].cols, rows: overrides[spriteType].rows };
+      }
+    }
+    const savedCustom = localStorage.getItem('on_house_custom_char_sprites');
+    if (savedCustom) {
+      const customList = JSON.parse(savedCustom);
+      const matched = customList.find((item: any) => item.id === spriteType);
+      if (matched && matched.cols && matched.rows) {
+        return { cols: matched.cols, rows: matched.rows };
+      }
+    }
+  } catch (e) {
+    // fallback
+  }
+
+  if (spriteType === 'pig') return { cols: 2, rows: 1 };
+  return { cols: 4, rows: 7 };
+}
+
 // Helper to create an empty 2D grid
 const createGrid = (w: number, h: number, fillVal: number): number[][] => {
   return Array.from({ length: h }, () => Array(w).fill(fillVal));
@@ -183,9 +230,110 @@ const buildApartmentComplex = (): MapDefinition => {
   };
 };
 
+// --- MAP 5: VILLAGE (시골 마을) ---
+const buildVillage = (): MapDefinition => {
+  const w = 45;
+  const h = 35;
+  const base = createGrid(w, h, 3000);
+  const decor = createGrid(w, h, -1);
+  const coll = createBoolGrid(w, h, false);
+  for (let x = 0; x < w; x++) { coll[0][x] = true; coll[h - 1][x] = true; }
+  for (let y = 0; y < h; y++) { coll[y][0] = true; coll[y][w - 1] = true; }
+
+  return {
+    id: 'village',
+    name: '🏘️ 시골 마을',
+    width: w, height: h,
+    tileset: 'village',
+    baseLayer: base, decorLayer: decor, collision: coll,
+    spawnPoints: [{ x: 22, y: 17 }]
+  };
+};
+
+// --- MAP 6: WATER (해변 연못) ---
+const buildWater = (): MapDefinition => {
+  const w = 45;
+  const h = 35;
+  const base = createGrid(w, h, 7000);
+  const decor = createGrid(w, h, -1);
+  const coll = createBoolGrid(w, h, false);
+  for (let x = 0; x < w; x++) { coll[0][x] = true; coll[h - 1][x] = true; }
+  for (let y = 0; y < h; y++) { coll[y][0] = true; coll[y][w - 1] = true; }
+
+  return {
+    id: 'water',
+    name: '🌊 해변 연못',
+    width: w, height: h,
+    tileset: 'water',
+    baseLayer: base, decorLayer: decor, collision: coll,
+    spawnPoints: [{ x: 22, y: 17 }]
+  };
+};
+
+// --- MAP 7: FOREST (숲속 쉼터) ---
+const buildForest = (): MapDefinition => {
+  const w = 45;
+  const h = 35;
+  const base = createGrid(w, h, 6000);
+  const decor = createGrid(w, h, -1);
+  const coll = createBoolGrid(w, h, false);
+  for (let x = 0; x < w; x++) { coll[0][x] = true; coll[h - 1][x] = true; }
+  for (let y = 0; y < h; y++) { coll[y][0] = true; coll[y][w - 1] = true; }
+
+  return {
+    id: 'forest',
+    name: '🌲 숲속 쉼터',
+    width: w, height: h,
+    tileset: 'nature',
+    baseLayer: base, decorLayer: decor, collision: coll,
+    spawnPoints: [{ x: 22, y: 17 }]
+  };
+};
+
+export const createCustomMap = (id: string, name: string, tileset: string = 'outdoor'): MapDefinition => {
+  const w = 40;
+  const h = 30;
+  let baseTile = 2000;
+  if (tileset === 'interior') baseTile = 1000;
+  else if (tileset === 'village') baseTile = 3000;
+  else if (tileset === 'wall') baseTile = 4000;
+  else if (tileset === 'house') baseTile = 5000;
+  else if (tileset === 'nature') baseTile = 6000;
+  else if (tileset === 'water') baseTile = 7000;
+  else if (tileset === 'field') baseTile = 8000;
+
+  const base = createGrid(w, h, baseTile);
+  const decor = createGrid(w, h, -1);
+  const coll = createBoolGrid(w, h, false);
+  for (let x = 0; x < w; x++) { coll[0][x] = true; coll[h - 1][x] = true; }
+  for (let y = 0; y < h; y++) { coll[y][0] = true; coll[y][w - 1] = true; }
+
+  return {
+    id,
+    name,
+    width: w, height: h,
+    tileset,
+    baseLayer: base, decorLayer: decor, collision: coll,
+    spawnPoints: [{ x: 20, y: 15 }]
+  };
+};
+
+export const PRESET_MAP_TEMPLATES: Record<string, { name: string; builder: () => MapDefinition }> = {
+  room: { name: '🏠 마이 룸', builder: buildMyRoom },
+  subway: { name: '🚇 지하철역', builder: buildSubway },
+  park: { name: '🌳 호수공원', builder: buildLakePark },
+  apt: { name: '🏢 아파트 단지', builder: buildApartmentComplex },
+  village: { name: '🏘️ 시골 마을', builder: buildVillage },
+  water: { name: '🌊 해변 연못', builder: buildWater },
+  forest: { name: '🌲 숲속 쉼터', builder: buildForest }
+};
+
 export const maps: Record<string, MapDefinition> = {
   room: buildMyRoom(),
   subway: buildSubway(),
   park: buildLakePark(),
-  apt: buildApartmentComplex()
+  apt: buildApartmentComplex(),
+  village: buildVillage(),
+  water: buildWater(),
+  forest: buildForest()
 };

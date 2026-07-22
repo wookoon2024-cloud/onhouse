@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { type MapDefinition } from './MapData';
+import { type MapDefinition, getCharRowActions, getCharGridDimensions } from './MapData';
 import type { PlayerState } from './syncManager';
 import { getDyedSprite } from './spriteDyer';
 
@@ -40,6 +40,20 @@ export const getTileDrawInfo = (idx: number, defaultTileset: string) => {
   let tilesetKey = defaultTileset;
   let localIdx = idx;
 
+  try {
+    const savedCustoms = localStorage.getItem('on_house_custom_map_tilesets');
+    if (savedCustoms) {
+      const customs: any[] = JSON.parse(savedCustoms);
+      const sortedCustoms = [...customs].sort((a, b) => (b.prefix || 9000) - (a.prefix || 9000));
+      for (const ct of sortedCustoms) {
+        const p = ct.prefix || 9000;
+        if (idx >= p) {
+          return { tilesetKey: ct.id, localIdx: idx - p };
+        }
+      }
+    }
+  } catch (e) {}
+
   if (idx >= 8000) {
     tilesetKey = 'field';
     localIdx = idx - 8000;
@@ -70,25 +84,42 @@ export const getTileDrawInfo = (idx: number, defaultTileset: string) => {
 };
 
 export const getTilesetInfo = (ts: string) => {
+  try {
+    const savedCustoms = localStorage.getItem('on_house_custom_map_tilesets');
+    if (savedCustoms) {
+      const customs: any[] = JSON.parse(savedCustoms);
+      const found = customs.find(c => c.id === ts);
+      if (found) {
+        return {
+          cols: found.cols || 16,
+          rows: found.rows || 16,
+          label: `🎨 ${found.name}`,
+          prefix: found.prefix || 9000,
+          url: found.url
+        };
+      }
+    }
+  } catch (e) {}
+
   switch (ts) {
     case 'interior':
-      return { cols: 22, rows: 17, label: '🏠 실내 인테리어' };
+      return { cols: 22, rows: 17, label: '🏠 실내 인테리어', prefix: 1000 };
     case 'outdoor':
-      return { cols: 22, rows: 26, label: '🏙️ 실외 바닥/도시' };
+      return { cols: 22, rows: 26, label: '🏙️ 실외 바닥/도시', prefix: 2000 };
     case 'village':
-      return { cols: 20, rows: 12, label: '🌳 자연/마을 외곽' };
+      return { cols: 20, rows: 12, label: '🌳 자연/마을 외곽', prefix: 3000 };
     case 'wall':
-      return { cols: 10, rows: 11, label: '🧱 심플 벽' };
+      return { cols: 10, rows: 11, label: '🧱 심플 벽', prefix: 4000 };
     case 'house':
-      return { cols: 33, rows: 23, label: '🏡 가옥 외관' };
+      return { cols: 33, rows: 23, label: '🏡 가옥 외관', prefix: 5000 };
     case 'nature':
-      return { cols: 24, rows: 21, label: '🌳 자연 환경' };
+      return { cols: 24, rows: 21, label: '🌳 자연 환경', prefix: 6000 };
     case 'water':
-      return { cols: 28, rows: 17, label: '🪵 강물/다리' };
+      return { cols: 28, rows: 17, label: '🪵 강물/다리', prefix: 7000 };
     case 'field':
-      return { cols: 5, rows: 15, label: '🌾 야외 소품/우물' };
+      return { cols: 5, rows: 15, label: '🌾 야외 소품/우물', prefix: 8000 };
     default:
-      return { cols: 22, rows: 26, label: '🏙️ 실외 바닥/도시' };
+      return { cols: 22, rows: 26, label: '🏙️ 실외 바닥/도시', prefix: 2000 };
   }
 };
 
@@ -120,7 +151,11 @@ export const getCameraCoords = (
     cameraY = (map.height * vSize - viewH) / 2;
   }
 
-  return { cameraX, cameraY, vSize };
+  return {
+    cameraX: Math.round(cameraX),
+    cameraY: Math.round(cameraY),
+    vSize
+  };
 };
 
 export const CanvasGame: React.FC<CanvasGameProps> = ({
@@ -161,10 +196,26 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
   const isPanning = useRef(false);
   const panStart = useRef({ x: 0, y: 0, camX: 0, camY: 0 });
 
-  // Local player ref for physics loop (to avoid stale React closures)
+  // Local player ref & Delta Time refs for smooth 60/120/144hz physics
   const localPlayerRef = useRef<PlayerState>(localPlayer);
+  const lastTimeRef = useRef<number>(performance.now());
+  const lastSyncTimeRef = useRef<number>(0);
+
   useEffect(() => {
-    localPlayerRef.current = localPlayer;
+    // Only sync position from prop if map changed or if player is NOT moving locally
+    const isMapChanged = localPlayerRef.current.mapId !== localPlayer.mapId;
+    if (isMapChanged || !localPlayerRef.current.isMoving) {
+      localPlayerRef.current = localPlayer;
+    } else {
+      // Preserve current smooth physics position (x, y) to prevent React state sync from pulling position backward
+      localPlayerRef.current = {
+        ...localPlayer,
+        x: localPlayerRef.current.x,
+        y: localPlayerRef.current.y,
+        dir: localPlayerRef.current.dir,
+        isMoving: localPlayerRef.current.isMoving
+      };
+    }
   }, [localPlayer]);
 
   // Mobile / Touch screen detector state
@@ -204,47 +255,89 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
     }
   }, [isEditMode]);
 
-  // Load assets once on mount
+  // Load assets once on mount & reload when sprite overrides change
   useEffect(() => {
-    const assets = {
-      interior: interiorTilesUrl,
-      outdoor: outdoorTilesUrl,
-      village: villageTilesUrl,
-      wall: wallTilesUrl,
-      house: houseTilesUrl,
-      nature: natureTilesUrl,
-      water: waterTilesUrl,
-      field: fieldTilesUrl,
-      ninja_blue: ninjaBlueUrl,
-      samurai_blue: samuraiBlueUrl,
-      samurai_green: samuraiGreenUrl,
-      pig: pigUrl
+    const loadAllAssets = () => {
+      let overrides: Record<string, { url: string }> = {};
+      try {
+        const saved = localStorage.getItem('on_house_char_image_overrides');
+        if (saved) overrides = JSON.parse(saved);
+      } catch (e) {}
+
+      const assets: Record<string, string> = {
+        interior: interiorTilesUrl,
+        outdoor: outdoorTilesUrl,
+        village: villageTilesUrl,
+        wall: wallTilesUrl,
+        house: houseTilesUrl,
+        nature: natureTilesUrl,
+        water: waterTilesUrl,
+        field: fieldTilesUrl,
+        ninja_blue: overrides['ninja_blue']?.url || ninjaBlueUrl,
+        samurai_blue: overrides['samurai_blue']?.url || samuraiBlueUrl,
+        samurai_green: overrides['samurai_green']?.url || samuraiGreenUrl,
+        pig: overrides['pig']?.url || pigUrl
+      };
+
+      // Add custom uploaded character sprites
+      try {
+        const customChars = localStorage.getItem('on_house_custom_char_sprites');
+        if (customChars) {
+          const list = JSON.parse(customChars);
+          list.forEach((opt: { id: string; url: string }) => {
+            assets[opt.id] = overrides[opt.id]?.url || opt.url;
+          });
+        }
+      } catch (e) {}
+
+      // Add custom uploaded map tilesets
+      try {
+        const customMaps = localStorage.getItem('on_house_custom_map_tilesets');
+        if (customMaps) {
+          const list = JSON.parse(customMaps);
+          list.forEach((opt: { id: string; url: string }) => {
+            assets[opt.id] = opt.url;
+          });
+        }
+      } catch (e) {}
+
+      const loadedImages: Record<string, HTMLImageElement> = {};
+      let loadedCount = 0;
+      const totalCount = Object.keys(assets).length;
+
+      Object.entries(assets).forEach(([key, url]) => {
+        const img = new Image();
+        img.src = url;
+        img.onload = () => {
+          loadedImages[key] = img;
+          loadedCount++;
+          if (loadedCount === totalCount) {
+            setImages(loadedImages);
+            setAssetsLoaded(true);
+          }
+        };
+        img.onerror = () => {
+          console.error(`Failed to load asset: ${key}`);
+        };
+      });
     };
 
-    const loadedImages: Record<string, HTMLImageElement> = {};
-    let loadedCount = 0;
-    const totalCount = Object.keys(assets).length;
+    loadAllAssets();
 
-    Object.entries(assets).forEach(([key, url]) => {
-      const img = new Image();
-      img.src = url;
-      img.onload = () => {
-        loadedImages[key] = img;
-        loadedCount++;
-        if (loadedCount === totalCount) {
-          setImages(loadedImages);
-          setAssetsLoaded(true);
-        }
-      };
-      img.onerror = () => {
-        console.error(`Failed to load asset: ${key} from ${url}`);
-      };
-    });
+    window.addEventListener('on_house_sprites_updated', loadAllAssets);
+    return () => {
+      window.removeEventListener('on_house_sprites_updated', loadAllAssets);
+    };
   }, []);
 
   // Keyboard input listeners
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const targetTag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (targetTag === 'input' || targetTag === 'textarea' || (e.target as HTMLElement)?.isContentEditable) {
+        return;
+      }
+
       const key = e.key.toLowerCase();
       if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
         // Prevent default scrolling for arrow keys/WASD
@@ -254,6 +347,12 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
+      const targetTag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (targetTag === 'input' || targetTag === 'textarea' || (e.target as HTMLElement)?.isContentEditable) {
+        keysPressed.current = {};
+        return;
+      }
+
       const key = e.key.toLowerCase();
       if (keysPressed.current[key]) {
         keysPressed.current[key] = false;
@@ -325,17 +424,16 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
     if (!ctx) return;
 
     const map = mapData;
-    const speed = 1.5; // Walk speed in pixels per frame
 
-    // Physics update function
-    const updatePhysics = () => {
+    // Physics update function with Delta Time (dt) for 100% smooth, frame-rate independent movement
+    const updatePhysics = (dt: number) => {
       const p = localPlayerRef.current;
 
       // EDIT MODE CAMERA PANNING CONTROL
       if (isEditMode) {
-        if (isPanning.current) return; // Right-click panning bypasses keys
+        if (isPanning.current) return;
 
-        const scrollSpeed = 4;
+        const scrollSpeed = 240 * dt; // 240px/sec
         let cdx = 0;
         let cdy = 0;
         if (keysPressed.current['w'] || keysPressed.current['arrowup']) cdy = -scrollSpeed;
@@ -347,28 +445,11 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         editCameraX.current += cdx;
         editCameraY.current += cdy;
 
-        // Bounding limits for edit camera
-        const tileScale = getTileScale();
-        const vSize = 16 * tileScale;
-        const maxCameraX = map.width * vSize - dimensions.width;
-        const maxCameraY = map.height * vSize - dimensions.height;
-
-        if (map.width * vSize > dimensions.width) {
-          editCameraX.current = Math.max(0, Math.min(editCameraX.current, maxCameraX));
-        } else {
-          editCameraX.current = (map.width * vSize - dimensions.width) / 2;
-        }
-
-        if (map.height * vSize > dimensions.height) {
-          editCameraY.current = Math.max(0, Math.min(editCameraY.current, maxCameraY));
-        } else {
-          editCameraY.current = (map.height * vSize - dimensions.height) / 2;
-        }
-        return; // Skip player movement physics
+        constrainEditCamera();
+        return;
       }
 
       // NORMAL PLAYER MOVEMENT PHYSICS
-      // Emergency Safety Check: Teleport player back inside map ONLY if completely out of bounds
       const spawnX = (map.spawnPoints[0]?.x ?? Math.floor(map.width / 2)) * 16;
       const spawnY = (map.spawnPoints[0]?.y ?? Math.floor(map.height / 2)) * 16;
       if (p.x < 0 || p.x > (map.width - 1) * 16 || p.y < 0 || p.y > (map.height - 1) * 16) {
@@ -376,31 +457,31 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         return;
       }
 
-      let moveUp = keysPressed.current['w'] || keysPressed.current['arrowup'];
-      let moveDown = keysPressed.current['s'] || keysPressed.current['arrowdown'];
-      let moveLeft = keysPressed.current['a'] || keysPressed.current['arrowleft'];
-      let moveRight = keysPressed.current['d'] || keysPressed.current['arrowright'];
+      const moveUp = keysPressed.current['w'] || keysPressed.current['arrowup'];
+      const moveDown = keysPressed.current['s'] || keysPressed.current['arrowdown'];
+      const moveLeft = keysPressed.current['a'] || keysPressed.current['arrowleft'];
+      const moveRight = keysPressed.current['d'] || keysPressed.current['arrowright'];
+
+      // Walk speed: 96 pixels per second (smooth 1.6px per frame at 60fps)
+      const MOVE_SPEED = 96;
+      const moveDist = MOVE_SPEED * dt;
 
       let dx = 0;
       let dy = 0;
 
-      if (moveUp) dy -= speed;
-      if (moveDown) dy += speed;
-      if (moveLeft) dx -= speed;
-      if (moveRight) dx += speed;
+      if (moveUp) dy -= moveDist;
+      if (moveDown) dy += moveDist;
+      if (moveLeft) dx -= moveDist;
+      if (moveRight) dx += moveDist;
 
       let newDir = p.dir;
 
-      // Smart Direction Selection:
-      // If moving along a single axis, set facing direction to that axis.
-      // If moving diagonally, keep existing direction if it matches one of the axes.
       if (dx !== 0 || dy !== 0) {
         if (dx === 0 && dy < 0) newDir = 'up';
         else if (dx === 0 && dy > 0) newDir = 'down';
         else if (dy === 0 && dx < 0) newDir = 'left';
         else if (dy === 0 && dx > 0) newDir = 'right';
         else {
-          // Diagonal movement: preserve current direction if it matches an active movement axis
           if (dy < 0 && p.dir === 'up') newDir = 'up';
           else if (dy > 0 && p.dir === 'down') newDir = 'down';
           else if (dx < 0 && p.dir === 'left') newDir = 'left';
@@ -410,7 +491,7 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         }
       }
 
-      // Normalize diagonal speed so diagonal walking is 100% smooth and not unnaturally fast
+      // Normalize diagonal speed
       if (dx !== 0 && dy !== 0) {
         dx *= 0.7071;
         dy *= 0.7071;
@@ -432,8 +513,30 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         }
 
         const moved = finalX !== p.x || finalY !== p.y;
-        onMove(finalX, finalY, newDir, moved);
+
+        // Instantly update local ref for 60/120/144fps smooth canvas rendering
+        localPlayerRef.current = {
+          ...p,
+          x: finalX,
+          y: finalY,
+          dir: newDir,
+          isMoving: moved
+        };
+
+        // Throttle React state & BroadcastChannel network sync to ~33ms (30fps) or state change
+        const nowTime = performance.now();
+        const stateChanged = !p.isMoving || p.dir !== newDir;
+        const timeElapsed = nowTime - lastSyncTimeRef.current > 33;
+
+        if (stateChanged || timeElapsed) {
+          lastSyncTimeRef.current = nowTime;
+          onMove(finalX, finalY, newDir, moved);
+        }
       } else if (p.isMoving) {
+        localPlayerRef.current = {
+          ...p,
+          isMoving: false
+        };
         onMove(p.x, p.y, p.dir, false);
       }
     };
@@ -460,7 +563,11 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
 
     // Render loop
     const render = () => {
-      updatePhysics();
+      const now = performance.now();
+      const dt = Math.min((now - lastTimeRef.current) / 1000, 0.05); // max 50ms per frame
+      lastTimeRef.current = now;
+
+      updatePhysics(dt);
 
       const dpr = window.devicePixelRatio || 1;
 
@@ -498,9 +605,6 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
 
       // Disable image smoothing for crisp pixel rendering (cross-browser)
       ctx.imageSmoothingEnabled = false;
-      (ctx as any).mozImageSmoothingEnabled = false;
-      (ctx as any).webkitImageSmoothingEnabled = false;
-      (ctx as any).msImageSmoothingEnabled = false;
 
       // 1. Draw Base Floor Layer
       for (let ty = 0; ty < map.height; ty++) {
@@ -511,11 +615,13 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
             const img = images[drawInfo.tilesetKey];
             if (img) {
               const tsInfo = getTilesetInfo(drawInfo.tilesetKey);
-              const srcX = (drawInfo.localIdx % tsInfo.cols) * 16;
-              const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * 16;
+              const tileW = Math.max(1, Math.floor(img.width / tsInfo.cols));
+              const tileH = Math.max(1, Math.floor(img.height / tsInfo.rows));
+              const srcX = (drawInfo.localIdx % tsInfo.cols) * tileW;
+              const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * tileH;
               ctx.drawImage(
                 img,
-                srcX, srcY, 16, 16,
+                srcX, srcY, tileW, tileH,
                 tx * vSize, ty * vSize, vSize, vSize
               );
             }
@@ -532,11 +638,13 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
             const img = images[drawInfo.tilesetKey];
             if (img) {
               const tsInfo = getTilesetInfo(drawInfo.tilesetKey);
-              const srcX = (drawInfo.localIdx % tsInfo.cols) * 16;
-              const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * 16;
+              const tileW = Math.max(1, Math.floor(img.width / tsInfo.cols));
+              const tileH = Math.max(1, Math.floor(img.height / tsInfo.rows));
+              const srcX = (drawInfo.localIdx % tsInfo.cols) * tileW;
+              const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * tileH;
               ctx.drawImage(
                 img,
-                srcX, srcY, 16, 16,
+                srcX, srcY, tileW, tileH,
                 tx * vSize, ty * vSize, vSize, vSize
               );
             }
@@ -586,27 +694,119 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
 
         const dyedSpriteSheet = getDyedSprite(spriteSheet, player.hue, player.isOnline);
 
-        // Authentic Ninja Adventure Sprite Matrix Mapping (spec: sprite_character.gd):
-        // Col (X) = Direction: 0 = Down, 1 = Up, 2 = Left, 3 = Right
-        // Row (Y) = Walk Animation Frames: 0, 1, 2, 3 (Idle = 0)
+        // Calculate sprite sheet grid bounds dynamically from character dimension rules & image size
+        const { cols: gridCols, rows: gridRows } = getCharGridDimensions(player.spriteType);
+        const maxCols = Math.max(1, gridCols);
+        const maxRows = Math.max(1, gridRows);
+
+        const tileW = spriteSheet.width / maxCols;
+        const tileH = spriteSheet.height / maxRows;
+
+        const isEmoting = !!(player.emoteUntil && Date.now() < player.emoteUntil && player.currentEmote);
+        const charRowActions = getCharRowActions(player.spriteType);
+
+        // Check if player's current statusMessage matches any registered character action row (e.g., "공부중", "일하는중", "회의중")
+        const statusText = player.statusMessage ? player.statusMessage.trim() : '';
+        const statusRowIdx = statusText
+          ? charRowActions.findIndex(
+              (act) =>
+                act.trim() &&
+                (act.trim().toLowerCase() === statusText.toLowerCase() ||
+                  statusText.toLowerCase().includes(act.trim().toLowerCase()) ||
+                  act.trim().toLowerCase().includes(statusText.toLowerCase()))
+            )
+          : -1;
+
         let col = 0; // Down
         if (player.dir === 'up') col = 1;
         else if (player.dir === 'left') col = 2;
         else if (player.dir === 'right') col = 3;
 
-        let row = 0; // Idle frame
-        if (player.isMoving) {
-          row = Math.floor(Date.now() / 120) % 4;
+        let row = 0; // Idle frame (Row 0 = 대기)
+
+        if (isEmoting && player.currentEmote) {
+          // Play custom emote action row if matched!
+          const emoteRowIdx = charRowActions.findIndex(act => act === player.currentEmote);
+          if (emoteRowIdx >= 0 && emoteRowIdx < maxRows) {
+            row = emoteRowIdx;
+          } else {
+            row = Math.min(6, maxRows - 1); // fallback
+          }
+          // Animate & loop through all column frames (0, 1, 2, 3...) of this emote row!
+          col = maxCols > 1 ? Math.floor(Date.now() / 140) % maxCols : 0;
+        } else if (player.isMoving) {
+          if (maxRows > 1) {
+            // Walk animation cycles through Rows 1, 2, 3 (걷기1, 걷기2, 걷기3)
+            const walkCycle = [1, 2, 3, 2];
+            const walkIdx = Math.floor(Date.now() / 120) % walkCycle.length;
+            row = Math.min(walkCycle[walkIdx], maxRows - 1);
+            col = col % maxCols;
+          } else {
+            // For 1-row sprites like pig.png (32x16), alternate between column 0 and 1 while walking
+            row = 0;
+            col = Math.floor(Date.now() / 150) % maxCols;
+          }
+        } else if (statusRowIdx >= 0 && statusRowIdx < maxRows) {
+          // Play registered status action animation loop (e.g., "공부중", "일하는중", "회의중", "식사중")!
+          row = statusRowIdx;
+          col = maxCols > 1 ? Math.floor(Date.now() / 180) % maxCols : 0;
+        } else {
+          row = 0; // Idle (Row 0 = 대기)
+          col = col % maxCols;
         }
 
-        const charDrawX = player.x * tileScale;
-        const charDrawY = player.y * tileScale;
+        // Clamp safely within valid image pixel bounds
+        col = Math.min(col, maxCols - 1);
+        row = Math.min(row, maxRows - 1);
 
-        ctx.drawImage(
-          dyedSpriteSheet,
-          col * 16, row * 16, 16, 16,
-          charDrawX, charDrawY, vSize, vSize
-        );
+        const charDrawX = Math.round(player.x * tileScale);
+        const charDrawY = Math.round(player.y * tileScale);
+
+        ctx.save();
+
+        if (maxRows === 1) {
+          // For 1-row sprites like pig.png (default image faces LEFT):
+          const centerX = charDrawX + vSize / 2;
+          const centerY = charDrawY + vSize / 2;
+          ctx.translate(centerX, centerY);
+
+          // 1. Correct Left/Right Flip (Default pig faces Left -> Flip when moving Right)
+          if (player.dir === 'right') {
+            ctx.scale(-1, 1);
+          }
+
+          // 2. Up / Down Direction Visual Cues & Cute Waddling
+          if (player.dir === 'up') {
+            // Tilts upward (-12 deg) + energetic upward stretch
+            const waddle = player.isMoving ? Math.sin(Date.now() / 80) * 0.1 : 0;
+            ctx.rotate(-0.2 + waddle);
+            ctx.scale(0.95, 1.05);
+          } else if (player.dir === 'down') {
+            // Tilts downward (+12 deg) + cute downward squish
+            const waddle = player.isMoving ? Math.sin(Date.now() / 80) * 0.1 : 0;
+            ctx.rotate(0.2 + waddle);
+            ctx.scale(1.05, 0.95);
+          } else if (player.isMoving) {
+            // Left/Right walking cute waddle bounce
+            const waddle = Math.sin(Date.now() / 70) * 0.12;
+            ctx.rotate(waddle);
+          }
+
+          ctx.drawImage(
+            dyedSpriteSheet,
+            col * tileW, row * tileH, tileW, tileH,
+            -vSize / 2, -vSize / 2, vSize, vSize
+          );
+        } else {
+          // Standard multi-row character sprites (Ninja, Samurai, Mario 32x32 / 64x64, etc.)
+          ctx.drawImage(
+            dyedSpriteSheet,
+            col * tileW, row * tileH, tileW, tileH,
+            charDrawX, charDrawY, vSize, vSize
+          );
+        }
+
+        ctx.restore();
 
         ctx.save();
         ctx.textBaseline = 'middle';
@@ -630,11 +830,28 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
 
         currentY -= 16; // Move Y up for next layer
 
-        // 2. Draw Status Badge (Middle HUD element above nickname if present)
-        const statusText = player.statusMessage;
-        if (statusText) {
+        // 1.5 Draw Emote Badge if active
+        if (isEmoting && player.currentEmote) {
           ctx.font = '10px "DungGeunMo", monospace';
-          const statusDisplay = `${!player.isOnline ? '💤' : '⚡'} ${statusText}`;
+          const emoteDisplay = `✨ [${player.currentEmote}]`;
+          const emoteWidth = ctx.measureText(emoteDisplay).width + 10;
+
+          ctx.fillStyle = 'rgba(245, 194, 231, 0.95)';
+          ctx.beginPath();
+          ctx.roundRect(headCenterX - emoteWidth / 2, currentY - 7, emoteWidth, 14, 4);
+          ctx.fill();
+
+          ctx.fillStyle = '#11111b';
+          ctx.fillText(emoteDisplay, headCenterX, currentY);
+
+          currentY -= 16;
+        }
+
+        // 2. Draw Status Badge (Middle HUD element above nickname if present)
+        const statusMsg = player.statusMessage;
+        if (statusMsg) {
+          ctx.font = '10px "DungGeunMo", monospace';
+          const statusDisplay = `${!player.isOnline ? '💤' : '⚡'} ${statusMsg}`;
           const badgeWidth = ctx.measureText(statusDisplay).width + 8;
 
           ctx.fillStyle = !player.isOnline ? 'rgba(40, 40, 50, 0.85)' : 'rgba(139, 92, 246, 0.85)';
@@ -650,7 +867,7 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
 
         // 3. Draw Chat Bubble (Top-most HUD element above status/name with zero overlap!)
         const chat = chatBubbles[player.id];
-        if (chat && Date.now() - chat.time < 4000) {
+        if (chat && Date.now() - chat.time < 4000 && !chat.text.startsWith('/')) {
           ctx.font = '11px Arial';
           const padding = 8;
           const bubbleWidth = ctx.measureText(chat.text).width + padding * 2;

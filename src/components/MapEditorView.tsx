@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { type MapDefinition, maps } from '../game/MapData';
-import { Trash2, Save, X, Undo, Redo, Pipette, Paintbrush, PaintBucket, Eraser, Info, Sparkles } from 'lucide-react';
+import { type MapDefinition, maps, PRESET_MAP_TEMPLATES } from '../game/MapData';
+import { Trash2, Save, X, Undo, Redo, Pipette, Paintbrush, PaintBucket, Eraser, Info, Sparkles, Plus, Download, Upload } from 'lucide-react';
 import { getTileDrawInfo, getTilesetInfo } from '../game/CanvasGame';
 
 import interiorTilesUrl from '../assets/interior_tiles.png';
@@ -12,25 +12,45 @@ import natureTilesUrl from '../assets/nature_tiles.png';
 import waterTilesUrl from '../assets/water_tiles.png';
 import fieldTilesUrl from '../assets/field_tiles.png';
 
+interface TilesetOption {
+  id: string;
+  name: string;
+  url: string;
+  cols: number;
+  rows: number;
+  size?: number;
+  prefix?: number;
+  isCustom?: boolean;
+}
+
+const getCustomMapTilesets = (): TilesetOption[] => {
+  try {
+    const saved = localStorage.getItem('on_house_custom_map_tilesets');
+    if (saved) return JSON.parse(saved);
+  } catch (e) {}
+  return [];
+};
+
 interface MapEditorViewProps {
   activeMaps: Record<string, MapDefinition>;
+  availableMapIds: string[];
   onSaveMap: (mapId: string, updatedMap: MapDefinition) => void;
+  onAddMap: (presetId?: string, customName?: string) => void;
+  onDeleteMap: (mapId: string) => void;
   onClose: () => void;
 }
 
-const MAP_LABELS = [
-  { id: 'room', name: '🏠 마이 룸' },
-  { id: 'subway', name: '🚇 지하철역' },
-  { id: 'park', name: '🌳 호수공원' },
-  { id: 'apt', name: '🏢 아파트 단지' }
-];
-
 export const MapEditorView: React.FC<MapEditorViewProps> = ({
   activeMaps,
+  availableMapIds,
   onSaveMap,
+  onAddMap,
+  onDeleteMap,
   onClose
 }) => {
-  const [selectedMapId, setSelectedMapId] = useState<string>('room');
+  const [selectedMapId, setSelectedMapId] = useState<string>(availableMapIds[0] || 'room');
+  const [showAddModal, setShowAddModal] = useState<boolean>(false);
+  const [customNameInput, setCustomNameInput] = useState<string>('');
   const [editLayer, setEditLayer] = useState<'base' | 'decor' | 'collision'>('base');
   
   // Brush & Tools
@@ -71,11 +91,24 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
   // Canvas painting state
   const isPainting = useRef(false);
+  const lastPaintedCellRef = useRef<{ x: number; y: number } | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
+  const [customMapTilesets] = useState<TilesetOption[]>(getCustomMapTilesets);
   const [activeTileset, setActiveTileset] = useState<string>(localMap.tileset);
 
   const getTilesetInfoLocal = (ts: string) => {
+    const foundCustom = customMapTilesets.find(t => t.id === ts);
+    if (foundCustom) {
+      return {
+        url: foundCustom.url,
+        cols: foundCustom.cols,
+        rows: foundCustom.rows,
+        label: `🎨 ${foundCustom.name}`,
+        prefix: foundCustom.prefix || 9000
+      };
+    }
+
     const globalInfo = getTilesetInfo(ts);
     let url = outdoorTilesUrl;
     switch (ts) {
@@ -92,7 +125,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       url,
       cols: globalInfo.cols,
       rows: globalInfo.rows,
-      label: globalInfo.label
+      label: globalInfo.label,
+      prefix: globalInfo.prefix
     };
   };
 
@@ -101,23 +135,69 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   const tilesetCols = tilesetInfo.cols;
   const tilesetRows = tilesetInfo.rows;
 
-  // Keyboard Shortcuts: Alt (Eyedropper indicator), B (Brush), F (Fill), E (Eyedropper), X (Eraser)
+  // Viewport & Space Panning Refs
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const [isSpaceHeld, setIsSpaceHeld] = useState<boolean>(false);
+  const isSpacePressed = useRef<boolean>(false);
+  const isPanningViewport = useRef<boolean>(false);
+  const panStartRef = useRef({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 });
+
+  // Refs for handleUndo / handleRedo to avoid stale closures in event listeners
+  const handleUndoRef = useRef<() => void>(() => {});
+  const handleRedoRef = useRef<() => void>(() => {});
+
+  // Keyboard Shortcuts: Space (Pan map), Ctrl+Z (Undo), Ctrl+Y / Ctrl+Shift+Z (Redo), Alt, B, F, E, X
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const isInput = document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA';
+
+      // Space key for map panning
+      if ((e.code === 'Space' || e.key === ' ') && !isInput) {
+        e.preventDefault();
+        if (!isSpacePressed.current) {
+          isSpacePressed.current = true;
+          setIsSpaceHeld(true);
+        }
+      }
+
+      if (isInput) return;
+
+      // Ctrl + Z (Undo) / Ctrl + Shift + Z or Ctrl + Y (Redo)
+      const isCtrl = e.ctrlKey || e.metaKey;
+      const key = e.key.toLowerCase();
+
+      if (isCtrl && key === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          handleRedoRef.current();
+        } else {
+          handleUndoRef.current();
+        }
+        return;
+      }
+
+      if (isCtrl && key === 'y') {
+        e.preventDefault();
+        handleRedoRef.current();
+        return;
+      }
+
       if (e.key === 'Alt') {
         setIsAltPressed(true);
       }
-      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
-        return;
-      }
-      const k = e.key.toLowerCase();
-      if (k === 'b') { setTool('brush'); }
-      else if (k === 'f' && editLayer !== 'collision') { setTool('bucket'); }
-      else if (k === 'e') { setTool('eyedropper'); }
-      else if (k === 'x' && editLayer !== 'collision') { setSelectedTile(-1); }
+
+      if (key === 'b') { setTool('brush'); }
+      else if (key === 'f' && editLayer !== 'collision') { setTool('bucket'); }
+      else if (key === 'e') { setTool('eyedropper'); }
+      else if (key === 'x' && editLayer !== 'collision') { setSelectedTile(-1); }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space' || e.key === ' ') {
+        isSpacePressed.current = false;
+        setIsSpaceHeld(false);
+        isPanningViewport.current = false;
+      }
       if (e.key === 'Alt') {
         setIsAltPressed(false);
       }
@@ -186,6 +266,10 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       field: fieldTilesUrl
     };
 
+    customMapTilesets.forEach((ct) => {
+      assetUrls[ct.id] = ct.url;
+    });
+
     const loaded: Record<string, HTMLImageElement> = {};
     let count = 0;
     const total = Object.keys(assetUrls).length;
@@ -201,7 +285,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         }
       };
     });
-  }, []);
+  }, [customMapTilesets]);
 
   // Main Canvas Render Loop
   useEffect(() => {
@@ -225,7 +309,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         if (drawInfo) {
           const img = images[drawInfo.tilesetKey];
           if (img) {
-            const tsInfo = getTilesetInfo(drawInfo.tilesetKey);
+            const tsInfo = getTilesetInfoLocal(drawInfo.tilesetKey);
             const srcX = (drawInfo.localIdx % tsInfo.cols) * 16;
             const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * 16;
             ctx.drawImage(
@@ -247,7 +331,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           if (drawInfo) {
             const img = images[drawInfo.tilesetKey];
             if (img) {
-              const tsInfo = getTilesetInfo(drawInfo.tilesetKey);
+              const tsInfo = getTilesetInfoLocal(drawInfo.tilesetKey);
               const srcX = (drawInfo.localIdx % tsInfo.cols) * 16;
               const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * 16;
               ctx.drawImage(
@@ -342,10 +426,61 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     setRedoHistory(r => r.slice(1));
   };
 
+  handleUndoRef.current = handleUndo;
+  handleRedoRef.current = handleRedo;
+
   const handleSave = () => {
     onSaveMap(selectedMapId, localMap);
     setOriginalMap(localMap);
     alert('디자인 변경 사항이 성공적으로 저장되었습니다!');
+  };
+
+  const handleExportBackup = () => {
+    try {
+      const backupData: Record<string, string> = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('on_house_')) {
+          const val = localStorage.getItem(key);
+          if (val) backupData[key] = val;
+        }
+      }
+      const jsonStr = JSON.stringify(backupData, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `on_house_backup_${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert('백업 파일 생성 실패: ' + e);
+    }
+  };
+
+  const handleImportBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const content = ev.target?.result as string;
+        const backupData = JSON.parse(content);
+        let count = 0;
+        Object.entries(backupData).forEach(([k, v]) => {
+          if (k.startsWith('on_house_') && typeof v === 'string') {
+            localStorage.setItem(k, v);
+            count++;
+          }
+        });
+        alert(`총 ${count}개의 백업 데이터가 성공적으로 복원되었습니다! 앱을 새로고침합니다.`);
+        window.location.reload();
+      } catch (err) {
+        alert('백업 파일을 불러오는 중 오류가 발생했습니다.');
+      }
+    };
+    reader.readAsText(file);
   };
 
   const handleCancel = () => {
@@ -488,8 +623,35 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     });
   };
 
+  // Viewport Drag-to-Pan Handlers (Space + Mouse Drag or Right/Middle Click)
+  const handleViewportMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isSpacePressed.current || isSpaceHeld || e.button === 1 || e.button === 2) {
+      e.preventDefault();
+      isPanningViewport.current = true;
+      panStartRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        scrollLeft: viewportRef.current?.scrollLeft || 0,
+        scrollTop: viewportRef.current?.scrollTop || 0
+      };
+    }
+  };
+
+  const handleViewportMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isPanningViewport.current && viewportRef.current) {
+      const dx = e.clientX - panStartRef.current.x;
+      const dy = e.clientY - panStartRef.current.y;
+      viewportRef.current.scrollLeft = panStartRef.current.scrollLeft - dx;
+      viewportRef.current.scrollTop = panStartRef.current.scrollTop - dy;
+    }
+  };
+
+  const handleViewportMouseUp = () => {
+    isPanningViewport.current = false;
+  };
+
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (e.button !== 0) return;
+    if (isSpacePressed.current || isSpaceHeld || e.button !== 0) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -514,6 +676,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       performFloodFill(tx, ty, selectedTile);
     } else {
       isPainting.current = true;
+      lastPaintedCellRef.current = { x: tx, y: ty };
       handlePaint(tx, ty);
     }
   };
@@ -530,14 +693,21 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     const tx = Math.floor(clickX / tileSize);
     const ty = Math.floor(clickY / tileSize);
 
-    setHoverTile({ x: tx, y: ty });
+    setHoverTile(prev => {
+      if (prev?.x === tx && prev?.y === ty) return prev;
+      return { x: tx, y: ty };
+    });
 
     if (!isPainting.current || (tool as string) !== 'brush' || e.altKey || isAltPressed) return;
+
+    if (lastPaintedCellRef.current?.x === tx && lastPaintedCellRef.current?.y === ty) return;
+    lastPaintedCellRef.current = { x: tx, y: ty };
     handlePaint(tx, ty);
   };
 
   const handleCanvasMouseLeave = () => {
     isPainting.current = false;
+    lastPaintedCellRef.current = null;
     setHoverTile(null);
   };
 
@@ -605,19 +775,28 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
   const getSelectedTileDetails = () => {
     const drawInfo = getTileDrawInfo(selectedTile, localMap.tileset);
-    if (!drawInfo) return { col: 0, row: 0, label: '지우개 🧽', url: '', cols: tilesetCols };
+    if (!drawInfo) return { col: 0, row: 0, label: '지우개 🧽', url: '', cols: tilesetCols, tileW: 16, tileH: 16 };
     const tsInfo = getTilesetInfoLocal(drawInfo.tilesetKey);
+    const img = images[drawInfo.tilesetKey];
+    const tileW = img ? Math.max(1, Math.floor(img.width / tsInfo.cols)) : 16;
+    const tileH = img ? Math.max(1, Math.floor(img.height / tsInfo.rows)) : 16;
     return {
       col: drawInfo.localIdx % tsInfo.cols,
       row: Math.floor(drawInfo.localIdx / tsInfo.cols),
       label: `${tsInfo.label} (ID: ${drawInfo.localIdx})`,
       url: tsInfo.url,
-      cols: tsInfo.cols
+      cols: tsInfo.cols,
+      tileW,
+      tileH
     };
   };
 
   const getPrefixedIndex = (localIdx: number, tilesetKey: string) => {
     if (localIdx === -1) return -1;
+    const custom = customMapTilesets.find(ct => ct.id === tilesetKey);
+    if (custom && custom.prefix) {
+      return custom.prefix + localIdx;
+    }
     switch (tilesetKey) {
       case 'interior': return 1000 + localIdx;
       case 'outdoor': return 2000 + localIdx;
@@ -667,33 +846,130 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           >
             <Save size={14} /> 저장하기
           </button>
+          <button
+            onClick={handleExportBackup}
+            title="현재 저장된 모든 맵과 커스텀 에셋을 .json 파일로 PC에 즉시 백업 저장"
+            style={{
+              padding: '6px 10px', background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(96, 165, 250, 0.3)',
+              borderRadius: '6px', color: '#60a5fa', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px',
+              fontWeight: 'bold', cursor: 'pointer'
+            }}
+          >
+            <Download size={13} /> 백업 저장
+          </button>
+          <label
+            title="저장했던 .json 백업 파일에서 맵/에셋 전체 복원"
+            style={{
+              padding: '6px 10px', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(52, 211, 153, 0.3)',
+              borderRadius: '6px', color: '#34d399', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px',
+              fontWeight: 'bold', cursor: 'pointer'
+            }}
+          >
+            <Upload size={13} /> 백업 복원
+            <input
+              type="file"
+              accept=".json"
+              onChange={handleImportBackup}
+              style={{ display: 'none' }}
+            />
+          </label>
         </div>
 
-        {/* Center: Map Selection Tabs */}
+        {/* Center: Map Selection Tabs with Add/Delete Controls */}
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-          {MAP_LABELS.map((m) => (
+          {availableMapIds.map((mId) => {
+            const mapObj = activeMaps[mId];
+            const name = mapObj ? mapObj.name : mId;
+            const isSelected = selectedMapId === mId;
+            const canDelete = availableMapIds.length > 1;
+
+            return (
+              <div
+                key={mId}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '4px',
+                  padding: '4px 6px 4px 10px', borderRadius: '6px',
+                  background: isSelected ? 'rgba(139, 92, 246, 0.25)' : 'rgba(255,255,255,0.03)',
+                  color: isSelected ? 'var(--accent)' : '#fff',
+                  border: isSelected ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <button
+                  onClick={() => {
+                    const hasChanges = JSON.stringify(localMap) !== JSON.stringify(originalMap);
+                    if (hasChanges) {
+                      if (!window.confirm("저장하지 않은 변경사항이 있습니다. 다른 지도로 이동하시겠습니까?")) {
+                        return;
+                      }
+                    }
+                    setSelectedMapId(mId);
+                  }}
+                  style={{
+                    background: 'none', border: 'none',
+                    color: isSelected ? 'var(--accent)' : '#fff',
+                    fontSize: '11px', cursor: 'pointer', padding: 0,
+                    fontWeight: isSelected ? 'bold' : 'normal'
+                  }}
+                >
+                  {name}
+                </button>
+
+                {/* Delete button (×) */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!canDelete) {
+                      alert("최소 1개의 맵은 항상 유지되어야 합니다.");
+                      return;
+                    }
+                    if (window.confirm(`'${name}' 맵을 에디터 및 목록에서 삭제하시겠습니까?`)) {
+                      onDeleteMap(mId);
+                      if (selectedMapId === mId) {
+                        const remaining = availableMapIds.filter((id) => id !== mId);
+                        if (remaining.length > 0) {
+                          setSelectedMapId(remaining[0]);
+                        }
+                      }
+                    }
+                  }}
+                  title={canDelete ? `${name} 맵 삭제` : "최소 1개 맵 필수"}
+                  style={{
+                    background: 'none', border: 'none',
+                    color: canDelete ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.15)',
+                    cursor: canDelete ? 'pointer' : 'not-allowed',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    padding: '2px', borderRadius: '4px', marginLeft: '2px'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (canDelete) (e.currentTarget as HTMLElement).style.color = '#ff6b6b';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (canDelete) (e.currentTarget as HTMLElement).style.color = 'rgba(255, 255, 255, 0.4)';
+                  }}
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            );
+          })}
+
+          {/* Add Map Button (+) */}
+          {availableMapIds.length < 4 && (
             <button
-              key={m.id}
-              onClick={() => {
-                const hasChanges = JSON.stringify(localMap) !== JSON.stringify(originalMap);
-                if (hasChanges) {
-                  if (!window.confirm("저장하지 않은 변경사항이 있습니다. 다른 지도로 이동하시겠습니까?")) {
-                    return;
-                  }
-                }
-                setSelectedMapId(m.id);
-              }}
+              onClick={() => setShowAddModal(true)}
+              title="새 맵 추가 (최대 4개)"
               style={{
-                padding: '6px 14px', fontSize: '11px', borderRadius: '6px',
-                background: selectedMapId === m.id ? 'rgba(139, 92, 246, 0.15)' : 'rgba(255,255,255,0.03)',
-                color: selectedMapId === m.id ? 'var(--accent)' : '#fff', 
-                border: selectedMapId === m.id ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
-                cursor: 'pointer'
+                padding: '5px 10px', fontSize: '11px', borderRadius: '6px',
+                background: 'rgba(139, 92, 246, 0.15)',
+                color: 'var(--accent)', border: '1px dashed var(--accent)',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
               }}
             >
-              {m.name}
+              <Plus size={13} />
+              <span>맵 추가</span>
             </button>
-          ))}
+          )}
         </div>
 
         {/* Right Actions: Undo, Redo, Reset */}
@@ -974,24 +1250,22 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
             <div style={{ color: 'var(--accent)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
               <Info size={12} /> 단축키 팁 (Quick Keys)
             </div>
-            <div>• <strong style={{ color: '#89dceb' }}>Alt + 클릭</strong>: 스포이드 (타일 추출)</div>
-            <div>• <strong>B</strong>: 브러시 | <strong>F</strong>: 채우기 | <strong>E</strong>: 스포이드</div>
-            <div>• <strong>X</strong>: 지우개 | <strong>Ctrl+Z / Y</strong>: 되돌리기</div>
-            <div>• <strong>휠 스크롤</strong>: 맵 캔버스 Zoom</div>
+            <div>• <strong style={{ color: '#89dceb' }}>Space + 드래그 / 우클릭</strong>: 지도 상하좌우 이동</div>
+            <div>• <strong style={{ color: '#a6e3a1' }}>Ctrl + Z</strong>: 되돌리기 | <strong style={{ color: '#a6e3a1' }}>Ctrl + Y</strong>: 다시실행</div>
+            <div>• <strong style={{ color: '#f9e2af' }}>Alt + 클릭</strong>: 스포이드 (타일 추출)</div>
+            <div>• <strong>B</strong>: 브러시 | <strong>F</strong>: 채우기 | <strong>X</strong>: 지우개</div>
           </div>
         </div>
 
-        {/* Center: Canvas Viewport */}
-        <div style={{
-          flex: 1, background: '#0a0a0f', overflow: 'auto', display: 'flex',
-          justifyContent: 'center', alignItems: 'center', position: 'relative', padding: '20px'
-        }}>
-          {/* Floating Zoom & Tool Bar over Viewport */}
+        {/* Center: Canvas Viewport Area Container */}
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden', height: '100%' }}>
+          {/* Floating Zoom & Tool Bar over Viewport (Fixed on top left) */}
           <div style={{
             position: 'absolute', top: '16px', left: '16px', zIndex: 12,
             background: 'rgba(20, 20, 30, 0.85)', padding: '6px 12px', borderRadius: '8px',
             border: '1px solid var(--border-glass)', display: 'flex', gap: '8px', alignItems: 'center',
-            backdropFilter: 'blur(8px)', boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
+            backdropFilter: 'blur(8px)', boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+            pointerEvents: 'auto'
           }}>
             <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>🔍 맵 Zoom:</span>
             {([0.5, 1.0, 1.5, 2.0, 3.0] as const).map((zVal) => (
@@ -1025,7 +1299,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
             >+</button>
           </div>
 
-          {/* 🧪 Eyedropper Toast Notification */}
+          {/* 🧪 Eyedropper Toast Notification (Fixed on top right) */}
           {pickedToast && (
             <div style={{
               position: 'absolute', top: '16px', right: '16px', zIndex: 12,
@@ -1037,20 +1311,48 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
             </div>
           )}
 
-          {/* Canvas Wrapper */}
-          <div style={{ position: 'relative', border: '1px solid #333', boxShadow: '0 8px 32px rgba(0,0,0,0.8)' }}>
-            <canvas
-              ref={canvasRef}
-              onMouseDown={handleCanvasMouseDown}
-              onMouseMove={handleCanvasMouseMove}
-              onMouseUp={() => isPainting.current = false}
-              onMouseLeave={handleCanvasMouseLeave}
-              onWheel={handleCanvasWheel}
-              style={{
-                display: 'block',
-                cursor: (isAltPressed || (tool as string) === 'eyedropper') ? 'crosshair' : tool === 'bucket' ? 'cell' : selectedTile === -1 ? 'alias' : 'pointer'
-              }}
-            />
+          {/* Scrollable Viewport Container */}
+          <div
+            ref={viewportRef}
+            onMouseDown={handleViewportMouseDown}
+            onMouseMove={handleViewportMouseMove}
+            onMouseUp={handleViewportMouseUp}
+            onMouseLeave={handleViewportMouseUp}
+            style={{
+              width: '100%', height: '100%', background: '#0a0a0f', overflow: 'auto', display: 'block',
+              position: 'relative', padding: '60px 40px 40px 40px',
+              cursor: isPanningViewport.current ? 'grabbing' : isSpaceHeld ? 'grab' : 'default',
+              userSelect: 'none', boxSizing: 'border-box'
+            }}
+          >
+            {/* Canvas Wrapper */}
+            <div style={{
+              position: 'relative', border: '1px solid #333', boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
+              margin: 'auto', width: 'fit-content'
+            }}>
+              <canvas
+                ref={canvasRef}
+                onMouseDown={handleCanvasMouseDown}
+                onMouseMove={handleCanvasMouseMove}
+                onMouseUp={() => isPainting.current = false}
+                onMouseLeave={handleCanvasMouseLeave}
+                onWheel={handleCanvasWheel}
+                style={{
+                  display: 'block',
+                  cursor: isPanningViewport.current
+                    ? 'grabbing'
+                    : isSpaceHeld
+                      ? 'grab'
+                      : (isAltPressed || (tool as string) === 'eyedropper')
+                        ? 'crosshair'
+                        : tool === 'bucket'
+                          ? 'cell'
+                          : selectedTile === -1
+                            ? 'alias'
+                            : 'pointer'
+                }}
+              />
+            </div>
           </div>
         </div>
 
@@ -1138,6 +1440,16 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               <option value="nature">🌳 울창한 나무/숲 (Nature)</option>
               <option value="water">🌊 강물/연못/나무다리 (Water)</option>
               <option value="field">🌾 마당/우물/울타리 (Field)</option>
+
+              {customMapTilesets.length > 0 && (
+                <optgroup label="🎨 내가 추가한 타일셋">
+                  {customMapTilesets.map(ct => (
+                    <option key={ct.id} value={ct.id}>
+                      🎨 {ct.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </div>
 
@@ -1153,10 +1465,12 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
             }}>
               {selectedTile !== -1 && tileDetails.url ? (
                 <div style={{
-                  width: '16px', height: '16px',
+                  width: `${tileDetails.tileW}px`,
+                  height: `${tileDetails.tileH}px`,
                   backgroundImage: `url(${tileDetails.url})`,
-                  backgroundPosition: `-${tileDetails.col * 16}px -${tileDetails.row * 16}px`,
-                  transform: 'scale(2.25)'
+                  backgroundPosition: `-${tileDetails.col * tileDetails.tileW}px -${tileDetails.row * tileDetails.tileH}px`,
+                  transform: tileDetails.tileW > 32 ? 'scale(0.5)' : (tileDetails.tileW > 20 ? 'scale(1.0)' : 'scale(2.25)'),
+                  transformOrigin: 'center center'
                 }} />
               ) : (
                 <span style={{ fontSize: '16px' }}>🧽</span>
@@ -1187,33 +1501,140 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               />
               
               {/* Clickable Overlay Grid Cells */}
-              {Array.from({ length: tilesetRows }).map((_, r) => (
-                <div key={r} style={{ display: 'flex' }}>
-                  {Array.from({ length: tilesetCols }).map((_, c) => {
-                    const localIdx = r * tilesetCols + c;
-                    const prefixedIdx = getPrefixedIndex(localIdx, activeTileset);
-                    const isSelected = selectedTile === prefixedIdx;
-                    return (
-                      <div
-                        key={c}
-                        onClick={() => setSelectedTile(prefixedIdx)}
-                        title={`Tile ID: ${localIdx} (Row: ${r}, Col: ${c})`}
-                        style={{
-                          width: `${16 * paletteZoom}px`,
-                          height: `${16 * paletteZoom}px`,
-                          border: isSelected ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.05)',
-                          background: isSelected ? 'rgba(139, 92, 246, 0.3)' : 'transparent',
-                          boxSizing: 'border-box', cursor: 'pointer', transition: 'border-color 0.1s'
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-              ))}
+              <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
+                {Array.from({ length: tilesetRows }).map((_, r) => (
+                  <div key={r} style={{ display: 'flex' }}>
+                    {Array.from({ length: tilesetCols }).map((_, c) => {
+                      const localIdx = r * tilesetCols + c;
+                      const prefixedIdx = getPrefixedIndex(localIdx, activeTileset);
+                      const isSelected = selectedTile === prefixedIdx;
+                      return (
+                        <div
+                          key={c}
+                          onClick={() => setSelectedTile(prefixedIdx)}
+                          title={`Tile ID: ${localIdx} (Row: ${r}, Col: ${c})`}
+                          style={{
+                            width: `${16 * paletteZoom}px`,
+                            height: `${16 * paletteZoom}px`,
+                            border: isSelected ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.05)',
+                            background: isSelected ? 'rgba(139, 92, 246, 0.3)' : 'transparent',
+                            boxSizing: 'border-box', cursor: 'pointer', transition: 'border-color 0.1s'
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Add Map Modal / Popover inside Map Editor */}
+      {showAddModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          zIndex: 999, display: 'flex', justifyContent: 'center', alignItems: 'center'
+        }}
+        onClick={() => setShowAddModal(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#181825', border: '1px solid rgba(255, 255, 255, 0.15)',
+              borderRadius: '12px', padding: '20px 24px', width: '340px',
+              boxShadow: '0 12px 40px rgba(0, 0, 0, 0.8)', color: '#fff'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <div style={{ fontSize: '14px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Sparkles size={16} style={{ color: 'var(--accent)' }} />
+                <span>에디터 맵 추가 (현재 {availableMapIds.length} / 최대 4개)</span>
+              </div>
+              <button
+                onClick={() => setShowAddModal(false)}
+                style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '12px' }}>
+              추가할 프리셋 맵 템플릿을 선택하거나 새 커스텀 맵을 생성하세요:
+            </div>
+
+            {/* Presets List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto', marginBottom: '14px' }}>
+              {Object.entries(PRESET_MAP_TEMPLATES).map(([key, template]) => {
+                const isAlreadyAdded = availableMapIds.includes(key);
+                return (
+                  <button
+                    key={key}
+                    disabled={isAlreadyAdded}
+                    onClick={() => {
+                      onAddMap(key);
+                      setSelectedMapId(key);
+                      setShowAddModal(false);
+                    }}
+                    style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '10px 14px', borderRadius: '6px',
+                      background: isAlreadyAdded ? 'rgba(255, 255, 255, 0.03)' : 'rgba(255, 255, 255, 0.07)',
+                      color: isAlreadyAdded ? '#666' : '#fff',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      cursor: isAlreadyAdded ? 'not-allowed' : 'pointer',
+                      textAlign: 'left', fontSize: '12px'
+                    }}
+                  >
+                    <span>{template.name}</span>
+                    <span style={{ fontSize: '10px', color: isAlreadyAdded ? '#555' : 'var(--accent)', fontWeight: 'bold' }}>
+                      {isAlreadyAdded ? '추가됨' : '+ 선택 추가'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Custom Map Form */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const name = customNameInput.trim() || `🎨 커스텀 맵 ${availableMapIds.length + 1}`;
+                onAddMap(undefined, name);
+                setShowAddModal(false);
+              }}
+              style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '14px' }}
+            >
+              <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '6px' }}>새 빈 커스텀 맵 직접 만들기:</div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="text"
+                  placeholder="예: 🎨 카페 테라스"
+                  value={customNameInput}
+                  onChange={(e) => setCustomNameInput(e.target.value)}
+                  style={{
+                    flex: 1, background: '#0d0d12', border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: '6px', padding: '8px 10px', color: '#fff', fontSize: '12px',
+                    outline: 'none'
+                  }}
+                />
+                <button
+                  type="submit"
+                  style={{
+                    padding: '8px 14px', background: 'var(--primary)', border: 'none',
+                    borderRadius: '6px', color: '#fff', fontSize: '12px', cursor: 'pointer',
+                    fontWeight: 'bold', whiteSpace: 'nowrap'
+                  }}
+                >
+                  생성
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

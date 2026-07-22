@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { PlayerState } from '../game/syncManager';
 import { User, Palette } from 'lucide-react';
 
@@ -8,7 +8,26 @@ interface CustomizerProps {
   onClose: () => void;
 }
 
+const DEFAULT_CHARACTERS = [
+  { id: 'ninja_blue', name: '🥷 닌자 (Ninja)' },
+  { id: 'samurai_blue', name: '⚔️ 블루 무사' },
+  { id: 'samurai_green', name: '🌿 그린 무사' },
+  { id: 'pig', name: '🐷 아기 돼지' },
+];
+
 export const Customizer: React.FC<CustomizerProps> = ({ player, onChange, onClose }) => {
+  // Load custom created character sprites from localStorage
+  const [customChars] = useState<Array<{ id: string; name: string }>>(() => {
+    try {
+      const saved = localStorage.getItem('on_house_custom_char_sprites');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const allCharOptions = [...DEFAULT_CHARACTERS, ...customChars];
+
   return (
     <div className="glass-panel" style={{
       position: 'absolute', 
@@ -28,7 +47,7 @@ export const Customizer: React.FC<CustomizerProps> = ({ player, onChange, onClos
           onClick={onClose}
           style={{
             background: 'rgba(0,0,0,0.3)', color: 'var(--text-secondary)',
-            padding: '4px 10px', borderRadius: '6px', fontSize: '12px'
+            padding: '4px 10px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', border: 'none'
           }}
         >
           닫기
@@ -52,59 +71,38 @@ export const Customizer: React.FC<CustomizerProps> = ({ player, onChange, onClos
         </div>
       </div>
 
-      {/* Sprite Type selection */}
+      {/* Sprite Type selection (Includes ALL custom & default characters!) */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <label className="pixel-text" style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-          캐릭터 베이스 외형 선택
-        </label>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-          <button
-            onClick={() => onChange({ spriteType: 'ninja_blue' })}
-            style={{
-              padding: '10px', borderRadius: '6px',
-              background: player.spriteType === 'ninja_blue' ? 'var(--primary)' : 'rgba(0,0,0,0.3)',
-              color: '#fff', border: player.spriteType === 'ninja_blue' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
-              fontSize: '11px', fontWeight: 'bold', cursor: 'pointer'
-            }}
-          >
-            🥷 닌자 (Ninja)
-          </button>
-
-          <button
-            onClick={() => onChange({ spriteType: 'samurai_blue' })}
-            style={{
-              padding: '10px', borderRadius: '6px',
-              background: player.spriteType === 'samurai_blue' ? 'var(--primary)' : 'rgba(0,0,0,0.3)',
-              color: '#fff', border: player.spriteType === 'samurai_blue' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
-              fontSize: '11px', fontWeight: 'bold', cursor: 'pointer'
-            }}
-          >
-            ⚔️ 블루 무사
-          </button>
-
-          <button
-            onClick={() => onChange({ spriteType: 'samurai_green' })}
-            style={{
-              padding: '10px', borderRadius: '6px',
-              background: player.spriteType === 'samurai_green' ? 'var(--primary)' : 'rgba(0,0,0,0.3)',
-              color: '#fff', border: player.spriteType === 'samurai_green' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
-              fontSize: '11px', fontWeight: 'bold', cursor: 'pointer'
-            }}
-          >
-            🌿 그린 무사
-          </button>
-
-          <button
-            onClick={() => onChange({ spriteType: 'pig' })}
-            style={{
-              padding: '10px', borderRadius: '6px',
-              background: player.spriteType === 'pig' ? 'var(--primary)' : 'rgba(0,0,0,0.3)',
-              color: '#fff', border: player.spriteType === 'pig' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
-              fontSize: '11px', fontWeight: 'bold', cursor: 'pointer'
-            }}
-          >
-            🐷 아기 돼지
-          </button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <label className="pixel-text" style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+            캐릭터 베이스 외형 선택
+          </label>
+          <span style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 'bold' }}>
+            총 {allCharOptions.length}종
+          </span>
+        </div>
+        <div style={{
+          display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px',
+          maxHeight: '200px', overflowY: 'auto', paddingRight: '4px'
+        }}>
+          {allCharOptions.map((char) => (
+            <button
+              key={char.id}
+              onClick={() => onChange({ spriteType: char.id })}
+              style={{
+                padding: '10px', borderRadius: '6px',
+                background: player.spriteType === char.id ? 'var(--primary)' : 'rgba(0,0,0,0.3)',
+                color: '#fff', border: player.spriteType === char.id ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
+                fontSize: '11px', fontWeight: 'bold', cursor: 'pointer',
+                textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+              }}
+              title={char.name}
+            >
+              {char.name.startsWith('👤') || char.name.startsWith('⚔️') || char.name.startsWith('🥷') || char.name.startsWith('🌿') || char.name.startsWith('🐷') || char.name.startsWith('🐶')
+                ? char.name
+                : `👤 ${char.name}`}
+            </button>
+          ))}
         </div>
       </div>
 
