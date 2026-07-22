@@ -248,6 +248,25 @@ export default function App() {
           [payload.mapId]: payload.mapData
         }));
       })
+      .on('broadcast', { event: 'asset_update' }, ({ payload }) => {
+        if (!payload || !payload.assetType || !payload.assetData) return;
+        const { assetType, assetData } = payload;
+        if (assetType === 'map_tileset') {
+          const saved = localStorage.getItem('on_house_custom_map_tilesets');
+          const current: any[] = saved ? JSON.parse(saved) : [];
+          if (!current.some((item: any) => item.id === assetData.id)) {
+            const next = [...current, assetData];
+            localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(next));
+          }
+        } else if (assetType === 'char_sprite') {
+          const saved = localStorage.getItem('on_house_custom_char_sprites');
+          const current: any[] = saved ? JSON.parse(saved) : [];
+          if (!current.some((item: any) => item.id === assetData.id)) {
+            const next = [...current, assetData];
+            localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(next));
+          }
+        }
+      })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           channel.send({

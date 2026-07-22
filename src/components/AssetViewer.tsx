@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { DEFAULT_CHAR_ROW_ACTIONS, getCharRowActions } from '../game/MapData';
 import { saveHouseAssetToDB, getSavedHouseCode } from '../services/HouseService';
+import { supabase } from '../lib/supabase';
 
 import interiorTilesUrl from '../assets/interior_tiles.png';
 import outdoorTilesUrl from '../assets/outdoor_tiles.png';
@@ -953,17 +954,32 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     };
 
     const currentHouse = getSavedHouseCode();
+    const assetType = uploadCategory === 'map' ? 'map_tileset' : 'char_sprite';
+
     if (uploadCategory === 'map') {
       setCustomMapTilesets((prev) => [...prev, newOption]);
       setActiveTab('map');
       setSelectedMapId(newId);
-      saveHouseAssetToDB(currentHouse, 'map_tileset', newOption);
     } else {
       setCustomCharSprites((prev) => [...prev, newOption]);
       setActiveTab('character');
       setSelectedCharId(newId);
-      saveHouseAssetToDB(currentHouse, 'char_sprite', newOption);
     }
+
+    // Save to Supabase DB for this House
+    saveHouseAssetToDB(currentHouse, assetType, newOption);
+
+    // Broadcast asset_update to all players in the same House
+    try {
+      supabase.channel(`house:${currentHouse}`).send({
+        type: 'broadcast',
+        event: 'asset_update',
+        payload: {
+          assetType,
+          assetData: newOption
+        }
+      });
+    } catch (e) {}
 
     setFileDataUrl(null);
     setAssetNameInput('');
