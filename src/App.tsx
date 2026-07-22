@@ -22,6 +22,7 @@ import { AssetViewer } from './components/AssetViewer';
 import { HouseJoinModal } from './components/HouseJoinModal';
 import { getSavedHouseCode, setSavedHouseCode, fetchHouseMaps, saveHouseMapToDB, fetchHouseAssets } from './services/HouseService';
 import { supabase } from './lib/supabase';
+import { APP_VERSION } from './config/version';
 
 interface ChatLogMessage {
   id: string;
@@ -203,6 +204,14 @@ export default function App() {
     // 1. Load house maps from Supabase DB
     fetchHouseMaps(houseCode).then((mapsData) => {
       setActiveMaps(mapsData);
+      const fetchedMapIds = Object.keys(mapsData);
+      if (fetchedMapIds.length > 0) {
+        setAvailableMapIds((prev) => {
+          const merged = Array.from(new Set([...prev, ...fetchedMapIds]));
+          localStorage.setItem('on_house_available_map_ids', JSON.stringify(merged));
+          return merged;
+        });
+      }
     });
 
     // 2. Load house custom assets from Supabase DB
@@ -251,6 +260,14 @@ export default function App() {
           ...prev,
           [payload.mapId]: payload.mapData
         }));
+        setAvailableMapIds((prev) => {
+          if (!prev.includes(payload.mapId)) {
+            const next = [...prev, payload.mapId];
+            localStorage.setItem('on_house_available_map_ids', JSON.stringify(next));
+            return next;
+          }
+          return prev;
+        });
       })
       .on('broadcast', { event: 'asset_update' }, ({ payload }) => {
         if (!payload || !payload.assetType || !payload.assetData) return;
@@ -489,6 +506,26 @@ export default function App() {
               [msg.mapId]: updatedMap
             };
           });
+          break;
+
+        case 'map_full_update':
+          if (msg.mapId && msg.mapData) {
+            setActiveMaps((prev) => {
+              localStorage.setItem('on_house_map_' + msg.mapId, JSON.stringify(msg.mapData));
+              return {
+                ...prev,
+                [msg.mapId]: msg.mapData
+              };
+            });
+            setAvailableMapIds((prev) => {
+              if (!prev.includes(msg.mapId)) {
+                const next = [...prev, msg.mapId];
+                localStorage.setItem('on_house_available_map_ids', JSON.stringify(next));
+                return next;
+              }
+              return prev;
+            });
+          }
           break;
 
         case 'map_reset':
@@ -821,6 +858,16 @@ export default function App() {
 
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
+      {/* App Version Badge (Bottom Left) */}
+      <div style={{
+        position: 'absolute', left: '10px', bottom: isMobile ? '4px' : '8px', zIndex: 99,
+        fontSize: '10px', fontWeight: 'bold', color: '#fff', background: 'rgba(0,0,0,0.6)',
+        backdropFilter: 'blur(4px)', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.15)',
+        pointerEvents: 'none', fontFamily: 'monospace'
+      }}>
+        {APP_VERSION}
+      </div>
+
       {/* 1. Main Canvas Game */}
       <CanvasGame
         localPlayer={localPlayer}
@@ -878,55 +925,55 @@ export default function App() {
       {/* 7. Classic Flat Translucent Integrated Chat Box */}
       <div style={{
         position: 'absolute',
-        bottom: isMobile ? '10px' : '14px',
+        bottom: isMobile ? '6px' : '14px',
         left: '50%',
         transform: 'translateX(-50%)',
-        width: isMobile ? 'calc(100% - 24px)' : 'calc(100% - 40px)',
+        width: isMobile ? 'calc(100% - 12px)' : 'calc(100% - 40px)',
         maxWidth: '680px',
         zIndex: 100,
-        background: 'rgba(15, 15, 25, 0.55)',
-        backdropFilter: 'blur(8px)',
-        borderRadius: '4px',
+        background: 'rgba(15, 15, 25, 0.75)',
+        backdropFilter: 'blur(10px)',
+        borderRadius: '6px',
         border: '1px solid rgba(255, 255, 255, 0.15)',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-        padding: '8px 12px',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+        padding: isMobile ? '6px 8px' : '8px 12px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '6px'
+        gap: '4px'
       }}>
         {/* Integrated Scrollable Chat Log History Area */}
         <div
           ref={chatLogScrollRef}
           style={{
-            maxHeight: '130px',
-            minHeight: '40px',
+            maxHeight: isMobile ? '60px' : '130px',
+            minHeight: '30px',
             overflowY: 'auto',
             display: 'flex',
             flexDirection: 'column',
             gap: '4px',
-            paddingRight: '6px',
-            margin: '2px 0'
+            paddingRight: '4px',
+            margin: '1px 0'
           }}
         >
           {chatLogs.length === 0 ? (
-            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', fontStyle: 'italic', padding: '2px 0' }}>
-              대화 내역이 없습니다. (Enter 키를 눌러 대화를 나누세요)
+            <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontStyle: 'italic', padding: '2px 0' }}>
+              {isMobile ? "대화 내역이 없습니다." : "대화 내역이 없습니다. (Enter 키를 눌러 대화를 나누세요)"}
             </div>
           ) : (
             chatLogs.map((log) => (
               <div
                 key={log.id}
                 style={{
-                  fontSize: '12px',
+                  fontSize: isMobile ? '11px' : '12px',
                   fontFamily: 'var(--font-pixel)',
                   color: '#fff',
                   display: 'flex',
-                  gap: '6px',
+                  gap: '4px',
                   alignItems: 'baseline'
                 }}
               >
-                <span style={{ color: '#fab387', fontWeight: 'bold' }}>[전체]</span>
-                <span style={{ color: '#a6e3a1', fontWeight: 'bold' }}>{log.senderName} :</span>
+                <span style={{ color: '#fab387', fontWeight: 'bold', whiteSpace: 'nowrap', flexShrink: 0 }}>[전체]</span>
+                <span style={{ color: '#a6e3a1', fontWeight: 'bold', whiteSpace: 'nowrap', flexShrink: 0 }}>{log.senderName} :</span>
                 <span style={{ wordBreak: 'break-word', color: '#e6e9ef' }}>{log.text}</span>
               </div>
             ))
@@ -937,39 +984,43 @@ export default function App() {
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
+          gap: isMobile ? '4px' : '8px',
           borderTop: '1px solid rgba(255,255,255,0.1)',
-          paddingTop: '6px'
+          paddingTop: '4px',
+          overflowX: 'auto',
+          maxWidth: '100%'
         }}>
           <span style={{
-            fontSize: '11px', fontWeight: 'bold', color: '#fab387',
-            background: 'rgba(250, 179, 135, 0.15)', padding: '2px 6px',
+            fontSize: '10px', fontWeight: 'bold', color: '#fab387',
+            background: 'rgba(250, 179, 135, 0.15)', padding: '2px 5px',
             borderRadius: '2px', border: '1px solid rgba(250, 179, 135, 0.3)',
-            flexShrink: 0
+            flexShrink: 0, whiteSpace: 'nowrap'
           }}>
             [전체]
           </span>
 
           {/* Status Picker (😊) */}
-          <StatusPicker
-            currentStatus={localPlayer.statusMessage}
-            onStatusChange={handleStatusChange}
-          />
+          <div style={{ flexShrink: 0 }}>
+            <StatusPicker
+              currentStatus={localPlayer.statusMessage}
+              onStatusChange={handleStatusChange}
+            />
+          </div>
 
           {/* Mailbox / DM Button */}
           <button
             onClick={handleOpenMailbox}
             style={{
               background: 'none', border: 'none', color: '#fff', cursor: 'pointer',
-              position: 'relative', display: 'flex', alignItems: 'center', padding: '4px', flexShrink: 0
+              position: 'relative', display: 'flex', alignItems: 'center', padding: '3px', flexShrink: 0
             }}
             title="메일함 / DM"
           >
-            <Mail size={15} />
+            <Mail size={14} />
             {unreadCount > 0 && (
               <span style={{
                 position: 'absolute', top: '-2px', right: '-4px', background: 'var(--danger)',
-                color: '#fff', fontSize: '9px', width: '14px', height: '14px', borderRadius: '50%',
+                color: '#fff', fontSize: '8px', width: '13px', height: '13px', borderRadius: '50%',
                 display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold'
               }}>
                 {unreadCount}
@@ -978,20 +1029,20 @@ export default function App() {
           </button>
 
           {/* Flat Chat Input Form */}
-          <form onSubmit={handleChatSubmit} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+          <form onSubmit={handleChatSubmit} style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: isMobile ? '90px' : '140px' }}>
             <input
               ref={chatInputRef}
               type="text"
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
-              placeholder={isMobile ? "메시지 보내기 (Enter)..." : "메시지를 입력하세요 (Enter 키로 전송)..."}
+              placeholder={isMobile ? "메시지 입력..." : "메시지를 입력하세요 (Enter 키로 전송)..."}
               style={{
                 width: '100%',
                 background: 'rgba(0, 0, 0, 0.45)',
                 border: '1px solid rgba(255, 255, 255, 0.15)',
                 borderRadius: '3px',
-                padding: '6px 10px',
-                fontSize: '12px',
+                padding: isMobile ? '4px 6px' : '6px 10px',
+                fontSize: isMobile ? '11px' : '12px',
                 color: '#fff',
                 outline: 'none'
               }}
@@ -999,7 +1050,7 @@ export default function App() {
           </form>
 
           {/* Right Action Icons */}
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
             <button
               onClick={() => {
                 setShowProfessionalEditor(!showProfessionalEditor);
@@ -1009,7 +1060,7 @@ export default function App() {
                 background: showProfessionalEditor ? 'rgba(139,92,246,0.3)' : 'none',
                 border: showProfessionalEditor ? '1px solid var(--accent)' : 'none',
                 color: showProfessionalEditor ? 'var(--accent)' : '#ccc',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px', borderRadius: '2px'
+                cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '3px', borderRadius: '2px'
               }}
               title="전문 지도 편집기"
             >
@@ -1022,7 +1073,7 @@ export default function App() {
                 background: showAssetViewer ? 'rgba(139,92,246,0.3)' : 'none',
                 border: showAssetViewer ? '1px solid var(--accent)' : 'none',
                 color: showAssetViewer ? 'var(--accent)' : '#ccc',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px', borderRadius: '2px'
+                cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '3px', borderRadius: '2px'
               }}
               title="픽셀 에디터"
             >
@@ -1035,7 +1086,7 @@ export default function App() {
                 background: isCustomizing ? 'rgba(139,92,246,0.3)' : 'none',
                 border: isCustomizing ? '1px solid var(--accent)' : 'none',
                 color: isCustomizing ? 'var(--accent)' : '#ccc',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px', borderRadius: '2px'
+                cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '3px', borderRadius: '2px'
               }}
               title="캐릭터 커스텀 설정"
             >
@@ -1049,12 +1100,13 @@ export default function App() {
                 background: 'rgba(139, 92, 246, 0.2)',
                 border: '1px solid var(--accent)',
                 color: 'var(--accent)',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
-                padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold'
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px',
+                padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold',
+                whiteSpace: 'nowrap', flexShrink: 0
               }}
               title="하우스 번호 (클릭하여 변경 및 공유)"
             >
-              <Home size={12} />
+              <Home size={11} />
               <span>{houseCode}</span>
             </button>
 
@@ -1090,8 +1142,22 @@ export default function App() {
               return next;
             });
 
+            setAvailableMapIds((prev) => {
+              if (!prev.includes(mapId)) {
+                const next = [...prev, mapId];
+                localStorage.setItem('on_house_available_map_ids', JSON.stringify(next));
+                return next;
+              }
+              return prev;
+            });
+
             // Save to Supabase DB for this House!
-            saveHouseMapToDB(houseCode, mapId, updatedMap);
+            saveHouseMapToDB(houseCode, mapId, updatedMap).then((res) => {
+              if (res && !res.success) {
+                console.error('Supabase DB save error:', res.error);
+                alert(`⚠️ 클라우드 DB 저장 실패: ${res.error || '권한 또는 네트워크 오류'}\n(로컬 브라우저에만 저장되었습니다. 다른 사람에게 공유하려면 Supabase DB 저장이 성공해야 합니다.)`);
+              }
+            });
 
             // Broadcast to all devices in real-time!
             try {

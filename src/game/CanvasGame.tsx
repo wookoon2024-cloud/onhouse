@@ -1105,22 +1105,23 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
       {/* Mobile virtual directional key overlay */}
       {isMobile && (
         <div style={{
-          position: 'absolute', left: '20px', bottom: '90px', width: '130px', height: '130px',
+          position: 'absolute', left: '12px', bottom: '125px', width: '115px', height: '115px',
           display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gridTemplateRows: 'repeat(3, 1fr)',
-          gap: '4px', zIndex: 105, background: 'rgba(0,0,0,0.15)', padding: '6px', borderRadius: '50%',
-          backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.05)',
-          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.3)'
+          gap: '3px', zIndex: 120, background: 'rgba(0,0,0,0.3)', padding: '5px', borderRadius: '50%',
+          backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.15)',
+          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)', touchAction: 'none'
         }}>
           <div />
           <button
-            onTouchStart={() => handleVirtualDpadPress('w', true)}
-            onTouchEnd={() => handleVirtualDpadPress('w', false)}
+            onTouchStart={(e) => { e.preventDefault(); handleVirtualDpadPress('w', true); }}
+            onTouchEnd={(e) => { e.preventDefault(); handleVirtualDpadPress('w', false); }}
             onMouseDown={() => handleVirtualDpadPress('w', true)}
             onMouseUp={() => handleVirtualDpadPress('w', false)}
             className="glass-panel"
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
-              borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', fontSize: '13px', fontWeight: 'bold'
+              borderRadius: '6px', border: '1px solid rgba(255,255,255,0.2)', fontSize: '12px', fontWeight: 'bold',
+              touchAction: 'none'
             }}
           >
             ▲
@@ -1128,30 +1129,32 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
           <div />
           
           <button
-            onTouchStart={() => handleVirtualDpadPress('a', true)}
-            onTouchEnd={() => handleVirtualDpadPress('a', false)}
+            onTouchStart={(e) => { e.preventDefault(); handleVirtualDpadPress('a', true); }}
+            onTouchEnd={(e) => { e.preventDefault(); handleVirtualDpadPress('a', false); }}
             onMouseDown={() => handleVirtualDpadPress('a', true)}
             onMouseUp={() => handleVirtualDpadPress('a', false)}
             className="glass-panel"
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
-              borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', fontSize: '13px', fontWeight: 'bold'
+              borderRadius: '6px', border: '1px solid rgba(255,255,255,0.2)', fontSize: '12px', fontWeight: 'bold',
+              touchAction: 'none'
             }}
           >
             ◀
           </button>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.2)', fontSize: '9px', fontFamily: 'var(--font-pixel)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '8px', fontFamily: 'var(--font-pixel)', whiteSpace: 'nowrap' }}>
             {isEditMode ? '시점' : '이동'}
           </div>
           <button
-            onTouchStart={() => handleVirtualDpadPress('d', true)}
-            onTouchEnd={() => handleVirtualDpadPress('d', false)}
+            onTouchStart={(e) => { e.preventDefault(); handleVirtualDpadPress('d', true); }}
+            onTouchEnd={(e) => { e.preventDefault(); handleVirtualDpadPress('d', false); }}
             onMouseDown={() => handleVirtualDpadPress('d', true)}
             onMouseUp={() => handleVirtualDpadPress('d', false)}
             className="glass-panel"
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
-              borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', fontSize: '13px', fontWeight: 'bold'
+              borderRadius: '6px', border: '1px solid rgba(255,255,255,0.2)', fontSize: '12px', fontWeight: 'bold',
+              touchAction: 'none'
             }}
           >
             ▶
@@ -1159,14 +1162,15 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
 
           <div />
           <button
-            onTouchStart={() => handleVirtualDpadPress('s', true)}
-            onTouchEnd={() => handleVirtualDpadPress('s', false)}
+            onTouchStart={(e) => { e.preventDefault(); handleVirtualDpadPress('s', true); }}
+            onTouchEnd={(e) => { e.preventDefault(); handleVirtualDpadPress('s', false); }}
             onMouseDown={() => handleVirtualDpadPress('s', true)}
             onMouseUp={() => handleVirtualDpadPress('s', false)}
             className="glass-panel"
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
-              borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', fontSize: '13px', fontWeight: 'bold'
+              borderRadius: '6px', border: '1px solid rgba(255,255,255,0.2)', fontSize: '12px', fontWeight: 'bold',
+              touchAction: 'none'
             }}
           >
             ▼

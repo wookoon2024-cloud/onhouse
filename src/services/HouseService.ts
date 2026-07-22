@@ -62,13 +62,17 @@ export const fetchHouseMaps = async (houseCode: string): Promise<Record<string, 
 };
 
 // Save single map to Supabase
-export const saveHouseMapToDB = async (houseCode: string, mapId: string, mapData: MapDefinition) => {
+export const saveHouseMapToDB = async (
+  houseCode: string,
+  mapId: string,
+  mapData: MapDefinition
+): Promise<{ success: boolean; error?: string }> => {
   try {
     // 1. Also update localStorage cache immediately
     localStorage.setItem('on_house_map_' + mapId, JSON.stringify(mapData));
 
     // 2. Try upsert into Supabase
-    const { error } = await supabase
+    const { error: upsertErr } = await supabase
       .from('house_maps')
       .upsert({
         house_code: houseCode,
@@ -77,37 +81,58 @@ export const saveHouseMapToDB = async (houseCode: string, mapId: string, mapData
         updated_at: new Date().toISOString()
       }, { onConflict: 'house_code,map_id' });
 
-    if (error) {
-      console.warn('Upsert fallback triggered:', error.message);
-      // Fallback check if existing row exists
-      const { data: existing } = await supabase
-        .from('house_maps')
-        .select('id')
-        .eq('house_code', houseCode)
-        .eq('map_id', mapId)
-        .maybeSingle();
+    if (!upsertErr) {
+      return { success: true };
+    }
 
-      if (existing && existing.id) {
-        await supabase
-          .from('house_maps')
-          .update({
-            map_data: mapData,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existing.id);
-      } else {
-        await supabase
-          .from('house_maps')
-          .insert({
-            house_code: houseCode,
-            map_id: mapId,
-            map_data: mapData,
-            updated_at: new Date().toISOString()
-          });
+    console.warn('Upsert fallback triggered:', upsertErr.message);
+
+    // Fallback check if existing row exists
+    const { data: existing, error: selectErr } = await supabase
+      .from('house_maps')
+      .select('id')
+      .eq('house_code', houseCode)
+      .eq('map_id', mapId)
+      .maybeSingle();
+
+    if (selectErr) {
+      console.error('Failed to select existing house map:', selectErr.message);
+      return { success: false, error: upsertErr.message || selectErr.message };
+    }
+
+    if (existing && existing.id) {
+      const { error: updateErr } = await supabase
+        .from('house_maps')
+        .update({
+          map_data: mapData,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existing.id);
+
+      if (updateErr) {
+        console.error('Failed to update house map:', updateErr.message);
+        return { success: false, error: updateErr.message };
+      }
+    } else {
+      const { error: insertErr } = await supabase
+        .from('house_maps')
+        .insert({
+          house_code: houseCode,
+          map_id: mapId,
+          map_data: mapData,
+          updated_at: new Date().toISOString()
+        });
+
+      if (insertErr) {
+        console.error('Failed to insert house map:', insertErr.message);
+        return { success: false, error: insertErr.message };
       }
     }
-  } catch (err) {
+
+    return { success: true };
+  } catch (err: any) {
     console.error('Error in saveHouseMapToDB:', err);
+    return { success: false, error: err?.message || 'DB 저장 중 예외 발생' };
   }
 };
 

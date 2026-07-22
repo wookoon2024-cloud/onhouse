@@ -235,19 +235,23 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   };
 
   // Sync state when map tab switches
+  const prevMapIdRef = useRef<string | null>(null);
   useEffect(() => {
-    const map = activeMaps[selectedMapId] || maps[selectedMapId];
-    if (map) {
-      setLocalMap(map);
-      setOriginalMap(map);
-      setWidthInput(map.width.toString());
-      setHeightInput(map.height.toString());
-      setHistory([]);
-      setRedoHistory([]);
-      setActiveTileset(map.tileset);
-      
-      if (map.tileset === 'interior') setSelectedTile(1199);
-      else setSelectedTile(2000);
+    if (prevMapIdRef.current !== selectedMapId) {
+      prevMapIdRef.current = selectedMapId;
+      const map = activeMaps[selectedMapId] || maps[selectedMapId];
+      if (map) {
+        setLocalMap(map);
+        setOriginalMap(map);
+        setWidthInput(map.width.toString());
+        setHeightInput(map.height.toString());
+        setHistory([]);
+        setRedoHistory([]);
+        setActiveTileset(map.tileset);
+        
+        if (map.tileset === 'interior') setSelectedTile(1199);
+        else setSelectedTile(2000);
+      }
     }
   }, [selectedMapId, activeMaps]);
 
@@ -520,16 +524,24 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     if (tx < 0 || tx >= localMap.width || ty < 0 || ty >= localMap.height) return;
 
     let pickedIdx = -1;
+    let targetLayer: 'base' | 'decor' | 'collision' = editLayer;
+
     if (editLayer === 'collision') {
       pickedIdx = localMap.collision[ty][tx] ? 1 : 0;
-    } else if (editLayer === 'decor' && localMap.decorLayer[ty][tx] !== -1) {
-      pickedIdx = localMap.decorLayer[ty][tx];
     } else {
-      pickedIdx = localMap.baseLayer[ty][tx];
+      // Smart detection: Check decor layer first, then base layer
+      if (localMap.decorLayer && localMap.decorLayer[ty] && localMap.decorLayer[ty][tx] !== undefined && localMap.decorLayer[ty][tx] !== -1) {
+        pickedIdx = localMap.decorLayer[ty][tx];
+        targetLayer = 'decor';
+      } else if (localMap.baseLayer && localMap.baseLayer[ty]) {
+        pickedIdx = localMap.baseLayer[ty][tx];
+        targetLayer = 'base';
+      }
     }
 
     if (pickedIdx !== -1) {
       setSelectedTile(pickedIdx);
+      setEditLayer(targetLayer);
 
       // Auto-switch tileset palette to picked tile's category
       const info = getTileDrawInfo(pickedIdx, localMap.tileset);
@@ -785,7 +797,10 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   };
 
   const getSelectedTileDetails = () => {
-    const drawInfo = getTileDrawInfo(selectedTile, localMap.tileset);
+    if (selectedTile === -1) {
+      return { col: 0, row: 0, label: '지우개 🧽', url: '', cols: tilesetCols, tileW: 16, tileH: 16 };
+    }
+    const drawInfo = getTileDrawInfo(selectedTile, activeTileset);
     if (!drawInfo) return { col: 0, row: 0, label: '지우개 🧽', url: '', cols: tilesetCols, tileW: 16, tileH: 16 };
     const tsInfo = getTilesetInfoLocal(drawInfo.tilesetKey);
     const img = images[drawInfo.tilesetKey];
@@ -1090,7 +1105,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                 onClick={() => {
                   setEditLayer(layer);
                   if (layer === 'collision') setSelectedTile(1);
-                  else if (selectedTile === 1 || selectedTile === 0 || selectedTile === -1) setSelectedTile(activeTileset === 'interior' ? 1199 : 2000);
+                  else if (selectedTile === 1 || selectedTile === 0 || selectedTile === -1) setSelectedTile(getPrefixedIndex(0, activeTileset));
                 }}
                 style={{
                   width: '100%', padding: '10px', fontSize: '11px', borderRadius: '4px',
@@ -1116,7 +1131,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               <button
                 onClick={() => {
                   setTool('brush');
-                  if (selectedTile === -1) setSelectedTile(activeTileset === 'interior' ? 1199 : 2000);
+                  if (selectedTile === -1) setSelectedTile(getPrefixedIndex(0, activeTileset));
                 }}
                 style={{
                   flex: 1, padding: '8px 4px', fontSize: '10px', borderRadius: '4px',
@@ -1436,7 +1451,11 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
             <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '4px' }}>타일셋 리스트들</div>
             <select
               value={activeTileset}
-              onChange={(e) => setActiveTileset(e.target.value)}
+              onChange={(e) => {
+                const newTs = e.target.value;
+                setActiveTileset(newTs);
+                setSelectedTile(getPrefixedIndex(0, newTs));
+              }}
               style={{
                 width: '100%', background: '#0a0a0f', border: '1px solid var(--border-glass)',
                 borderRadius: '6px', padding: '8px 12px', color: '#fff', fontSize: '12px',
