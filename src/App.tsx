@@ -615,9 +615,19 @@ export default function App() {
   }, [houseCode]);
 
   const handleJoinHouse = (newCode: string) => {
-    const saved = setSavedHouseCode(newCode);
-    setHouseCodeState(saved);
+    const formatted = setSavedHouseCode(newCode);
+    if (formatted === houseCode) {
+      setShowHouseModal(false);
+      return;
+    }
+
+    // Reset other players list completely when joining a different house room!
+    setOtherPlayers({});
+
+    // Reset house code state
+    setHouseCodeState(formatted);
     setShowHouseModal(false);
+    showToast(`온하우스 [${formatted}] 방으로 이동하였습니다.`);
   };
 
   // Safety check: Teleport player back inside map ONLY if completely out of bounds (e.g. when map size shrinks)
@@ -644,9 +654,9 @@ export default function App() {
     setUnreadCount(unreads.length);
   };
 
-  // Initialize sync channel
+  // Initialize sync channel per house code
   useEffect(() => {
-    const bc = new BroadcastChannel('on_house_sync');
+    const bc = new BroadcastChannel('on_house_sync_' + houseCode);
     bcRef.current = bc;
 
     // Wake up: remove our device from offline lists across all tabs
@@ -914,7 +924,7 @@ export default function App() {
       handleLeave();
       bc.close();
     };
-  }, []);
+  }, [houseCode]);
 
   // 1. Coordinate & movement updater
   const handleMove = (x: number, y: number, dir: 'down' | 'up' | 'left' | 'right', isMoving: boolean) => {
