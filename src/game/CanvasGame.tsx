@@ -172,6 +172,98 @@ export const getCameraCoords = (
   };
 };
 
+// BFS Pathfinding Algorithm (calculates shortest path around obstacles to detour cleanly!)
+export const findPathAroundObstacles = (
+  startX: number,
+  startY: number,
+  targetX: number,
+  targetY: number,
+  map: MapDefinition
+): { x: number; y: number }[] => {
+  let startTileX = Math.floor((startX + 8) / 16);
+  let startTileY = Math.floor((startY + 8) / 16);
+  let destTileX = Math.floor((targetX + 8) / 16);
+  let destTileY = Math.floor((targetY + 8) / 16);
+
+  // Clamp within map bounds
+  startTileX = Math.max(0, Math.min(map.width - 1, startTileX));
+  startTileY = Math.max(0, Math.min(map.height - 1, startTileY));
+  destTileX = Math.max(0, Math.min(map.width - 1, destTileX));
+  destTileY = Math.max(0, Math.min(map.height - 1, destTileY));
+
+  if (startTileX === destTileX && startTileY === destTileY) {
+    return [{ x: targetX, y: targetY }];
+  }
+
+  const isPassable = (tx: number, ty: number) => {
+    if (tx < 0 || tx >= map.width || ty < 0 || ty >= map.height) return false;
+    return map.collision[ty][tx] === 0;
+  };
+
+  // If destination tile is impassable, find nearest open neighbor
+  if (!isPassable(destTileX, destTileY)) {
+    const neighbors = [
+      { x: destTileX + 1, y: destTileY },
+      { x: destTileX - 1, y: destTileY },
+      { x: destTileX, y: destTileY + 1 },
+      { x: destTileX, y: destTileY - 1 }
+    ];
+    const openNeighbor = neighbors.find(n => isPassable(n.x, n.y));
+    if (openNeighbor) {
+      destTileX = openNeighbor.x;
+      destTileY = openNeighbor.y;
+    }
+  }
+
+  const queue: { x: number; y: number; path: { x: number; y: number }[] }[] = [
+    { x: startTileX, y: startTileY, path: [] }
+  ];
+  const visited = new Set<string>();
+  visited.add(`${startTileX},${startTileY}`);
+
+  const dirs = [
+    { x: 0, y: -1 },
+    { x: 0, y: 1 },
+    { x: -1, y: 0 },
+    { x: 1, y: 0 }
+  ];
+
+  let foundPath: { x: number; y: number }[] | null = null;
+  let maxSteps = 1200;
+
+  while (queue.length > 0 && maxSteps > 0) {
+    maxSteps--;
+    const curr = queue.shift()!;
+
+    if (curr.x === destTileX && curr.y === destTileY) {
+      foundPath = curr.path;
+      break;
+    }
+
+    for (const d of dirs) {
+      const nx = curr.x + d.x;
+      const ny = curr.y + d.y;
+      const key = `${nx},${ny}`;
+
+      if (isPassable(nx, ny) && !visited.has(key)) {
+        visited.add(key);
+        queue.push({
+          x: nx,
+          y: ny,
+          path: [...curr.path, { x: nx * 16, y: ny * 16 }]
+        });
+      }
+    }
+  }
+
+  if (foundPath && foundPath.length > 0) {
+    foundPath[foundPath.length - 1] = { x: targetX, y: targetY };
+    return foundPath;
+  }
+
+  return [{ x: targetX, y: targetY }];
+};
+
 export const CanvasGame: React.FC<CanvasGameProps> = ({
   localPlayer,
   otherPlayers,
@@ -352,9 +444,10 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
     const handleWalkTo = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail && detail.x !== undefined && detail.y !== undefined) {
-        autoWalkTargetRef.current = {
-          targetX: detail.x,
-          targetY: detail.y,
+        const p = localPlayerRef.current;
+        const waypoints = findPathAroundObstacles(p.x, p.y, detail.x, detail.y, mapDataRef.current);
+        autoWalkPathRef.current = {
+          waypoints,
           onArrival: detail.onArrival
         };
       }
@@ -368,9 +461,13 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
     };
   }, []);
 
-  const autoWalkTargetRef = useRef<{
-    targetX: number;
-    targetY: number;
+  const mapDataRef = useRef(mapData);
+  useEffect(() => {
+    mapDataRef.current = mapData;
+  }, [mapData]);
+
+  const autoWalkPathRef = useRef<{
+    waypoints: { x: number; y: number }[];
     onArrival?: () => void;
   } | null>(null);
 
@@ -665,14 +762,15 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
       const moveRight = keysPressed.current['d'] || keysPressed.current['arrowright'];
 
       if (moveUp || moveDown || moveLeft || moveRight) {
-        autoWalkTargetRef.current = null;
+        autoWalkPathRef.current = null;
       }
 
-      // AUTOMATIC WALK DESTINATION (e.g. for Greeting "인사하기" walk animation!)
-      if (autoWalkTargetRef.current) {
-        const dest = autoWalkTargetRef.current;
-        const diffX = dest.targetX - p.x;
-        const diffY = dest.targetY - p.y;
+      // AUTOMATIC WALK WAYPOINT PATH (A* / BFS Pathfinding Around Obstacles!)
+      if (autoWalkPathRef.current && autoWalkPathRef.current.waypoints.length > 0) {
+        const pathData = autoWalkPathRef.current;
+        const currentTarget = pathData.waypoints[0];
+        const diffX = currentTarget.x - p.x;
+        const diffY = currentTarget.y - p.y;
         const dist = Math.sqrt(diffX * diffX + diffY * diffY);
 
         if (dist > 6) {
@@ -700,9 +798,8 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
             finalY = nextY;
           }
 
-          // If blocked by obstacle tile in both axes, stop auto-walk gracefully at boundary
           if (finalX === p.x && finalY === p.y) {
-            autoWalkTargetRef.current = null;
+            autoWalkPathRef.current = null;
             localPlayerRef.current = {
               ...p,
               dir: walkDir,
@@ -722,23 +819,27 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
           onMove(finalX, finalY, walkDir, true);
           return;
         } else {
-          // Arrived at target destination!
-          const onArrivalFunc = dest.onArrival;
-          autoWalkTargetRef.current = null;
+          // Reached current waypoint tile! Pop it off queue
+          pathData.waypoints.shift();
 
-          localPlayerRef.current = {
-            ...p,
-            x: dest.targetX,
-            y: dest.targetY,
-            dir: 'right',
-            isMoving: false
-          };
-          onMove(dest.targetX, dest.targetY, 'right', false);
+          if (pathData.waypoints.length === 0) {
+            // Reached final destination!
+            const onArrivalFunc = pathData.onArrival;
+            autoWalkPathRef.current = null;
 
-          if (onArrivalFunc) {
-            onArrivalFunc();
+            localPlayerRef.current = {
+              ...p,
+              x: currentTarget.x,
+              y: currentTarget.y,
+              isMoving: false
+            };
+            onMove(currentTarget.x, currentTarget.y, p.dir, false);
+
+            if (onArrivalFunc) {
+              onArrivalFunc();
+            }
+            return;
           }
-          return;
         }
       }
 
