@@ -147,6 +147,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   const [selectedCharId, setSelectedCharId] = useState<string>('samurai_blue');
   const [gridZoom, setGridZoom] = useState<number>(2.0);
 
+  // Temporary string state for direct typing in 맵 출력 크기 input box
+  const [sizeInputText, setSizeInputText] = useState<string | null>(null);
+
   const [hoveredTile, setHoveredTile] = useState<{ col: number; row: number; index: number; prefixedId?: number } | null>(null);
   const [selectedTileState, setSelectedTileState] = useState<{ col: number; row: number; index: number; prefixedId?: number } | null>(null);
 
@@ -1688,28 +1691,65 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
               </button>
             )}
 
-            {/* Per-Character Map Display Size Adjustment Control (in px) */}
+            {/* Per-Character Map Display Size Adjustment Control (Direct Typing & - / + Buttons!) */}
             {activeTab === 'character' && (
               <div style={{
                 display: 'flex', alignItems: 'center', gap: '5px',
-                background: 'rgba(139, 92, 246, 0.12)', border: '1px solid var(--accent)',
-                padding: '4px 8px', borderRadius: '6px'
+                background: 'rgba(139, 92, 246, 0.15)', border: '1px solid var(--accent)',
+                padding: '3px 8px', borderRadius: '6px'
               }}>
                 <span style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   📏 맵 출력 크기:
                 </span>
+
+                {/* Decrease (-) Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const currentDisplaySize = charImageOverrides[currentSelectedId]?.size || 16;
+                    const next = Math.max(8, currentDisplaySize - 2);
+                    handleUpdateCharacterDisplaySize(currentSelectedId, next);
+                  }}
+                  title="크기 줄이기 (-2px)"
+                  style={{
+                    background: '#252538', border: '1px solid rgba(255,255,255,0.2)',
+                    color: '#fff', width: '22px', height: '22px', borderRadius: '4px',
+                    fontSize: '13px', fontWeight: 'bold', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    padding: 0
+                  }}
+                >
+                  -
+                </button>
+
+                {/* Direct Editable Number Box */}
                 <input
-                  type="number"
-                  min={12}
-                  max={128}
-                  step={2}
-                  value={currentOption?.size || 16}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={sizeInputText !== null ? sizeInputText : (charImageOverrides[currentSelectedId]?.size || 16)}
+                  onFocus={(e) => {
+                    const curr = charImageOverrides[currentSelectedId]?.size || 16;
+                    setSizeInputText(curr.toString());
+                    e.target.select();
+                  }}
                   onChange={(e) => {
-                    const newSize = Math.max(12, Math.min(128, parseInt(e.target.value, 10) || 16));
-                    handleUpdateCharacterDisplaySize(currentSelectedId, newSize);
+                    const val = e.target.value;
+                    setSizeInputText(val);
+                    const num = parseInt(val, 10);
+                    if (!isNaN(num) && num >= 8 && num <= 128) {
+                      handleUpdateCharacterDisplaySize(currentSelectedId, num);
+                    }
+                  }}
+                  onBlur={() => {
+                    const curr = charImageOverrides[currentSelectedId]?.size || 16;
+                    const num = parseInt(sizeInputText !== null ? sizeInputText : curr.toString(), 10);
+                    const validNum = isNaN(num) ? 16 : Math.max(8, Math.min(128, num));
+                    handleUpdateCharacterDisplaySize(currentSelectedId, validNum);
+                    setSizeInputText(null);
                   }}
                   style={{
-                    width: '44px',
+                    width: '38px',
                     background: '#0d0d12',
                     border: '1px solid var(--accent)',
                     borderRadius: '4px',
@@ -1717,10 +1757,31 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                     fontSize: '11px',
                     fontWeight: 'bold',
                     textAlign: 'center',
-                    padding: '3px 4px',
+                    padding: '2px 0',
                     outline: 'none'
                   }}
                 />
+
+                {/* Increase (+) Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const currentDisplaySize = charImageOverrides[currentSelectedId]?.size || 16;
+                    const next = Math.min(128, currentDisplaySize + 2);
+                    handleUpdateCharacterDisplaySize(currentSelectedId, next);
+                  }}
+                  title="크기 키우기 (+2px)"
+                  style={{
+                    background: '#252538', border: '1px solid rgba(255,255,255,0.2)',
+                    color: '#fff', width: '22px', height: '22px', borderRadius: '4px',
+                    fontSize: '13px', fontWeight: 'bold', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    padding: 0
+                  }}
+                >
+                  +
+                </button>
+
                 <span style={{ fontSize: '10px', color: '#aaa' }}>px</span>
               </div>
             )}
