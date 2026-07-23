@@ -1170,7 +1170,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       return { x: tx, y: ty };
     });
 
-    if (isDraggingObject && selectedObjectId && objectDragStart) {
+    if (isDraggingObject && selectedObjectId && objectDragStart && e.buttons === 1) {
       const deltaTx = Math.round((e.clientX - objectDragStart.originX) / tileSize);
       const deltaTy = Math.round((e.clientY - objectDragStart.originY) / tileSize);
       const targetTx = Math.max(0, Math.min(localMap.width - 1, objectDragStart.startTx + deltaTx));
