@@ -22,9 +22,14 @@ import { AssetViewer } from './components/AssetViewer';
 import { HouseJoinModal } from './components/HouseJoinModal';
 import { PlayerInteractionModal } from './components/PlayerInteractionModal';
 import { DMRequestModal } from './components/DMRequestModal';
-import { getSavedHouseCode, setSavedHouseCode, fetchHouseMaps, saveHouseMapToDB, deleteHouseMapFromDB, fetchHouseAssets } from './services/HouseService';
 import { supabase } from './lib/supabase';
 import { APP_VERSION } from './config/version';
+import type { MapMemo, InventoryItem } from './types/memo';
+import { fetchHouseMemos, saveMemoToDB, deleteMemoFromDB, getLocalInventory, saveLocalInventory } from './services/MemoService';
+import { CreateMemoModal } from './components/CreateMemoModal';
+import { ViewMemoModal } from './components/ViewMemoModal';
+import { InventoryModal } from './components/InventoryModal';
+import { Briefcase } from 'lucide-react';
 
 interface ChatLogMessage {
   id: string;
@@ -135,6 +140,125 @@ export default function App() {
   const [interactionTargetPlayer, setInteractionTargetPlayer] = useState<PlayerState | null>(null);
   const [incomingDMRequest, setIncomingDMRequest] = useState<{ requesterId: string; requesterName: string; requesterPlayer: PlayerState } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Memos & Inventory State
+  const [memos, setMemos] = useState<MapMemo[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>(getLocalInventory);
+  const [activeCreateMemoPos, setActiveCreateMemoPos] = useState<{ x: number; y: number } | null>(null);
+  const [activeViewMemo, setActiveViewMemo] = useState<MapMemo | null>(null);
+  const [showInventoryModal, setShowInventoryModal] = useState<boolean>(false);
+
+  // Load & Realtime Sync Memos
+  useEffect(() => {
+    fetchHouseMemos(houseCode, localPlayer.mapId).then(setMemos);
+
+    const channel = supabase.channel(`house_memos_${houseCode}_${localPlayer.mapId}`)
+      .on('broadcast', { event: 'memo_add' }, ({ payload }) => {
+        if (payload && payload.mapId === localPlayer.mapId) {
+          setMemos(prev => [...prev.filter(m => m.id !== payload.id), payload]);
+        }
+      })
+      .on('broadcast', { event: 'memo_delete' }, ({ payload }) => {
+        if (payload && payload.id) {
+          setMemos(prev => prev.filter(m => m.id !== payload.id));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [houseCode, localPlayer.mapId]);
+
+  // Handle Create Memo Submission
+  const handleCreateMemoSubmit = (newMemo: MapMemo) => {
+    saveMemoToDB(houseCode, newMemo);
+    setMemos(prev => [...prev.filter(m => m.id !== newMemo.id), newMemo]);
+    setActiveCreateMemoPos(null);
+
+    // Broadcast to other online players in house
+    supabase.channel(`house_memos_${houseCode}_${newMemo.mapId}`).send({
+      type: 'broadcast',
+      event: 'memo_add',
+      payload: newMemo
+    }).catch(() => {});
+  };
+
+  // Handle Pickup One-Time Memo to Inventory (🎒 장비함)
+  const handlePickupMemo = (memo: MapMemo) => {
+    // Delete from map DB & state
+    deleteMemoFromDB(houseCode, memo.mapId, memo.id);
+    setMemos(prev => prev.filter(m => m.id !== memo.id));
+    setActiveViewMemo(null);
+
+    // Broadcast deletion to other players
+    supabase.channel(`house_memos_${houseCode}_${memo.mapId}`).send({
+      type: 'broadcast',
+      event: 'memo_delete',
+      payload: { id: memo.id }
+    }).catch(() => {});
+
+    // Add to Inventory
+    const now = new Date();
+    const formattedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    const invItem: InventoryItem = {
+      id: `inv_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      title: memo.content ? memo.content.substring(0, 15) : '메모 아이템',
+      itemType: 'memo',
+      memoType: memo.memoType,
+      content: memo.content,
+      imageUrl: memo.imageUrl,
+      authorName: memo.authorName,
+      createdAt: memo.createdAt,
+      receivedAt: formattedDate
+    };
+
+    const updatedInv = [invItem, ...inventory];
+    setInventory(updatedInv);
+    saveLocalInventory(updatedInv);
+  };
+
+  // Handle Drop Inventory Item back onto map floor
+  const handleDropItemToMap = (item: InventoryItem) => {
+    const now = new Date();
+    const formattedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    const newMemo: MapMemo = {
+      id: `memo_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      mapId: localPlayer.mapId,
+      x: Math.round(localPlayer.x),
+      y: Math.round(localPlayer.y),
+      authorId: localPlayer.id,
+      authorName: item.authorName || localPlayer.nickname,
+      memoType: item.memoType || 'one_time',
+      content: item.content || '',
+      imageUrl: item.imageUrl,
+      createdAt: formattedDate
+    };
+
+    saveMemoToDB(houseCode, newMemo);
+    setMemos(prev => [...prev.filter(m => m.id !== newMemo.id), newMemo]);
+
+    // Remove from Inventory
+    const updatedInv = inventory.filter(i => i.id !== item.id);
+    setInventory(updatedInv);
+    saveLocalInventory(updatedInv);
+
+    // Broadcast addition to other players
+    supabase.channel(`house_memos_${houseCode}_${newMemo.mapId}`).send({
+      type: 'broadcast',
+      event: 'memo_add',
+      payload: newMemo
+    }).catch(() => {});
+  };
+
+  // Handle Delete Inventory Item
+  const handleDeleteInventoryItem = (itemId: string) => {
+    const updatedInv = inventory.filter(i => i.id !== itemId);
+    setInventory(updatedInv);
+    saveLocalInventory(updatedInv);
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -1927,6 +2051,9 @@ export default function App() {
         chatBubbles={chatBubbles}
         onMove={handleMove}
         onPlayerClick={handlePlayerClick}
+        memos={memos}
+        onInteractMemo={(memo) => setActiveViewMemo(memo)}
+        onCreateMemoRequest={(x, y) => setActiveCreateMemoPos({ x, y })}
         isEditMode={false}
         selectedTile={0}
         editLayer="base"
@@ -2233,6 +2360,32 @@ export default function App() {
               <Settings size={14} />
             </button>
 
+            {/* Inventory Equipment Bag Button */}
+            <button
+              onClick={() => setShowInventoryModal(true)}
+              style={{
+                background: showInventoryModal ? 'rgba(139,92,246,0.3)' : 'none',
+                border: showInventoryModal ? '1px solid var(--accent)' : 'none',
+                color: showInventoryModal ? 'var(--accent)' : '#ccc',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '3px', borderRadius: '2px',
+                position: 'relative'
+              }}
+              title="장비함 (가방)"
+            >
+              <Briefcase size={14} />
+              {inventory.length > 0 && (
+                <span style={{
+                  position: 'absolute', top: '-4px', right: '-4px',
+                  background: 'var(--accent)', color: '#111',
+                  borderRadius: '50%', width: '12px', height: '12px',
+                  fontSize: '8px', fontWeight: 'bold', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center'
+                }}>
+                  {inventory.length}
+                </span>
+              )}
+            </button>
+
             {/* House Code Switcher Button */}
             <button
               onClick={() => setShowHouseModal(true)}
@@ -2328,6 +2481,38 @@ export default function App() {
           currentHouseCode={houseCode}
           onJoinHouse={handleJoinHouse}
           onClose={() => setShowHouseModal(false)}
+        />
+      )}
+
+      {/* 10. Create Memo Modal */}
+      {activeCreateMemoPos && (
+        <CreateMemoModal
+          mapId={localPlayer.mapId}
+          x={activeCreateMemoPos.x}
+          y={activeCreateMemoPos.y}
+          authorId={localPlayer.id}
+          authorName={localPlayer.nickname}
+          onSubmit={handleCreateMemoSubmit}
+          onClose={() => setActiveCreateMemoPos(null)}
+        />
+      )}
+
+      {/* 11. View Memo Modal */}
+      {activeViewMemo && (
+        <ViewMemoModal
+          memo={activeViewMemo}
+          onPickup={activeViewMemo.memoType === 'one_time' ? () => handlePickupMemo(activeViewMemo) : undefined}
+          onClose={() => setActiveViewMemo(null)}
+        />
+      )}
+
+      {/* 12. Inventory Equipment Bag Modal (RPG Slot Grid Style) */}
+      {showInventoryModal && (
+        <InventoryModal
+          inventory={inventory}
+          onDropToMap={handleDropItemToMap}
+          onDeleteItem={handleDeleteInventoryItem}
+          onClose={() => setShowInventoryModal(false)}
         />
       )}
     </div>

@@ -17,6 +17,8 @@ import samuraiBlueUrl from '../assets/samurai_blue.png';
 import samuraiGreenUrl from '../assets/samurai_green.png';
 import pigUrl from '../assets/pig.png';
 
+import type { MapMemo } from '../types/memo';
+
 interface CanvasGameProps {
   localPlayer: PlayerState;
   otherPlayers: Record<string, PlayerState>;
@@ -26,6 +28,11 @@ interface CanvasGameProps {
   onMove: (x: number, y: number, dir: 'down' | 'up' | 'left' | 'right', isMoving: boolean) => void;
   onPlayerClick: (player: PlayerState) => void;
   
+  // Memo Props
+  memos?: MapMemo[];
+  onInteractMemo?: (memo: MapMemo) => void;
+  onCreateMemoRequest?: (x: number, y: number) => void;
+
   // Editor Props
   isEditMode: boolean;
   selectedTile: number;
@@ -173,6 +180,9 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
   chatBubbles,
   onMove,
   onPlayerClick,
+  memos = [],
+  onInteractMemo,
+  onCreateMemoRequest,
   
   isEditMode,
   selectedTile,
@@ -493,6 +503,17 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
     };
   }, [assetVersion]);
 
+  // State for Map Right-Click Context Menu
+  const [mapContextMenu, setMapContextMenu] = useState<{ clientX: number; clientY: number; worldX: number; worldY: number } | null>(null);
+
+  // Global dismiss listener for context menu on ANY click anywhere on screen
+  useEffect(() => {
+    if (!mapContextMenu) return;
+    const handleGlobalClick = () => setMapContextMenu(null);
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, [mapContextMenu]);
+
   // Keyboard input listeners
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -503,9 +524,27 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
 
       const key = e.key.toLowerCase();
       if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
-        // Prevent default scrolling for arrow keys/WASD
+        // Prevent default scrolling for arrow keys/WASD & dismiss context menu
         e.preventDefault();
         keysPressed.current[key] = true;
+        setMapContextMenu(null);
+      }
+
+      if (e.key === ' ' || e.code === 'Space') {
+        e.preventDefault();
+        setMapContextMenu(null);
+        // Spacebar memo pickup check
+        if (memos && memos.length > 0 && localPlayerRef.current) {
+          const p = localPlayerRef.current;
+          const nearbyMemo = memos.find(m => {
+            if (m.mapId !== currentMapId) return false;
+            const dist = Math.hypot(p.x - m.x, p.y - m.y);
+            return dist <= 38;
+          });
+          if (nearbyMemo) {
+            onInteractMemo?.(nearbyMemo);
+          }
+        }
       }
     };
 
@@ -529,7 +568,7 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, []);
+  }, [memos, currentMapId, onInteractMemo]);
 
   // Window resize handler
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
@@ -891,6 +930,36 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
             }
           }
         }
+      }
+
+      // 2.5 Draw Map Memos Layer (Clean icon and shadow ONLY - NO text tag above!)
+      if (!isEditMode && memos && memos.length > 0) {
+        memos.forEach((memo) => {
+          if (memo.mapId !== currentMapId) return;
+
+          const screenX = memo.x * tileScale;
+          const screenY = memo.y * tileScale;
+          const bounceY = Math.sin(Date.now() / 250) * 3;
+
+          ctx.save();
+          // Drop Shadow
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+          ctx.beginPath();
+          ctx.ellipse(screenX + vSize / 2, screenY + vSize - 2, 8, 4, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Floating Memo Envelope Icon (NO text tag above!)
+          ctx.font = `${Math.max(14, 14 * (tileScale / 2))}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(
+            memo.memoType === 'notice' ? '📢' : '📝',
+            screenX + vSize / 2,
+            screenY + vSize / 2 - 4 + bounceY
+          );
+
+          ctx.restore();
+        });
       }
 
         // 3. Draw Collision Debug Overlay (only in edit mode, red translucent blocks)
