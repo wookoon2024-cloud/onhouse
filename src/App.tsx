@@ -180,6 +180,32 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Helper to fetch custom character asset data for player sync
+  const getCustomCharData = (spriteType: string) => {
+    try {
+      const saved = localStorage.getItem('on_house_custom_char_sprites');
+      if (saved) {
+        const list = JSON.parse(saved);
+        return list.find((item: any) => item.id === spriteType) || null;
+      }
+    } catch (e) {}
+    return null;
+  };
+
+  const sendPlayerSync = (playerData: PlayerState) => {
+    try {
+      const customData = getCustomCharData(playerData.spriteType);
+      supabase.channel(`house:${houseCode}`).send({
+        type: 'broadcast',
+        event: 'player_sync',
+        payload: {
+          ...playerData,
+          customCharData: customData
+        }
+      });
+    } catch (e) {}
+  };
+
   // Keep player state ref up-to-date for event handlers
   const localPlayerRef = useRef<PlayerState>(localPlayer);
   useEffect(() => {
@@ -191,13 +217,7 @@ export default function App() {
     localStorage.setItem('on_house_status', localPlayer.statusMessage);
 
     // Broadcast player update to Supabase Realtime channel
-    try {
-      supabase.channel(`house:${houseCode}`).send({
-        type: 'broadcast',
-        event: 'player_sync',
-        payload: localPlayer
-      });
-    } catch (e) {}
+    sendPlayerSync(localPlayer);
   }, [localPlayer, houseCode]);
 
   // Supabase House DB fetch & Realtime WebSocket Channel
@@ -237,10 +257,29 @@ export default function App() {
     channel
       .on('broadcast', { event: 'player_sync' }, ({ payload }) => {
         if (!payload || payload.id === deviceId.current) return;
+
+        // If player has custom char data, dynamically update local asset cache
+        if (payload.customCharData && payload.customCharData.id && payload.customCharData.url) {
+          try {
+            const saved = localStorage.getItem('on_house_custom_char_sprites');
+            const current: any[] = saved ? JSON.parse(saved) : [];
+            if (!current.some((item: any) => item.id === payload.customCharData.id)) {
+              const next = [...current, payload.customCharData];
+              localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(next));
+              setAssetVersion((v) => v + 1);
+            }
+          } catch (e) {}
+        }
+
         setOtherPlayers((prev) => ({
           ...prev,
           [payload.id]: payload
         }));
+      })
+      .on('broadcast', { event: 'request_player_sync' }, ({ payload }) => {
+        if (!payload || payload.fromId === deviceId.current) return;
+        // Reply with current local player state immediately!
+        sendPlayerSync(localPlayerRef.current);
       })
       .on('broadcast', { event: 'chat' }, ({ payload }) => {
         if (!payload || payload.id === deviceId.current) return;
@@ -299,10 +338,11 @@ export default function App() {
       })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
+          sendPlayerSync(localPlayerRef.current);
           channel.send({
             type: 'broadcast',
-            event: 'player_sync',
-            payload: localPlayerRef.current
+            event: 'request_player_sync',
+            payload: { fromId: deviceId.current }
           });
         }
       });
