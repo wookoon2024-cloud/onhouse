@@ -880,52 +880,8 @@ export default function App() {
     window.addEventListener('beforeunload', handleUnload);
     window.addEventListener('pagehide', handleUnload);
 
-    // 1. Periodic heartbeat ping (every 4s) to keep lastActive timestamp fresh across all clients
-    const heartbeatPingTimer = setInterval(() => {
-      const payload = {
-        id: deviceId.current,
-        player: {
-          ...localPlayerRef.current,
-          lastActive: Date.now()
-        }
-      };
-
-      bcRef.current?.postMessage({
-        type: 'heartbeat',
-        playerId: deviceId.current,
-        player: payload.player
-      });
-
-      try {
-        channel.send({
-          type: 'broadcast',
-          event: 'heartbeat',
-          payload
-        });
-      } catch (e) {}
-    }, 4000);
-
-    // 2. Heartbeat / Inactivity Timeout Monitor: Mark player as offline ONLY if no heartbeat for 45 seconds
-    const offlineCheckTimer = setInterval(() => {
-      const now = Date.now();
-      setOtherPlayers((prev) => {
-        let updated = false;
-        const next = { ...prev };
-        for (const pid in next) {
-          const p = next[pid];
-          if (p.isOnline && p.statusMessage !== '오프라인' && (now - (p.lastActive || 0) > 45000)) {
-            next[pid] = { ...p, isOnline: false, statusMessage: '오프라인' };
-            updated = true;
-          }
-        }
-        return updated ? next : prev;
-      });
-    }, 10000);
-
     return () => {
       handleUnload();
-      clearInterval(heartbeatPingTimer);
-      clearInterval(offlineCheckTimer);
       window.removeEventListener('beforeunload', handleUnload);
       window.removeEventListener('pagehide', handleUnload);
       supabase.removeChannel(channel);
