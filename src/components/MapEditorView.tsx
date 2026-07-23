@@ -1140,10 +1140,12 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       lastPaintedCellRef.current = { x: tx, y: ty };
       handlePaint(tx, ty);
 
-      // Clean anchor: clear stamp & deselect so object is cleanly fixed on floor!
-      setPaletteSelection(null);
-      setSelectedObjectId(null);
-      setTool('select');
+      // Clean anchor: clear stamp & deselect only when placing a palette object!
+      if (paletteSelection) {
+        setPaletteSelection(null);
+        setSelectedObjectId(null);
+        setTool('select');
+      }
     }
   };
 
