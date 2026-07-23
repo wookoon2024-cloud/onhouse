@@ -2,6 +2,28 @@ import { supabase } from '../lib/supabase';
 import { type MapDefinition, maps } from '../game/MapData';
 
 export const getSavedHouseCode = (): string => {
+  try {
+    if (typeof window !== 'undefined' && window.location) {
+      const searchParams = new URLSearchParams(window.location.search);
+      let roomParam = searchParams.get('house') || searchParams.get('room');
+
+      if (!roomParam && window.location.hash) {
+        roomParam = window.location.hash.replace('#', '');
+      }
+
+      if (roomParam && roomParam.trim()) {
+        const formatted = roomParam.trim().toUpperCase();
+        localStorage.setItem('on_house_current_code', formatted);
+
+        // Clean up URL query param without refreshing page
+        const cleanUrl = window.location.origin + window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+
+        return formatted;
+      }
+    }
+  } catch (e) {}
+
   return localStorage.getItem('on_house_current_code') || 'H-1001';
 };
 

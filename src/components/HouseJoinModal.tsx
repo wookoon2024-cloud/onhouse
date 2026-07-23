@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Home, Sparkles, X, ArrowRight, Copy, Check, Users } from 'lucide-react';
+import { Home, Sparkles, X, ArrowRight, Copy, Check, Users, Share2, Link } from 'lucide-react';
 
 interface HouseJoinModalProps {
   currentHouseCode: string;
@@ -14,6 +14,7 @@ export const HouseJoinModal: React.FC<HouseJoinModalProps> = ({
 }) => {
   const [inputCode, setInputCode] = useState<string>(currentHouseCode);
   const [copied, setCopied] = useState<boolean>(false);
+  const [linkCopied, setLinkCopied] = useState<boolean>(false);
 
   const generateRandomCode = () => {
     const num = Math.floor(1000 + Math.random() * 9000);
@@ -21,9 +22,34 @@ export const HouseJoinModal: React.FC<HouseJoinModalProps> = ({
   };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(currentHouseCode);
+    try {
+      navigator.clipboard.writeText(currentHouseCode);
+    } catch (e) {
+      const textarea = document.createElement('textarea');
+      textarea.value = currentHouseCode;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCopyLink = () => {
+    const shareUrl = `${window.location.origin}${window.location.pathname}?house=${currentHouseCode}`;
+    try {
+      navigator.clipboard.writeText(shareUrl);
+    } catch (e) {
+      const textarea = document.createElement('textarea');
+      textarea.value = shareUrl;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -82,7 +108,7 @@ export const HouseJoinModal: React.FC<HouseJoinModalProps> = ({
         <div style={{
           background: 'rgba(255, 255, 255, 0.04)', border: '1px solid var(--border-glass)',
           borderRadius: '10px', padding: '12px 16px', marginBottom: '20px',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px'
         }}>
           <div>
             <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>현재 접속 중인 하우스 번호</div>
@@ -90,19 +116,39 @@ export const HouseJoinModal: React.FC<HouseJoinModalProps> = ({
               🏠 {currentHouseCode}
             </div>
           </div>
-          <button
-            onClick={handleCopy}
-            style={{
-              padding: '6px 12px', fontSize: '11px', borderRadius: '6px',
-              background: copied ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.08)',
-              border: copied ? '1px solid #10b981' : '1px solid var(--border-glass)',
-              color: copied ? '#34d399' : '#fff', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: '4px', transition: 'all 0.15s'
-            }}
-          >
-            {copied ? <Check size={12} /> : <Copy size={12} />}
-            {copied ? '복사됨!' : '코드 복사'}
-          </button>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={handleCopy}
+              style={{
+                padding: '6px 10px', fontSize: '11px', borderRadius: '6px',
+                background: copied ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.08)',
+                border: copied ? '1px solid #10b981' : '1px solid var(--border-glass)',
+                color: copied ? '#34d399' : '#fff', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '4px', transition: 'all 0.15s'
+              }}
+              title="하우스 코드 복사"
+            >
+              {copied ? <Check size={12} /> : <Copy size={12} />}
+              {copied ? '복사됨!' : '코드 복사'}
+            </button>
+            <button
+              type="button"
+              onClick={handleCopyLink}
+              style={{
+                padding: '6px 10px', fontSize: '11px', borderRadius: '6px',
+                background: linkCopied ? 'rgba(139, 92, 246, 0.3)' : 'var(--primary)',
+                border: linkCopied ? '1px solid var(--accent)' : 'none',
+                color: '#fff', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '4px', transition: 'all 0.15s',
+                fontWeight: 'bold'
+              }}
+              title="친구 초대를 위한 바로가기 URL 복사"
+            >
+              {linkCopied ? <Check size={12} /> : <Link size={12} />}
+              {linkCopied ? '링크 복사됨!' : '🔗 초대 링크 복사'}
+            </button>
+          </div>
         </div>
 
         {/* Enter Code Form */}

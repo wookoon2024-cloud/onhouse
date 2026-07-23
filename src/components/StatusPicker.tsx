@@ -19,7 +19,7 @@ export const StatusPicker: React.FC<StatusPickerProps> = ({ currentStatus, onSta
     if (!isOpen && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
       setCoords({
-        bottom: Math.max(10, window.innerHeight - rect.top + 8),
+        bottom: Math.max(10, window.innerHeight - rect.top + 6),
         left: Math.max(10, Math.min(rect.left, window.innerWidth - 250))
       });
     }

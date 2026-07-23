@@ -17,7 +17,7 @@ import { Messenger } from './components/Messenger';
 import { StatusPicker } from './components/StatusPicker';
 import { MapSelector } from './components/MapSelector';
 import { MapEditorView } from './components/MapEditorView';
-import { Mail, Settings, User, Eye, Hammer, Home } from 'lucide-react';
+import { Mail, Settings, User, Eye, Hammer, Home, Share2 } from 'lucide-react';
 import { AssetViewer } from './components/AssetViewer';
 import { HouseJoinModal } from './components/HouseJoinModal';
 import { PlayerInteractionModal } from './components/PlayerInteractionModal';
@@ -1667,6 +1667,36 @@ export default function App() {
             >
               <Home size={11} />
               <span>{houseCode}</span>
+            </button>
+
+            {/* Quick Share Link Button */}
+            <button
+              onClick={() => {
+                const shareUrl = `${window.location.origin}${window.location.pathname}?house=${houseCode}`;
+                try {
+                  navigator.clipboard.writeText(shareUrl);
+                } catch (e) {
+                  const textarea = document.createElement('textarea');
+                  textarea.value = shareUrl;
+                  document.body.appendChild(textarea);
+                  textarea.select();
+                  document.execCommand('copy');
+                  document.body.removeChild(textarea);
+                }
+                showToast(`온하우스 [${houseCode}] 방 바로가기 URL이 클립보드에 복사되었습니다! 🔗`);
+              }}
+              style={{
+                background: 'rgba(139, 92, 246, 0.35)',
+                border: '1px solid var(--accent)',
+                color: '#fff',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px',
+                padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold',
+                whiteSpace: 'nowrap', flexShrink: 0
+              }}
+              title="친구 초대를 위한 방 바로가기 URL 복사"
+            >
+              <Share2 size={11} />
+              <span>초대링크</span>
             </button>
 
             <div style={{ width: '1px', height: '14px', background: 'rgba(255,255,255,0.15)' }} />
