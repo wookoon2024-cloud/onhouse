@@ -142,7 +142,7 @@ export default function App() {
   const [interactionTargetPlayer, setInteractionTargetPlayer] = useState<PlayerState | null>(null);
   const [incomingDMRequest, setIncomingDMRequest] = useState<{ requesterId: string; requesterName: string; requesterPlayer: PlayerState } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [chatLogMode, setChatLogMode] = useState<'collapsed' | 'normal' | 'expanded'>('normal');
+  const [isChatLogCollapsed, setIsChatLogCollapsed] = useState(false);
 
   // Memos & Inventory State
   const [memos, setMemos] = useState<MapMemo[]>([]);
@@ -2173,57 +2173,58 @@ export default function App() {
         gap: '4px'
       }}>
         {/* Integrated Scrollable Chat Log History Area */}
-        <div
-          ref={chatLogScrollRef}
-          style={{
-            maxHeight: chatLogMode === 'collapsed' ? (isMobile ? '24px' : '28px') : chatLogMode === 'expanded' ? (isMobile ? '220px' : '340px') : (isMobile ? '60px' : '130px'),
-            minHeight: chatLogMode === 'collapsed' ? '24px' : '30px',
-            overflowY: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '4px',
-            paddingRight: '4px',
-            margin: '1px 0',
-            transition: 'max-height 0.2s ease, min-height 0.2s ease'
-          }}
-        >
-          {chatLogs.length === 0 ? (
-            <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontStyle: 'italic', padding: '2px 0' }}>
-              {isMobile ? "대화 내역이 없습니다." : "대화 내역이 없습니다. (Enter 키를 눌러 대화를 나누세요)"}
-            </div>
-          ) : (
-            chatLogs.map((log) => (
-              <div
-                key={log.id}
-                style={{
-                  fontSize: isMobile ? '11px' : '12px',
-                  fontFamily: 'var(--font-pixel)',
-                  color: '#fff',
-                  display: 'flex',
-                  gap: '4px',
-                  alignItems: 'baseline'
-                }}
-              >
-                <span style={{
-                  color: log.channel === 'map' ? '#a6e3a1' : '#fab387',
-                  whiteSpace: 'nowrap', flexShrink: 0
-                }}>
-                  [{log.channel === 'map' ? `맵${log.mapName ? '·' + log.mapName : ''}` : '전체'}]
-                </span>
-                <span style={{ color: '#a6e3a1', whiteSpace: 'nowrap', flexShrink: 0 }}>{log.senderName} :</span>
-                <span style={{ wordBreak: 'break-word', color: '#e6e9ef' }}>{log.text}</span>
+        {!isChatLogCollapsed && (
+          <div
+            ref={chatLogScrollRef}
+            style={{
+              maxHeight: isMobile ? '60px' : '130px',
+              minHeight: '30px',
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px',
+              paddingRight: '4px',
+              margin: '1px 0'
+            }}
+          >
+            {chatLogs.length === 0 ? (
+              <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontStyle: 'italic', padding: '2px 0' }}>
+                {isMobile ? "대화 내역이 없습니다." : "대화 내역이 없습니다. (Enter 키를 눌러 대화를 나누세요)"}
               </div>
-            ))
-          )}
-        </div>
+            ) : (
+              chatLogs.map((log) => (
+                <div
+                  key={log.id}
+                  style={{
+                    fontSize: isMobile ? '11px' : '12px',
+                    fontFamily: 'var(--font-pixel)',
+                    color: '#fff',
+                    display: 'flex',
+                    gap: '4px',
+                    alignItems: 'baseline'
+                  }}
+                >
+                  <span style={{
+                    color: log.channel === 'map' ? '#a6e3a1' : '#fab387',
+                    whiteSpace: 'nowrap', flexShrink: 0
+                  }}>
+                    [{log.channel === 'map' ? `맵${log.mapName ? '·' + log.mapName : ''}` : '전체'}]
+                  </span>
+                  <span style={{ color: '#a6e3a1', whiteSpace: 'nowrap', flexShrink: 0 }}>{log.senderName} :</span>
+                  <span style={{ wordBreak: 'break-word', color: '#e6e9ef' }}>{log.text}</span>
+                </div>
+              ))
+            )}
+          </div>
+        )}
 
         {/* Integrated Flat Tools & Input Controls Header Row */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           gap: isMobile ? '4px' : '8px',
-          borderTop: '1px solid rgba(255,255,255,0.1)',
-          paddingTop: '4px',
+          borderTop: isChatLogCollapsed ? 'none' : '1px solid rgba(255,255,255,0.1)',
+          paddingTop: isChatLogCollapsed ? '0px' : '4px',
           overflowX: 'auto',
           maxWidth: '100%'
         }}>
@@ -2246,48 +2247,27 @@ export default function App() {
             {chatChannel === 'global' ? '[전체]' : '[맵]'}
           </button>
 
-          {/* Chat History Expand / Collapse Toggle Buttons ([축소] / [확장]) */}
-          <div style={{ display: 'flex', gap: '2px', flexShrink: 0 }}>
-            <button
-              type="button"
-              onClick={() => setChatLogMode((prev) => (prev === 'collapsed' ? 'normal' : 'collapsed'))}
-              style={{
-                fontSize: '10px',
-                color: chatLogMode === 'collapsed' ? '#f38ba8' : '#a6adc8',
-                background: chatLogMode === 'collapsed' ? 'rgba(243, 139, 168, 0.2)' : 'rgba(255,255,255,0.06)',
-                padding: '2px 5px',
-                borderRadius: '3px',
-                border: chatLogMode === 'collapsed' ? '1px solid rgba(243, 139, 168, 0.4)' : '1px solid rgba(255,255,255,0.1)',
-                cursor: 'pointer',
-                outline: 'none',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.15s ease'
-              }}
-              title="채팅 내역 축소 / 복원"
-            >
-              {chatLogMode === 'collapsed' ? '▼ 펼치기' : '▼ 축소'}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setChatLogMode((prev) => (prev === 'expanded' ? 'normal' : 'expanded'))}
-              style={{
-                fontSize: '10px',
-                color: chatLogMode === 'expanded' ? '#89b4fa' : '#a6adc8',
-                background: chatLogMode === 'expanded' ? 'rgba(137, 180, 250, 0.2)' : 'rgba(255,255,255,0.06)',
-                padding: '2px 5px',
-                borderRadius: '3px',
-                border: chatLogMode === 'expanded' ? '1px solid rgba(137, 180, 250, 0.4)' : '1px solid rgba(255,255,255,0.1)',
-                cursor: 'pointer',
-                outline: 'none',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.15s ease'
-              }}
-              title="채팅 내역 확장 / 기본"
-            >
-              {chatLogMode === 'expanded' ? '▲ 기본' : '▲ 확장'}
-            </button>
-          </div>
+          {/* Chat History Single Toggle Button ([▼ 축소] / [▲ 펼치기]) */}
+          <button
+            type="button"
+            onClick={() => setIsChatLogCollapsed((prev) => !prev)}
+            style={{
+              fontSize: '10px',
+              color: isChatLogCollapsed ? '#fab387' : '#a6adc8',
+              background: isChatLogCollapsed ? 'rgba(250, 179, 135, 0.15)' : 'rgba(255,255,255,0.06)',
+              padding: '2px 6px',
+              borderRadius: '3px',
+              border: isChatLogCollapsed ? '1px solid rgba(250, 179, 135, 0.4)' : '1px solid rgba(255,255,255,0.1)',
+              cursor: 'pointer',
+              outline: 'none',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              transition: 'all 0.15s ease'
+            }}
+            title="채팅 내역 축소 (숨기기) / 펼치기"
+          >
+            {isChatLogCollapsed ? '▲ 펼치기' : '▼ 축소'}
+          </button>
 
           {/* Status Picker (😊) */}
           <div style={{ flexShrink: 0 }}>
