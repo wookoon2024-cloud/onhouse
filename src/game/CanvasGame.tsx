@@ -228,12 +228,15 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
       const now = performance.now();
       const { type, fromPos, toPos } = detail;
 
+      const tileScale = getTileScale();
+      const vSize = 16 * tileScale;
+
       if (type === 'heart' && fromPos && toPos) {
-        // Center particles over character head/body (+16px offset)
-        const sX = fromPos.x + 16;
-        const sY = fromPos.y + 8;
-        const tX = toPos.x + 16;
-        const tY = toPos.y + 8;
+        // Convert 16px map coordinates to scaled camera space (* tileScale)
+        const sX = fromPos.x * tileScale + vSize / 2;
+        const sY = fromPos.y * tileScale + vSize / 4;
+        const tX = toPos.x * tileScale + vSize / 2;
+        const tY = toPos.y * tileScale + vSize / 4;
 
         for (let i = 0; i < 4; i++) {
           particlesRef.current.push({
@@ -246,18 +249,18 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
             icon: i % 2 === 0 ? '❤️' : '💖',
             startTime: now + i * 100,
             duration: 1150,
-            arcOffset: (i - 1.5) * 32,
-            scale: 1
+            arcOffset: (i - 1.5) * (24 * tileScale),
+            scale: tileScale > 1.5 ? 1.2 : 1
           });
         }
       } else if (type === 'cheer' && fromPos) {
-        const sX = fromPos.x + 16;
-        const sY = fromPos.y + 16;
+        const sX = fromPos.x * tileScale + vSize / 2;
+        const sY = fromPos.y * tileScale + vSize / 4;
 
         const offsets = [
-          { x: -20, y: -25, icon: '👏' },
-          { x: 0, y: -42, icon: '👏' },
-          { x: 20, y: -25, icon: '👏' }
+          { x: -16 * tileScale, y: -20 * tileScale, icon: '👏' },
+          { x: 0, y: -32 * tileScale, icon: '👏' },
+          { x: 16 * tileScale, y: -20 * tileScale, icon: '👏' }
         ];
 
         offsets.forEach((off, idx) => {
@@ -270,7 +273,7 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
             startTime: now + idx * 80,
             duration: 1600,
             offsetX: off.x,
-            scale: 1.2
+            scale: tileScale > 1.5 ? 1.2 : 1
           });
         });
       }
@@ -1102,20 +1105,22 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         let opacity = 1;
 
         if (pt.type === 'heart' && pt.targetX !== undefined && pt.targetY !== undefined) {
+          const tScale = getTileScale();
           // Curved quadratic Bezier trajectory from startX/Y to targetX/Y
           const midX = (pt.startX + pt.targetX) / 2 + (pt.arcOffset || 0);
-          const midY = Math.min(pt.startY, pt.targetY) - 45;
+          const midY = Math.min(pt.startY, pt.targetY) - (35 * tScale);
 
           const t1 = 1 - progress;
           px = t1 * t1 * pt.startX + 2 * t1 * progress * midX + progress * progress * pt.targetX;
           py = t1 * t1 * pt.startY + 2 * t1 * progress * midY + progress * progress * pt.targetY;
 
-          scale = 1 + Math.sin(progress * Math.PI) * 0.4;
+          scale = (pt.scale || 1) + Math.sin(progress * Math.PI) * 0.4;
           opacity = progress > 0.85 ? (1 - progress) / 0.15 : 1;
         } else if (pt.type === 'cheer') {
+          const tScale = getTileScale();
           // Floating upward with bounce
           px = pt.startX + (pt.offsetX || 0);
-          py = pt.startY - 20 - progress * 28 + Math.sin(progress * Math.PI * 3) * 3;
+          py = pt.startY - (10 * tScale) - progress * (28 * tScale) + Math.sin(progress * Math.PI * 3) * 3;
           scale = (pt.scale || 1.1) + Math.sin(progress * Math.PI) * 0.3;
           opacity = progress > 0.7 ? (1 - progress) / 0.3 : 1;
         }
