@@ -582,7 +582,22 @@ export default function App() {
       })
       .on('broadcast', { event: 'reaction_anim' }, ({ payload }) => {
         if (!payload) return;
-        window.dispatchEvent(new CustomEvent('on_house_spawn_particle', { detail: payload }));
+
+        // Ensure particles target receiver's exact local coordinates on receiver screen!
+        const adjustedPayload = { ...payload };
+        if (adjustedPayload.toId === deviceId.current) {
+          adjustedPayload.toPos = { x: localPlayerRef.current.x, y: localPlayerRef.current.y };
+          if (adjustedPayload.fromId && otherPlayers[adjustedPayload.fromId]) {
+            adjustedPayload.fromPos = { x: otherPlayers[adjustedPayload.fromId].x, y: otherPlayers[adjustedPayload.fromId].y };
+          }
+        } else if (adjustedPayload.fromId === deviceId.current) {
+          adjustedPayload.fromPos = { x: localPlayerRef.current.x, y: localPlayerRef.current.y };
+          if (adjustedPayload.toId && otherPlayers[adjustedPayload.toId]) {
+            adjustedPayload.toPos = { x: otherPlayers[adjustedPayload.toId].x, y: otherPlayers[adjustedPayload.toId].y };
+          }
+        }
+
+        window.dispatchEvent(new CustomEvent('on_house_spawn_particle', { detail: adjustedPayload }));
 
         if (payload.toId === deviceId.current && payload.fromId && payload.fromId !== deviceId.current) {
           const emoji = payload.emoji || (
@@ -1422,33 +1437,60 @@ export default function App() {
 
   // Send reaction emoji with custom action animations!
   const handleSendReaction = (targetId: string, emoji: string) => {
-    const targetPlayer = otherPlayers[targetId] || offlinePlayers[targetId];
+    const targetPlayer = otherPlayers[targetId] || offlinePlayers[targetId] || {
+      id: targetId,
+      nickname: '친구',
+      x: localPlayer.x + 32,
+      y: localPlayer.y,
+      spriteType: 'ninja_blue',
+      hue: 0,
+      mapId: localPlayer.mapId,
+      dir: 'down',
+      isMoving: false,
+      isOnline: true,
+      statusMessage: '',
+      lastActive: Date.now()
+    };
 
     if (emoji === '❤️' || emoji === '좋아요') {
       // 1. Flying Heart Particle from local player to target player!
-      if (targetPlayer) {
-        const payload = {
-          type: 'heart',
-          fromId: deviceId.current,
-          fromName: localPlayer.nickname,
-          fromPos: { x: localPlayer.x, y: localPlayer.y },
-          toId: targetId,
-          toName: targetPlayer.nickname,
-          toPos: { x: targetPlayer.x, y: targetPlayer.y }
-        };
+      const payload = {
+        type: 'heart',
+        emoji: '❤️',
+        fromId: deviceId.current,
+        fromName: localPlayer.nickname,
+        fromPos: { x: localPlayer.x, y: localPlayer.y },
+        toId: targetId,
+        toName: targetPlayer.nickname,
+        toPos: { x: targetPlayer.x, y: targetPlayer.y }
+      };
 
-        window.dispatchEvent(new CustomEvent('on_house_spawn_particle', { detail: payload }));
+      window.dispatchEvent(new CustomEvent('on_house_spawn_particle', { detail: payload }));
 
-        try {
-          supabase.channel(`house:${houseCode}`).send({
-            type: 'broadcast',
-            event: 'reaction_anim',
-            payload
-          });
-        } catch (e) {}
+      bcRef.current?.postMessage({
+        type: 'reaction_anim',
+        payload
+      });
 
-        showToast(`[${targetPlayer.nickname}] 님에게 ❤️ 하트를 날렸습니다!`);
-      }
+      try {
+        supabase.channel(`house:${houseCode}`).send({
+          type: 'broadcast',
+          event: 'reaction_anim',
+          payload
+        });
+        supabase.channel(`house:${houseCode}`).send({
+          type: 'broadcast',
+          event: 'reaction',
+          payload: {
+            fromId: deviceId.current,
+            fromName: localPlayer.nickname,
+            toId: targetId,
+            emoji: '❤️'
+          }
+        });
+      } catch (e) {}
+
+      showToast(`[${targetPlayer.nickname}] 님에게 ❤️ 하트를 날렸습니다!`);
     } else if (emoji === '👋' || emoji === '인사하기') {
       // 2. Greeting: Walk in front of target player smoothly, then say "안녕하세요! 👋"
       if (targetPlayer) {
