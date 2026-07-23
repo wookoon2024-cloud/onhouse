@@ -73,6 +73,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   
   // Hover cursor highlight
   const [hoverTile, setHoverTile] = useState<{ x: number; y: number } | null>(null);
+  const [hoverPaletteTile, setHoverPaletteTile] = useState<{ col: number; row: number } | null>(null);
 
   // Resizable Palette Width (280px to 850px) & Palette Scale (1.0x to 3.0x)
   const [paletteWidth, setPaletteWidth] = useState<number>(380);
@@ -415,22 +416,48 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         ctx.fillRect(hx, hy, tileSize, tileSize);
         ctx.strokeRect(hx, hy, tileSize, tileSize);
       } else {
-        // White Brush Highlight Box based on brushSize
-        const half = Math.floor(brushSize / 2);
-        const bx = Math.max(0, (hoverTile.x - half)) * tileSize;
-        const by = Math.max(0, (hoverTile.y - half)) * tileSize;
-        const bw = Math.min(localMap.width - hoverTile.x + half, brushSize) * tileSize;
-        const bh = Math.min(localMap.height - hoverTile.y + half, brushSize) * tileSize;
+        const bw = Math.min(localMap.width - hoverTile.x, brushSize) * tileSize;
+        const bh = Math.min(localMap.height - hoverTile.y, brushSize) * tileSize;
+
+        // Draw real-time multi-tile object texture preview under mouse cursor!
+        if (selectedTile !== -1 && editLayer !== 'collision') {
+          ctx.globalAlpha = 0.75;
+          const drawInfo = getTileDrawInfo(selectedTile, activeTileset);
+          if (drawInfo) {
+            const img = images[drawInfo.tilesetKey];
+            const tsInfo = getTilesetInfoLocal(drawInfo.tilesetKey);
+            if (img && tsInfo) {
+              const baseCol = drawInfo.localIdx % tsInfo.cols;
+              const baseRow = Math.floor(drawInfo.localIdx / tsInfo.cols);
+              for (let dy = 0; dy < brushSize; dy++) {
+                for (let dx = 0; dx < brushSize; dx++) {
+                  const px = hoverTile.x + dx;
+                  const py = hoverTile.y + dy;
+                  const targetCol = baseCol + dx;
+                  const targetRow = baseRow + dy;
+                  if (px < localMap.width && py < localMap.height && targetCol < tsInfo.cols && targetRow < tsInfo.rows) {
+                    ctx.drawImage(
+                      img,
+                      targetCol * 16, targetRow * 16, 16, 16,
+                      px * tileSize, py * tileSize, tileSize, tileSize
+                    );
+                  }
+                }
+              }
+            }
+          }
+          ctx.globalAlpha = 1.0;
+        }
 
         ctx.strokeStyle = '#f9e2af';
         ctx.lineWidth = 2;
-        ctx.fillStyle = 'rgba(249, 226, 175, 0.2)';
-        ctx.fillRect(bx, by, bw, bh);
-        ctx.strokeRect(bx, by, bw, bh);
+        ctx.fillStyle = 'rgba(249, 226, 175, 0.15)';
+        ctx.fillRect(hx, hy, bw, bh);
+        ctx.strokeRect(hx, hy, bw, bh);
       }
       ctx.restore();
     }
-  }, [images, localMap, zoom, showGrid, showDecor, showCollision, hoverTile, isAltPressed, tool, brushSize]);
+  }, [images, localMap, zoom, showGrid, showDecor, showCollision, hoverTile, isAltPressed, tool, brushSize, selectedTile, editLayer, activeTileset]);
 
   // Undo / Redo
   const handleUndo = () => {
@@ -634,23 +661,31 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       const newDecor = prev.decorLayer.map(r => [...r]);
       const newCollision = prev.collision.map(r => [...r]);
 
-      const half = Math.floor(brushSize / 2);
-      
-      for (let dy = -half; dy <= (brushSize % 2 === 0 ? half - 1 : half); dy++) {
-        for (let dx = -half; dx <= (brushSize % 2 === 0 ? half - 1 : half); dx++) {
+      for (let dy = 0; dy < brushSize; dy++) {
+        for (let dx = 0; dx < brushSize; dx++) {
           const ptx = tx + dx;
           const pty = ty + dy;
 
           if (ptx >= 0 && ptx < prev.width && pty >= 0 && pty < prev.height) {
-            if (editLayer === 'base') {
-              newBase[pty][ptx] = selectedTile;
-            } else if (editLayer === 'decor') {
-              newDecor[pty][ptx] = selectedTile;
-              if (autoCollision) {
-                newCollision[pty][ptx] = selectedTile !== -1;
-              }
-            } else if (editLayer === 'collision') {
+            if (editLayer === 'collision') {
               newCollision[pty][ptx] = selectedTile === 1;
+            } else if (selectedTile === -1) {
+              if (editLayer === 'base') {
+                newBase[pty][ptx] = -1;
+              } else if (editLayer === 'decor') {
+                newDecor[pty][ptx] = -1;
+                if (autoCollision) newCollision[pty][ptx] = false;
+              }
+            } else {
+              const tileToPaint = getOffsetTile(selectedTile, activeTileset, dx, dy);
+              if (editLayer === 'base') {
+                newBase[pty][ptx] = tileToPaint;
+              } else if (editLayer === 'decor') {
+                newDecor[pty][ptx] = tileToPaint;
+                if (autoCollision) {
+                  newCollision[pty][ptx] = tileToPaint !== -1;
+                }
+              }
             }
           }
         }
@@ -853,6 +888,26 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       case 'field': return 8000 + localIdx;
       default: return localIdx;
     }
+  };
+
+  const getOffsetTile = (baseTileIdx: number, currentTsKey: string, dx: number, dy: number): number => {
+    if (baseTileIdx === -1) return -1;
+    const drawInfo = getTileDrawInfo(baseTileIdx, currentTsKey);
+    if (!drawInfo) return baseTileIdx;
+
+    const tsInfo = getTilesetInfoLocal(drawInfo.tilesetKey);
+    const baseCol = drawInfo.localIdx % tsInfo.cols;
+    const baseRow = Math.floor(drawInfo.localIdx / tsInfo.cols);
+
+    const targetCol = baseCol + dx;
+    const targetRow = baseRow + dy;
+
+    if (targetCol >= tsInfo.cols || targetRow >= tsInfo.rows) {
+      return baseTileIdx;
+    }
+
+    const targetLocalIdx = targetRow * tsInfo.cols + targetCol;
+    return getPrefixedIndex(targetLocalIdx, drawInfo.tilesetKey);
   };
 
   const tileDetails = getSelectedTileDetails();
@@ -1527,27 +1582,45 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
             background: 'rgba(15, 15, 25, 0.6)', display: 'flex', alignItems: 'center', gap: '12px'
           }}>
             <div style={{
-              width: '36px', height: '36px', border: '2px solid var(--accent)',
-              borderRadius: '6px', background: '#000', display: 'flex', justifyContent: 'center',
-              alignItems: 'center', overflow: 'hidden', imageRendering: 'pixelated'
+              width: `${Math.max(36, Math.min(64, brushSize * 18))}px`,
+              height: `${Math.max(36, Math.min(64, brushSize * 18))}px`,
+              border: '2px solid var(--accent)',
+              borderRadius: '6px', background: '#000', display: 'grid',
+              gridTemplateColumns: `repeat(${brushSize}, 1fr)`,
+              overflow: 'hidden', imageRendering: 'pixelated', padding: '1px', boxSizing: 'border-box'
             }}>
-              {selectedTile !== -1 && tileDetails.url ? (
-                <div style={{
-                  width: `${tileDetails.tileW}px`,
-                  height: `${tileDetails.tileH}px`,
-                  backgroundImage: `url(${tileDetails.url})`,
-                  backgroundPosition: `-${tileDetails.col * tileDetails.tileW}px -${tileDetails.row * tileDetails.tileH}px`,
-                  transform: tileDetails.tileW > 32 ? 'scale(0.5)' : (tileDetails.tileW > 20 ? 'scale(1.0)' : 'scale(2.25)'),
-                  transformOrigin: 'center center'
-                }} />
+              {selectedTile !== -1 ? (
+                Array.from({ length: brushSize * brushSize }).map((_, i) => {
+                  const dx = i % brushSize;
+                  const dy = Math.floor(i / brushSize);
+                  const subTile = getOffsetTile(selectedTile, activeTileset, dx, dy);
+                  const subInfo = getTileDrawInfo(subTile, activeTileset);
+                  if (!subInfo) return <div key={i} />;
+                  const tsInfo = getTilesetInfoLocal(subInfo.tilesetKey);
+                  const subCol = subInfo.localIdx % tsInfo.cols;
+                  const subRow = Math.floor(subInfo.localIdx / tsInfo.cols);
+                  return (
+                    <div key={i} style={{
+                      width: '100%', height: '100%',
+                      backgroundImage: `url(${tsInfo.url})`,
+                      backgroundPosition: `-${subCol * 16}px -${subRow * 16}px`,
+                      backgroundSize: `${tsInfo.cols * 100}% auto`,
+                      imageRendering: 'pixelated'
+                    }} />
+                  );
+                })
               ) : (
-                <span style={{ fontSize: '16px' }}>🧽</span>
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', height: '100%' }}>
+                  <span style={{ fontSize: '16px' }}>🧽</span>
+                </div>
               )}
             </div>
             <div>
-              <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>현재 선택된 타일</div>
+              <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
+                현재 선택된 브러시 ({brushSize}x{brushSize} 크기)
+              </div>
               <div style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 'bold', marginTop: '2px' }}>
-                {tileDetails.label}
+                {selectedTile === -1 ? '지우개 🧽' : `${tileDetails.label} [${brushSize}x${brushSize} 멀티타일]` }
               </div>
             </div>
           </div>
@@ -1569,24 +1642,51 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               />
               
               {/* Clickable Overlay Grid Cells */}
-              <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
+              <div
+                onMouseLeave={() => setHoverPaletteTile(null)}
+                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+              >
                 {Array.from({ length: tilesetRows }).map((_, r) => (
                   <div key={r} style={{ display: 'flex' }}>
                     {Array.from({ length: tilesetCols }).map((_, c) => {
                       const localIdx = r * tilesetCols + c;
                       const prefixedIdx = getPrefixedIndex(localIdx, activeTileset);
-                      const isSelected = selectedTile === prefixedIdx;
+                      
+                      // Check if part of selected multi-tile block
+                      const selDrawInfo = getTileDrawInfo(selectedTile, activeTileset);
+                      let isSelected = selectedTile === prefixedIdx;
+                      if (selDrawInfo && selDrawInfo.tilesetKey === activeTileset) {
+                        const selCol = selDrawInfo.localIdx % tilesetCols;
+                        const selRow = Math.floor(selDrawInfo.localIdx / tilesetCols);
+                        isSelected = c >= selCol && c < selCol + brushSize && r >= selRow && r < selRow + brushSize;
+                      }
+
+                      // Check if part of hovered multi-tile block
+                      let isHovered = false;
+                      if (hoverPaletteTile) {
+                        isHovered = c >= hoverPaletteTile.col && c < hoverPaletteTile.col + brushSize && r >= hoverPaletteTile.row && r < hoverPaletteTile.row + brushSize;
+                      }
+
                       return (
                         <div
                           key={c}
                           onClick={() => setSelectedTile(prefixedIdx)}
-                          title={`Tile ID: ${localIdx} (Row: ${r}, Col: ${c})`}
+                          onMouseEnter={() => setHoverPaletteTile({ col: c, row: r })}
+                          title={`Tile ID: ${localIdx} (Row: ${r}, Col: ${c}) - Brush ${brushSize}x${brushSize}`}
                           style={{
                             width: `${16 * paletteZoom}px`,
                             height: `${16 * paletteZoom}px`,
-                            border: isSelected ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.05)',
-                            background: isSelected ? 'rgba(139, 92, 246, 0.3)' : 'transparent',
-                            boxSizing: 'border-box', cursor: 'pointer', transition: 'border-color 0.1s'
+                            border: isSelected 
+                              ? '2px solid var(--accent)' 
+                              : isHovered 
+                                ? '1.5px solid #89dceb' 
+                                : '1px solid rgba(255,255,255,0.05)',
+                            background: isSelected 
+                              ? 'rgba(139, 92, 246, 0.35)' 
+                              : isHovered 
+                                ? 'rgba(137, 220, 235, 0.2)' 
+                                : 'transparent',
+                            boxSizing: 'border-box', cursor: 'pointer', transition: 'border-color 0.05s'
                           }}
                         />
                       );
