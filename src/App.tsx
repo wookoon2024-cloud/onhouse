@@ -142,6 +142,7 @@ export default function App() {
   const [interactionTargetPlayer, setInteractionTargetPlayer] = useState<PlayerState | null>(null);
   const [incomingDMRequest, setIncomingDMRequest] = useState<{ requesterId: string; requesterName: string; requesterPlayer: PlayerState } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [chatLogMode, setChatLogMode] = useState<'collapsed' | 'normal' | 'expanded'>('normal');
 
   // Memos & Inventory State
   const [memos, setMemos] = useState<MapMemo[]>([]);
@@ -2175,14 +2176,15 @@ export default function App() {
         <div
           ref={chatLogScrollRef}
           style={{
-            maxHeight: isMobile ? '60px' : '130px',
-            minHeight: '30px',
+            maxHeight: chatLogMode === 'collapsed' ? (isMobile ? '24px' : '28px') : chatLogMode === 'expanded' ? (isMobile ? '220px' : '340px') : (isMobile ? '60px' : '130px'),
+            minHeight: chatLogMode === 'collapsed' ? '24px' : '30px',
             overflowY: 'auto',
             display: 'flex',
             flexDirection: 'column',
             gap: '4px',
             paddingRight: '4px',
-            margin: '1px 0'
+            margin: '1px 0',
+            transition: 'max-height 0.2s ease, min-height 0.2s ease'
           }}
         >
           {chatLogs.length === 0 ? (
@@ -2204,11 +2206,11 @@ export default function App() {
               >
                 <span style={{
                   color: log.channel === 'map' ? '#a6e3a1' : '#fab387',
-                  fontWeight: 'bold', whiteSpace: 'nowrap', flexShrink: 0
+                  whiteSpace: 'nowrap', flexShrink: 0
                 }}>
                   [{log.channel === 'map' ? `맵${log.mapName ? '·' + log.mapName : ''}` : '전체'}]
                 </span>
-                <span style={{ color: '#a6e3a1', fontWeight: 'bold', whiteSpace: 'nowrap', flexShrink: 0 }}>{log.senderName} :</span>
+                <span style={{ color: '#a6e3a1', whiteSpace: 'nowrap', flexShrink: 0 }}>{log.senderName} :</span>
                 <span style={{ wordBreak: 'break-word', color: '#e6e9ef' }}>{log.text}</span>
               </div>
             ))
@@ -2230,7 +2232,7 @@ export default function App() {
             type="button"
             onClick={() => setChatChannel((mode) => mode === 'global' ? 'map' : 'global')}
             style={{
-              fontSize: '10px', fontWeight: 'bold',
+              fontSize: '10px',
               color: chatChannel === 'global' ? '#fab387' : '#a6e3a1',
               background: chatChannel === 'global' ? 'rgba(250, 179, 135, 0.15)' : 'rgba(166, 227, 161, 0.15)',
               padding: '2px 6px',
@@ -2243,6 +2245,49 @@ export default function App() {
           >
             {chatChannel === 'global' ? '[전체]' : '[맵]'}
           </button>
+
+          {/* Chat History Expand / Collapse Toggle Buttons ([축소] / [확장]) */}
+          <div style={{ display: 'flex', gap: '2px', flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={() => setChatLogMode((prev) => (prev === 'collapsed' ? 'normal' : 'collapsed'))}
+              style={{
+                fontSize: '10px',
+                color: chatLogMode === 'collapsed' ? '#f38ba8' : '#a6adc8',
+                background: chatLogMode === 'collapsed' ? 'rgba(243, 139, 168, 0.2)' : 'rgba(255,255,255,0.06)',
+                padding: '2px 5px',
+                borderRadius: '3px',
+                border: chatLogMode === 'collapsed' ? '1px solid rgba(243, 139, 168, 0.4)' : '1px solid rgba(255,255,255,0.1)',
+                cursor: 'pointer',
+                outline: 'none',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.15s ease'
+              }}
+              title="채팅 내역 축소 / 복원"
+            >
+              {chatLogMode === 'collapsed' ? '▼ 펼치기' : '▼ 축소'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setChatLogMode((prev) => (prev === 'expanded' ? 'normal' : 'expanded'))}
+              style={{
+                fontSize: '10px',
+                color: chatLogMode === 'expanded' ? '#89b4fa' : '#a6adc8',
+                background: chatLogMode === 'expanded' ? 'rgba(137, 180, 250, 0.2)' : 'rgba(255,255,255,0.06)',
+                padding: '2px 5px',
+                borderRadius: '3px',
+                border: chatLogMode === 'expanded' ? '1px solid rgba(137, 180, 250, 0.4)' : '1px solid rgba(255,255,255,0.1)',
+                cursor: 'pointer',
+                outline: 'none',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.15s ease'
+              }}
+              title="채팅 내역 확장 / 기본"
+            >
+              {chatLogMode === 'expanded' ? '▲ 기본' : '▲ 확장'}
+            </button>
+          </div>
 
           {/* Status Picker (😊) */}
           <div style={{ flexShrink: 0 }}>
