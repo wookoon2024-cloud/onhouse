@@ -667,7 +667,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         const bh = Math.min(localMap.height - hoverTile.y, pRows) * tileSize;
 
         // Draw real-time multi-tile object texture preview under mouse cursor!
-        if (selectedTile !== -1 && editLayer !== 'collision' && tool !== 'select') {
+        if (selectedTile !== -1 && editLayer !== 'collision' && tool === 'brush' && (paletteSelection || brushSize > 1)) {
           ctx.globalAlpha = 0.75;
           if (tsInfo) {
             const img = images[drawInfo?.tilesetKey || activeTileset];
@@ -1087,6 +1087,14 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   };
 
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    // Right click cancels stamp preview and switches to select mode
+    if (e.button === 2) {
+      e.preventDefault();
+      setPaletteSelection(null);
+      setTool('select');
+      return;
+    }
+
     if (isSpacePressed.current || isSpaceHeld || e.button !== 0) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -1129,10 +1137,9 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       lastPaintedCellRef.current = { x: tx, y: ty };
       handlePaint(tx, ty);
 
-      if (paletteSelection || brushSize > 1) {
-        setPaletteSelection(null);
-        setTool('select');
-      }
+      // ALWAYS anchor placed object to floor & switch to 'select' mode!
+      setPaletteSelection(null);
+      setTool('select');
     }
   };
 
