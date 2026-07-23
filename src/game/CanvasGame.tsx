@@ -33,6 +33,7 @@ interface CanvasGameProps {
   onPaintTile: (tx: number, ty: number, tileIdx: number, layer: 'base' | 'decor' | 'collision') => void;
   mapData: MapDefinition;
   brushSize: number; // 1 = 1x1, 2 = 2x2, 3 = 3x3, etc.
+  assetVersion?: number;
 }
 
 export const getTileDrawInfo = (idx: number, defaultTileset: string) => {
