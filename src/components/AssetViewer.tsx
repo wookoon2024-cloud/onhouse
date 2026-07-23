@@ -424,57 +424,56 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     mainImg.src = currentOption.url;
   };
 
-  // 🗑️ Delete/Clear Specific Frame Tile
-  // Rule (Req 7): "프레임삭제하기 눌렀을떄 그 행포함 그 행뒤로 모든 프레임이 없으면 그행은 삭제"
+  // 🗑️ Delete Specific Frame Column (`col`, `row`)
+  // Rule: Delete target column from sprite sheet (shrank cols from N to N-1). If row becomes empty or cols <= 1, delete row.
   const handleDeleteFrameColumn = (col: number, row: number) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
-      const cols = currentOption.cols;
+      const oldCols = currentOption.cols;
       const rows = currentOption.rows;
-      const tileW = Math.max(16, Math.floor(img.width / cols));
+      const tileW = Math.max(16, Math.floor(img.width / oldCols));
       const tileH = Math.max(16, Math.floor(img.height / rows));
 
+      // 1. If cols === 1 (only 1 column left): delete that action row!
+      if (oldCols <= 1) {
+        if (rows > 1) {
+          handleDeleteActionRow(row);
+        }
+        setContextMenuTile(null);
+        return;
+      }
+
+      // 2. Delete target column `col` across the sprite sheet
+      const newCols = oldCols - 1;
       const canvas = document.createElement('canvas');
-      canvas.width = img.width;
+      canvas.width = newCols * tileW;
       canvas.height = img.height;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
+      ctx.imageSmoothingEnabled = false;
 
-      // 1. Draw full image
-      ctx.drawImage(img, 0, 0);
-
-      // 2. Clear target frame slot
-      ctx.clearRect(col * tileW, row * tileH, tileW, tileH);
-
-      // 3. Scan row pixels to check remaining frames
-      const rowImgData = ctx.getImageData(0, row * tileH, img.width, tileH);
-      const data = rowImgData.data;
-
-      const isFrameNonEmpty = (c: number): boolean => {
-        const startX = c * tileW;
-        for (let y = 0; y < tileH; y++) {
-          for (let x = 0; x < tileW; x++) {
-            const idx = (y * img.width + (startX + x)) * 4;
-            if (data[idx + 3] > 15) return true;
-          }
-        }
-        return false;
-      };
-
-      // Check if any frame exists at or after `col` in this row
-      let hasFramesAtOrAfterCol = false;
-      for (let c = col; c < cols; c++) {
-        if (isFrameNonEmpty(c)) {
-          hasFramesAtOrAfterCol = true;
-          break;
-        }
+      // Copy left columns (0 up to col - 1)
+      if (col > 0) {
+        ctx.drawImage(img, 0, 0, col * tileW, img.height, 0, 0, col * tileW, img.height);
       }
 
-      // Check if any frame exists anywhere in this row
+      // Copy right columns (col + 1 to oldCols - 1) shifted left by 1 tileW
+      if (col < oldCols - 1) {
+        const rightSrcX = (col + 1) * tileW;
+        const rightW = (oldCols - col - 1) * tileW;
+        const rightDstX = col * tileW;
+        ctx.drawImage(img, rightSrcX, 0, rightW, img.height, rightDstX, 0, rightW, img.height);
+      }
+
+      const updatedUrl = canvas.toDataURL();
+
+      // Check if after deleting this column, the specified row has no non-empty frames left
+      const rowImgData = ctx.getImageData(0, row * tileH, canvas.width, tileH);
+      const data = rowImgData.data;
       let hasAnyFrameInRow = false;
-      for (let c = 0; c < cols; c++) {
-        if (isFrameNonEmpty(c)) {
+      for (let i = 3; i < data.length; i += 4) {
+        if (data[i] > 15) {
           hasAnyFrameInRow = true;
           break;
         }
@@ -482,20 +481,19 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
 
       setContextMenuTile(null);
 
-      // Rule: If no frames exist at or after `col` in this row, or if the row is empty: delete that action row!
-      if ((!hasFramesAtOrAfterCol || !hasAnyFrameInRow) && rows > 1) {
+      // If the row has become completely empty after column deletion, delete that action row!
+      if (!hasAnyFrameInRow && rows > 1) {
         handleDeleteActionRow(row);
         return;
       }
 
-      // Otherwise, save updated sprite sheet
-      const updatedUrl = canvas.toDataURL();
+      // Save updated sprite sheet with `cols = newCols`
       setCharImageOverrides((prev) => ({
         ...prev,
         [currentSelectedId]: {
           url: updatedUrl,
           rows: currentOption.rows,
-          cols: currentOption.cols,
+          cols: newCols,
           size: tileW
         }
       }));
