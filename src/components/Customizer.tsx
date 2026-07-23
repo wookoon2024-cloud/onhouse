@@ -109,67 +109,43 @@ export const Customizer: React.FC<CustomizerProps> = ({ player, onChange, onClos
         </div>
 
         {/* Dropdown Selectbox for Character Selection */}
-        <select
-          value={player.spriteType}
-          onChange={(e) => onChange({ spriteType: e.target.value })}
-          style={{
-            width: '100%', background: '#0d0d12', border: '1px solid var(--accent)',
-            borderRadius: '6px', padding: '10px 12px', color: '#fff', fontSize: '12px',
-            fontWeight: 'bold', outline: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
-          }}
-        >
-          {allCharOptions.map((char) => (
-            <option key={char.id} value={char.id}>
-              {char.name.startsWith('👤') || char.name.startsWith('⚔️') || char.name.startsWith('🥷') || char.name.startsWith('🌿') || char.name.startsWith('🐷') || char.name.startsWith('🐶')
-                ? char.name
-                : `👤 ${char.name}`}
-            </option>
-          ))}
-        </select>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <select
+            value={player.spriteType}
+            onChange={(e) => onChange({ spriteType: e.target.value })}
+            style={{
+              flex: 1, background: '#0d0d12', border: '1px solid var(--accent)',
+              borderRadius: '6px', padding: '10px 12px', color: '#fff', fontSize: '12px',
+              fontWeight: 'bold', outline: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
+            }}
+          >
+            {allCharOptions.map((char) => (
+              <option key={char.id} value={char.id}>
+                {char.name.startsWith('👤') || char.name.startsWith('⚔️') || char.name.startsWith('🥷') || char.name.startsWith('🌿') || char.name.startsWith('🐷') || char.name.startsWith('🐶')
+                  ? char.name
+                  : `👤 ${char.name}`}
+              </option>
+            ))}
+          </select>
 
-        <div style={{
-          display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px',
-          maxHeight: '160px', overflowY: 'auto', paddingRight: '4px'
-        }}>
-          {allCharOptions.map((char) => {
-            const isCustom = !DEFAULT_CHARACTERS.some(d => d.id === char.id);
-            const isSelected = player.spriteType === char.id;
-
-            return (
-              <div key={char.id} style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <button
-                  onClick={() => onChange({ spriteType: char.id })}
-                  style={{
-                    flex: 1, padding: isCustom ? '10px 24px 10px 8px' : '10px 8px', borderRadius: '6px',
-                    background: isSelected ? 'var(--primary)' : 'rgba(0,0,0,0.3)',
-                    color: '#fff', border: isSelected ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
-                    fontSize: '11px', fontWeight: 'bold', cursor: 'pointer',
-                    textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-                  }}
-                  title={char.name}
-                >
-                  {char.name.startsWith('👤') || char.name.startsWith('⚔️') || char.name.startsWith('🥷') || char.name.startsWith('🌿') || char.name.startsWith('🐷') || char.name.startsWith('🐶')
-                    ? char.name
-                    : `👤 ${char.name}`}
-                </button>
-
-                {isCustom && (
-                  <button
-                    onClick={(e) => handleDeleteCustomChar(e, char.id, char.name)}
-                    style={{
-                      position: 'absolute', right: '4px', background: 'rgba(243, 139, 168, 0.25)',
-                      border: '1px solid rgba(243, 139, 168, 0.4)', color: '#ff6b6b',
-                      borderRadius: '4px', padding: '3px', cursor: 'pointer', display: 'flex',
-                      alignItems: 'center', justifyContent: 'center'
-                    }}
-                    title="커스텀 캐릭터 삭제"
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                )}
-              </div>
-            );
-          })}
+          {/* Delete button if currently selected character is custom */}
+          {!DEFAULT_CHARACTERS.some(d => d.id === player.spriteType) && (
+            <button
+              onClick={(e) => {
+                const currentObj = allCharOptions.find(c => c.id === player.spriteType);
+                if (currentObj) handleDeleteCustomChar(e, currentObj.id, currentObj.name);
+              }}
+              style={{
+                padding: '10px', background: 'rgba(243, 139, 168, 0.2)',
+                border: '1px solid rgba(243, 139, 168, 0.4)', color: '#ff6b6b',
+                borderRadius: '6px', cursor: 'pointer', display: 'flex',
+                alignItems: 'center', justifyContent: 'center', flexShrink: 0
+              }}
+              title="선택된 커스텀 캐릭터 삭제"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
         </div>
       </div>
 
