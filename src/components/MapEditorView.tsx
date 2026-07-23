@@ -188,10 +188,19 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         setIsAltPressed(true);
       }
 
-      if (key === 'b') { setTool('brush'); }
-      else if (key === 'f' && editLayer !== 'collision') { setTool('bucket'); }
-      else if (key === 'e') { setTool('eyedropper'); }
-      else if (key === 'x' && editLayer !== 'collision') { setSelectedTile(-1); }
+      if (key === 'b') {
+        setTool('brush');
+        if (selectedTile === -1) setSelectedTile(getPrefixedIndex(0, activeTileset));
+      } else if (key === 'f' && editLayer !== 'collision') {
+        setTool('bucket');
+        if (selectedTile === -1) setSelectedTile(getPrefixedIndex(0, activeTileset));
+      } else if (key === 'e' && editLayer !== 'collision') {
+        setTool('eyedropper');
+        if (selectedTile === -1) setSelectedTile(getPrefixedIndex(0, activeTileset));
+      } else if (key === 'x' && editLayer !== 'collision') {
+        setSelectedTile(-1);
+        setTool('brush');
+      }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -205,13 +214,21 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       }
     };
 
+    const handleBlur = () => {
+      setIsAltPressed(false);
+      setIsSpaceHeld(false);
+      isSpacePressed.current = false;
+    };
+
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
     };
-  }, [editLayer]);
+  }, [editLayer, selectedTile, activeTileset]);
 
   // Drag-to-resize Right Palette Panel
   const handlePaletteResizeStart = (e: React.MouseEvent) => {
@@ -862,7 +879,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               cursor: 'pointer'
             }}
           >
-            <X size={14} /> 취소
+            <X size={14} /> 닫기
           </button>
           <button
             onClick={handleSave}
@@ -874,33 +891,6 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           >
             <Save size={14} /> 저장하기
           </button>
-          <button
-            onClick={handleExportBackup}
-            title="현재 저장된 모든 맵과 커스텀 에셋을 .json 파일로 PC에 즉시 백업 저장"
-            style={{
-              padding: '6px 10px', background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(96, 165, 250, 0.3)',
-              borderRadius: '6px', color: '#60a5fa', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px',
-              fontWeight: 'bold', cursor: 'pointer'
-            }}
-          >
-            <Download size={13} /> 백업 저장
-          </button>
-          <label
-            title="저장했던 .json 백업 파일에서 맵/에셋 전체 복원"
-            style={{
-              padding: '6px 10px', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(52, 211, 153, 0.3)',
-              borderRadius: '6px', color: '#34d399', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px',
-              fontWeight: 'bold', cursor: 'pointer'
-            }}
-          >
-            <Upload size={13} /> 백업 복원
-            <input
-              type="file"
-              accept=".json"
-              onChange={handleImportBackup}
-              style={{ display: 'none' }}
-            />
-          </label>
         </div>
 
         {/* Center: Map Selection Tabs with Add/Delete Controls */}
@@ -1166,12 +1156,14 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                   setTool('brush');
                   if (selectedTile === -1) setSelectedTile(getPrefixedIndex(0, activeTileset));
                 }}
+                disabled={editLayer === 'collision'}
                 style={{
                   flex: 1, padding: '8px 4px', fontSize: '10px', borderRadius: '4px',
-                  background: tool === 'brush' && selectedTile !== -1 ? 'rgba(139, 92, 246, 0.25)' : 'rgba(255,255,255,0.03)',
-                  color: tool === 'brush' && selectedTile !== -1 ? 'var(--accent)' : '#fff',
-                  border: tool === 'brush' && selectedTile !== -1 ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer'
+                  background: tool === 'brush' && selectedTile !== -1 && editLayer !== 'collision' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(255,255,255,0.03)',
+                  color: tool === 'brush' && selectedTile !== -1 && editLayer !== 'collision' ? 'var(--accent)' : '#fff',
+                  border: tool === 'brush' && selectedTile !== -1 && editLayer !== 'collision' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer',
+                  opacity: editLayer === 'collision' ? 0.4 : 1
                 }}
                 title="브러시 (단축키: B)"
               >
@@ -1179,13 +1171,16 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               </button>
 
               <button
-                onClick={() => setTool('bucket')}
+                onClick={() => {
+                  setTool('bucket');
+                  if (selectedTile === -1) setSelectedTile(getPrefixedIndex(0, activeTileset));
+                }}
                 disabled={editLayer === 'collision'}
                 style={{
                   flex: 1, padding: '8px 4px', fontSize: '10px', borderRadius: '4px',
-                  background: tool === 'bucket' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(255,255,255,0.03)',
-                  color: tool === 'bucket' ? 'var(--accent)' : '#fff',
-                  border: tool === 'bucket' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
+                  background: tool === 'bucket' && selectedTile !== -1 && editLayer !== 'collision' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(255,255,255,0.03)',
+                  color: tool === 'bucket' && selectedTile !== -1 && editLayer !== 'collision' ? 'var(--accent)' : '#fff',
+                  border: tool === 'bucket' && selectedTile !== -1 && editLayer !== 'collision' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer',
                   opacity: editLayer === 'collision' ? 0.4 : 1
                 }}
@@ -1195,14 +1190,18 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               </button>
 
               <button
-                onClick={() => setTool('eyedropper')}
+                onClick={() => {
+                  setTool('eyedropper');
+                  if (selectedTile === -1) setSelectedTile(getPrefixedIndex(0, activeTileset));
+                }}
+                disabled={editLayer === 'collision'}
                 style={{
                   flex: 1, padding: '8px 4px', fontSize: '10px', borderRadius: '4px',
-                  background: tool === 'eyedropper' || isAltPressed ? 'rgba(137, 220, 235, 0.3)' : 'rgba(255,255,255,0.03)',
-                  color: tool === 'eyedropper' || isAltPressed ? '#89dceb' : '#fff',
-                  border: tool === 'eyedropper' || isAltPressed ? '1px solid #89dceb' : '1px solid var(--border-glass)',
+                  background: (tool === 'eyedropper' || isAltPressed) && editLayer !== 'collision' ? 'rgba(137, 220, 235, 0.3)' : 'rgba(255,255,255,0.03)',
+                  color: (tool === 'eyedropper' || isAltPressed) && editLayer !== 'collision' ? '#89dceb' : '#fff',
+                  border: (tool === 'eyedropper' || isAltPressed) && editLayer !== 'collision' ? '1px solid #89dceb' : '1px solid var(--border-glass)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer',
-                  fontWeight: 'bold'
+                  fontWeight: 'bold', opacity: editLayer === 'collision' ? 0.4 : 1
                 }}
                 title="스포이드 (단축키: Alt + 클릭 / E)"
               >
@@ -1234,12 +1233,16 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               {editLayer !== 'collision' ? (
                 <>
                   <button
-                    onClick={() => setSelectedTile(-1)}
+                    onClick={() => {
+                      setSelectedTile(-1);
+                      setTool('brush');
+                    }}
                     style={{
                       width: '100%', padding: '8px', fontSize: '11px', borderRadius: '4px',
                       background: selectedTile === -1 ? 'var(--danger)' : 'rgba(255,255,255,0.03)',
-                      color: '#fff', border: '1px solid var(--border-glass)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer'
+                      color: '#fff', border: selectedTile === -1 ? '1px solid var(--danger)' : '1px solid var(--border-glass)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer',
+                      fontWeight: selectedTile === -1 ? 'bold' : 'normal'
                     }}
                     title="지우개 (단축키: X)"
                   >
@@ -1264,7 +1267,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                     style={{
                       flex: 1, padding: '8px', fontSize: '11px', borderRadius: '4px',
                       background: selectedTile === 1 ? 'var(--danger)' : 'rgba(255,255,255,0.03)',
-                      color: '#fff', border: '1px solid var(--border-glass)', cursor: 'pointer'
+                      color: '#fff', border: selectedTile === 1 ? '1px solid var(--danger)' : '1px solid var(--border-glass)',
+                      fontWeight: selectedTile === 1 ? 'bold' : 'normal', cursor: 'pointer'
                     }}
                   >
                     🚫 충돌 벽 추가
@@ -1274,7 +1278,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                     style={{
                       flex: 1, padding: '8px', fontSize: '11px', borderRadius: '4px',
                       background: selectedTile === 0 ? 'var(--primary)' : 'rgba(255,255,255,0.03)',
-                      color: '#fff', border: '1px solid var(--border-glass)', cursor: 'pointer'
+                      color: '#fff', border: selectedTile === 0 ? '1px solid var(--primary)' : '1px solid var(--border-glass)',
+                      fontWeight: selectedTile === 0 ? 'bold' : 'normal', cursor: 'pointer'
                     }}
                   >
                     🟢 충돌 제거
