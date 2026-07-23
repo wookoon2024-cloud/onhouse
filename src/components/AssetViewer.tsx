@@ -1359,6 +1359,47 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     return { dataUrl: canvas.toDataURL(), cols, rows };
   };
 
+  // 📏 Update custom character display size on map (in px)
+  const handleUpdateCharacterDisplaySize = (charId: string, newSize: number) => {
+    setCharImageOverrides((prev) => {
+      const existing = prev[charId] || {
+        url: currentOption.url,
+        rows: currentOption.rows,
+        cols: currentOption.cols,
+        size: newSize
+      };
+      const updated = {
+        ...prev,
+        [charId]: {
+          ...existing,
+          size: newSize
+        }
+      };
+      localStorage.setItem('on_house_char_image_overrides', JSON.stringify(updated));
+      return updated;
+    });
+
+    setCustomCharSprites((prev) => {
+      const updated = prev.map((item) => {
+        if (item.id === charId) {
+          return { ...item, size: newSize };
+        }
+        return item;
+      });
+      localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(updated));
+      return updated;
+    });
+
+    const currentHouse = getSavedHouseCode();
+    saveHouseAssetToDB(currentHouse, 'char_sprite', {
+      ...currentOption,
+      size: newSize
+    });
+
+    window.dispatchEvent(new Event('on_house_sprites_updated'));
+    setToastMessage(`📏 [${currentOption.name}] 맵 출력 크기가 ${newSize}px로 설정되었습니다!`);
+  };
+
   // Save new custom asset (Supports character creation by Name Only & Shows Upload Progress!)
   const handleSaveCustomAsset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1645,6 +1686,43 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
               >
                 <Trash2 size={12} /> 삭제
               </button>
+            )}
+
+            {/* Per-Character Map Display Size Adjustment Control (in px) */}
+            {activeTab === 'character' && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '5px',
+                background: 'rgba(139, 92, 246, 0.12)', border: '1px solid var(--accent)',
+                padding: '4px 8px', borderRadius: '6px'
+              }}>
+                <span style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  📏 맵 출력 크기:
+                </span>
+                <input
+                  type="number"
+                  min={12}
+                  max={128}
+                  step={2}
+                  value={currentOption?.size || 16}
+                  onChange={(e) => {
+                    const newSize = Math.max(12, Math.min(128, parseInt(e.target.value, 10) || 16));
+                    handleUpdateCharacterDisplaySize(currentSelectedId, newSize);
+                  }}
+                  style={{
+                    width: '44px',
+                    background: '#0d0d12',
+                    border: '1px solid var(--accent)',
+                    borderRadius: '4px',
+                    color: '#fff',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    textAlign: 'center',
+                    padding: '3px 4px',
+                    outline: 'none'
+                  }}
+                />
+                <span style={{ fontSize: '10px', color: '#aaa' }}>px</span>
+              </div>
             )}
           </div>
 

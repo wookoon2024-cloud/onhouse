@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { type MapDefinition, getCharRowActions, getCharGridDimensions } from './MapData';
+import { type MapDefinition, getCharRowActions, getCharGridDimensions, getCharDisplaySize } from './MapData';
 import type { PlayerState } from './syncManager';
 import { getDyedSprite } from './spriteDyer';
 
@@ -1213,10 +1213,18 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
           ctx.filter = 'none';
         }
 
+        // Get custom configured display size for this character (default 16px tile scale)
+        const baseCharSize = getCharDisplaySize(player.spriteType);
+        const charDrawW = Math.round((baseCharSize / 16) * vSize);
+        const charDrawH = Math.round((baseCharSize / 16) * vSize);
+
+        const drawX = Math.round(charDrawX - (charDrawW - vSize) / 2);
+        const drawY = Math.round(charDrawY - (charDrawH - vSize));
+
         if (maxRows === 1) {
           // For 1-row sprites like pig.png (default image faces LEFT):
-          const centerX = charDrawX + vSize / 2;
-          const centerY = charDrawY + vSize / 2;
+          const centerX = drawX + charDrawW / 2;
+          const centerY = drawY + charDrawH / 2;
           ctx.translate(centerX, centerY);
 
           // 1. Correct Left/Right Flip (Default pig faces Left -> Flip when moving Right)
@@ -1244,14 +1252,14 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
           ctx.drawImage(
             dyedSpriteSheet,
             col * tileW, row * tileH, tileW, tileH,
-            -vSize / 2, -vSize / 2, vSize, vSize
+            -charDrawW / 2, -charDrawH / 2, charDrawW, charDrawH
           );
         } else {
-          // Standard multi-row character sprites (Ninja, Samurai, Mario 32x32 / 64x64, etc.)
+          // Standard multi-row character sprites (rendered at custom character display size!)
           ctx.drawImage(
             dyedSpriteSheet,
             col * tileW, row * tileH, tileW, tileH,
-            charDrawX, charDrawY, vSize, vSize
+            drawX, drawY, charDrawW, charDrawH
           );
         }
 
@@ -1262,8 +1270,8 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         ctx.textBaseline = 'middle';
         ctx.textAlign = 'center';
 
-        const headCenterX = charDrawX + vSize / 2;
-        let currentY = charDrawY - 8; // Start right above player head sprite
+        const headCenterX = drawX + charDrawW / 2;
+        let currentY = drawY - 8; // Start right above player head sprite
 
         // 1. Draw Nickname (Bottom-most HUD element right above head with 📱 mobile icon if on mobile)
         ctx.font = '10px "DungGeunMo", monospace';

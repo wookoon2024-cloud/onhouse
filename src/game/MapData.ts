@@ -57,6 +57,30 @@ export function getCharGridDimensions(spriteType: string): { cols: number; rows:
   return { cols: 4, rows: 7 };
 }
 
+export function getCharDisplaySize(spriteType: string): number {
+  try {
+    const savedOverrides = localStorage.getItem('on_house_char_image_overrides');
+    if (savedOverrides) {
+      const overrides = JSON.parse(savedOverrides);
+      if (overrides[spriteType] && overrides[spriteType].size) {
+        return overrides[spriteType].size;
+      }
+    }
+    const savedCustom = localStorage.getItem('on_house_custom_char_sprites');
+    if (savedCustom) {
+      const customList = JSON.parse(savedCustom);
+      const matched = customList.find((item: any) => item.id === spriteType);
+      if (matched && matched.size) {
+        return matched.size;
+      }
+    }
+  } catch (e) {
+    // fallback
+  }
+
+  return 16; // Default base size is 16px tile scale
+}
+
 // Helper to create an empty 2D grid
 const createGrid = (w: number, h: number, fillVal: number): number[][] => {
   return Array.from({ length: h }, () => Array(w).fill(fillVal));
