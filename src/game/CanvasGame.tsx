@@ -1447,10 +1447,14 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
     };
   }, [assetsLoaded, images, currentMapId, dimensions, otherPlayers, offlinePlayers, chatBubbles, isEditMode, mapData]);
 
-  // Click on Canvas handler to interact with characters
+  // Click on Canvas handler to interact with characters, memos, or walk to floor destination
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (isEditMode) return; // Disable DMs while building!
     if (!canvasRef.current || !localPlayer) return;
+
+    // Always dismiss context menu if open
+    setMapContextMenu(null);
+
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
@@ -1462,6 +1466,7 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
     const gameX = clickX + cameraX;
     const gameY = clickY + cameraY;
 
+    // 1. Check if another player was clicked
     const candidates: { player: PlayerState; dist: number }[] = [];
 
     const checkCandidate = (p: PlayerState) => {
@@ -1488,7 +1493,43 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
     if (candidates.length > 0) {
       candidates.sort((a, b) => a.dist - b.dist);
       onPlayerClick(candidates[0].player);
+      return;
     }
+
+    // 2. Check if a Map Memo was clicked
+    if (memos && memos.length > 0) {
+      const clickedMemo = memos.find((m) => {
+        if (m.mapId !== currentMapId) return false;
+        const mx = m.x * tileScale + vSize / 2;
+        const my = m.y * tileScale + vSize / 2;
+        const dist = Math.hypot(gameX - mx, gameY - my);
+        return dist < 24;
+      });
+
+      if (clickedMemo) {
+        window.dispatchEvent(new CustomEvent('on_house_walk_to', {
+          detail: {
+            x: clickedMemo.x,
+            y: clickedMemo.y,
+            onArrival: () => {
+              onInteractMemo?.(clickedMemo);
+            }
+          }
+        }));
+        return;
+      }
+    }
+
+    // 3. Otherwise: Mouse Click Walk to floor destination (with BFS pathfinding!)
+    const targetX = Math.round(gameX / tileScale - 8);
+    const targetY = Math.round(gameY / tileScale - 8);
+
+    const clampedX = Math.max(0, Math.min(mapData.width * 16 - 16, targetX));
+    const clampedY = Math.max(0, Math.min(mapData.height * 16 - 16, targetY));
+
+    window.dispatchEvent(new CustomEvent('on_house_walk_to', {
+      detail: { x: clampedX, y: clampedY }
+    }));
   };
 
   // Editor: Paint tile trigger with Brush Size support!
@@ -1547,11 +1588,35 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
     }
   };
 
-  // Context menu blocker to allow seamless Right Click Drag panning
+  // Context menu handler for Right-Click on Map Floor to show "📝 이 위치에 메모 남기기"
   const handleContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (isEditMode) {
-      e.preventDefault();
-    }
+    e.preventDefault();
+    if (isEditMode) return;
+
+    if (!canvasRef.current || !localPlayer) return;
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+
+    const tileScale = getTileScale();
+    const { cameraX, cameraY } = getCameraCoords(localPlayer.x, localPlayer.y, mapData, dimensions.width, dimensions.height, tileScale);
+
+    const gameX = clickX + cameraX;
+    const gameY = clickY + cameraY;
+
+    const targetX = Math.round(gameX / tileScale - 8);
+    const targetY = Math.round(gameY / tileScale - 8);
+
+    const clampedX = Math.max(0, Math.min(mapData.width * 16 - 16, targetX));
+    const clampedY = Math.max(0, Math.min(mapData.height * 16 - 16, targetY));
+
+    setMapContextMenu({
+      clientX: e.clientX,
+      clientY: e.clientY,
+      worldX: clampedX,
+      worldY: clampedY
+    });
   };
 
   return (
@@ -1709,6 +1774,47 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
             ▼
           </button>
           <div />
+        </div>
+      )}
+
+      {/* Map Right-Click Context Menu Popup */}
+      {mapContextMenu && (
+        <div
+          style={{
+            position: 'fixed',
+            left: `${mapContextMenu.clientX}px`,
+            top: `${mapContextMenu.clientY}px`,
+            zIndex: 1200,
+            background: '#181825',
+            border: '1px solid var(--accent)',
+            borderRadius: '8px',
+            padding: '6px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.8)'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => {
+              onCreateMemoRequest?.(mapContextMenu.worldX, mapContextMenu.worldY);
+              setMapContextMenu(null);
+            }}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#fff',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              padding: '6px 10px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+            className="hover-highlight"
+          >
+            📝 이 위치에 메모 남기기
+          </button>
         </div>
       )}
     </div>
