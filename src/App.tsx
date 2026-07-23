@@ -252,11 +252,8 @@ export default function App() {
       setActiveMaps(mapsData);
       const fetchedMapIds = Object.keys(mapsData);
       if (fetchedMapIds.length > 0) {
-        setAvailableMapIds((prev) => {
-          const merged = Array.from(new Set([...prev, ...fetchedMapIds]));
-          localStorage.setItem('on_house_available_map_ids', JSON.stringify(merged));
-          return merged;
-        });
+        setAvailableMapIds(fetchedMapIds);
+        localStorage.setItem('on_house_available_map_ids', JSON.stringify(fetchedMapIds));
       }
     });
 
