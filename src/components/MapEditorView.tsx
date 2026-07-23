@@ -961,6 +961,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       const newBase = prev.baseLayer.map(r => [...r]);
       const newDecor = prev.decorLayer.map(r => [...r]);
       const newCollision = prev.collision.map(r => [...r]);
+      let nextObjects = prev.objects ? [...prev.objects] : [];
 
       let cols = brushSize;
       let rows = brushSize;
@@ -1026,7 +1027,6 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         }
       }
 
-      let nextObjects = prev.objects ? [...prev.objects] : [];
       if (isMultiTileObject) {
         const newObj: MapObjectInstance = {
           id: `obj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
