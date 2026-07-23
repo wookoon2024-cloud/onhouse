@@ -424,8 +424,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     mainImg.src = currentOption.url;
   };
 
-  // 🗑️ Delete Specific Frame Column (`col`, `row`)
-  // Rule: Delete target column from sprite sheet (shrank cols from N to N-1). If row becomes empty or cols <= 1, delete row.
+  // 🗑️ Delete/Clear Frame Cell (`col`, `row`)
+  // Rule: Clear target cell (col, row). Only shrink `cols` count if target column `col` AND all columns after `col` (c >= col) are completely empty across ALL rows!
   const handleDeleteFrameColumn = (col: number, row: number) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -435,59 +435,88 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       const tileW = Math.max(16, Math.floor(img.width / oldCols));
       const tileH = Math.max(16, Math.floor(img.height / rows));
 
-      // 1. If cols === 1 (only 1 column left): delete that action row!
-      if (oldCols <= 1) {
-        if (rows > 1) {
-          handleDeleteActionRow(row);
-        }
-        setContextMenuTile(null);
-        return;
-      }
-
-      // 2. Delete target column `col` across the sprite sheet
-      const newCols = oldCols - 1;
       const canvas = document.createElement('canvas');
-      canvas.width = newCols * tileW;
+      canvas.width = img.width;
       canvas.height = img.height;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
       ctx.imageSmoothingEnabled = false;
 
-      // Copy left columns (0 up to col - 1)
-      if (col > 0) {
-        ctx.drawImage(img, 0, 0, col * tileW, img.height, 0, 0, col * tileW, img.height);
-      }
+      // 1. Draw current full sprite sheet
+      ctx.drawImage(img, 0, 0);
 
-      // Copy right columns (col + 1 to oldCols - 1) shifted left by 1 tileW
-      if (col < oldCols - 1) {
-        const rightSrcX = (col + 1) * tileW;
-        const rightW = (oldCols - col - 1) * tileW;
-        const rightDstX = col * tileW;
-        ctx.drawImage(img, rightSrcX, 0, rightW, img.height, rightDstX, 0, rightW, img.height);
-      }
+      // 2. Clear target cell (col, row) -> make it transparent
+      ctx.clearRect(col * tileW, row * tileH, tileW, tileH);
 
-      const updatedUrl = canvas.toDataURL();
+      // Helper: Check if column `c` is completely empty across ALL rows
+      const isColumnEmpty = (c: number): boolean => {
+        if (c < 0 || c >= oldCols) return true;
+        const colData = ctx.getImageData(c * tileW, 0, tileW, img.height).data;
+        for (let i = 3; i < colData.length; i += 4) {
+          if (colData[i] > 10) return false; // Non-transparent pixel found
+        }
+        return true;
+      };
 
-      // Check if after deleting this column, the specified row has no non-empty frames left
-      const rowImgData = ctx.getImageData(0, row * tileH, canvas.width, tileH);
-      const data = rowImgData.data;
-      let hasAnyFrameInRow = false;
-      for (let i = 3; i < data.length; i += 4) {
-        if (data[i] > 15) {
-          hasAnyFrameInRow = true;
+      // 3. Check if target column `col` AND ALL columns after `col` (c >= col) are empty across ALL rows
+      let canTrimFromCol = true;
+      for (let c = col; c < oldCols; c++) {
+        if (!isColumnEmpty(c)) {
+          canTrimFromCol = false;
           break;
+        }
+      }
+
+      let newCols = oldCols;
+      if (canTrimFromCol && oldCols > 1) {
+        let lastNonEmptyCol = -1;
+        for (let c = col - 1; c >= 0; c--) {
+          if (!isColumnEmpty(c)) {
+            lastNonEmptyCol = c;
+            break;
+          }
+        }
+        newCols = Math.max(1, lastNonEmptyCol + 1);
+      }
+
+      // Crop width if column count decreased
+      let finalCanvas = canvas;
+      if (newCols !== oldCols) {
+        const cropCanvas = document.createElement('canvas');
+        cropCanvas.width = newCols * tileW;
+        cropCanvas.height = img.height;
+        const cropCtx = cropCanvas.getContext('2d');
+        if (cropCtx) {
+          cropCtx.imageSmoothingEnabled = false;
+          cropCtx.drawImage(canvas, 0, 0, cropCanvas.width, cropCanvas.height, 0, 0, cropCanvas.width, cropCanvas.height);
+          finalCanvas = cropCanvas;
+        }
+      }
+
+      const updatedUrl = finalCanvas.toDataURL();
+
+      // Check if after clearing, that action row has no frames left anywhere
+      const finalCtx = finalCanvas.getContext('2d');
+      let rowIsEmpty = true;
+      if (finalCtx) {
+        const rowData = finalCtx.getImageData(0, row * tileH, finalCanvas.width, tileH).data;
+        for (let i = 3; i < rowData.length; i += 4) {
+          if (rowData[i] > 10) {
+            rowIsEmpty = false;
+            break;
+          }
         }
       }
 
       setContextMenuTile(null);
 
-      // If the row has become completely empty after column deletion, delete that action row!
-      if (!hasAnyFrameInRow && rows > 1) {
+      // If the row became completely empty and multiple rows exist, delete action row
+      if (rowIsEmpty && rows > 1) {
         handleDeleteActionRow(row);
         return;
       }
 
-      // Save updated sprite sheet with `cols = newCols`
+      // Save updated sprite sheet
       setCharImageOverrides((prev) => ({
         ...prev,
         [currentSelectedId]: {
