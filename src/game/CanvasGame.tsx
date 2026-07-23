@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { type MapDefinition, getCharRowActions, getCharGridDimensions, getCharDisplaySize } from './MapData';
+import { type MapDefinition, type MapObjectInstance, getCharRowActions, getCharGridDimensions, getCharDisplaySize } from './MapData';
 import type { PlayerState } from './syncManager';
 import { getDyedSprite } from './spriteDyer';
 
@@ -1285,11 +1285,33 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         ctx.restore();
       };
 
-      // 3. Render Layer 2 Decor Tiles & Players Interleaved Row by Row (Y-Depth Sorting!)
+      // 3. Render Layer 2 Decor Tiles, Objects & Players Interleaved Row by Row (Y-Depth Sorting!)
+      const objectTilesSet = new Set<string>();
+      const objectRootRowMap: Record<number, MapObjectInstance[]> = {};
+
+      if (map.objects && map.objects.length > 0) {
+        map.objects.forEach((obj) => {
+          const rootRow = obj.y + obj.height - 1;
+          if (!objectRootRowMap[rootRow]) {
+            objectRootRowMap[rootRow] = [];
+          }
+          objectRootRowMap[rootRow].push(obj);
+
+          // Track tile cells owned by this object
+          for (let ody = 0; ody < obj.height; ody++) {
+            for (let odx = 0; odx < obj.width; odx++) {
+              objectTilesSet.add(`${obj.x + odx}_${obj.y + ody}`);
+            }
+          }
+        });
+      }
+
       let renderPlayerIdx = 0;
       for (let ty = 0; ty < map.height; ty++) {
-        // A. Render Layer 2 Decor Tiles for current row ty
+        // A. Render Standalone Layer 2 Decor Tiles for current row ty (skipping object-owned tiles)
         for (let tx = 0; tx < map.width; tx++) {
+          if (objectTilesSet.has(`${tx}_${ty}`)) continue;
+
           const tileIdx = map.decorLayer[ty][tx];
           const drawInfo = getTileDrawInfo(tileIdx, map.tileset);
           if (drawInfo) {
@@ -1309,7 +1331,37 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
           }
         }
 
-        // B. Render all players whose feet Y falls within or before current row ty
+        // B. Render Objects rooted at this row (ty), sorted by zIndex ascending
+        const objectsAtRow = objectRootRowMap[ty];
+        if (objectsAtRow && objectsAtRow.length > 0) {
+          const sortedObjs = [...objectsAtRow].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+          sortedObjs.forEach((obj) => {
+            const tsInfo = getTilesetInfo(obj.tilesetKey);
+            const img = images[obj.tilesetKey];
+            if (img && tsInfo) {
+              const tileW = Math.max(1, Math.floor(img.width / tsInfo.cols));
+              const tileH = Math.max(1, Math.floor(img.height / tsInfo.rows));
+              for (let ody = 0; ody < obj.height; ody++) {
+                for (let odx = 0; odx < obj.width; odx++) {
+                  const targetTx = obj.x + odx;
+                  const targetTy = obj.y + ody;
+                  if (targetTx >= 0 && targetTx < map.width && targetTy >= 0 && targetTy < map.height) {
+                    const localIdx = (obj.startRow + ody) * tsInfo.cols + (obj.startCol + odx);
+                    const srcX = (localIdx % tsInfo.cols) * tileW;
+                    const srcY = Math.floor(localIdx / tsInfo.cols) * tileH;
+                    ctx.drawImage(
+                      img,
+                      srcX, srcY, tileW, tileH,
+                      targetTx * vSize, targetTy * vSize, vSize, vSize
+                    );
+                  }
+                }
+              }
+            }
+          });
+        }
+
+        // C. Render all players whose feet Y falls within or before current row ty
         const rowBottomY = (ty + 1) * 16;
         while (renderPlayerIdx < renderList.length && renderList[renderPlayerIdx].y < rowBottomY) {
           renderPlayer(renderList[renderPlayerIdx]);

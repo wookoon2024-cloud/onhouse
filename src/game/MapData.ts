@@ -1,3 +1,16 @@
+export interface MapObjectInstance {
+  id: string;
+  tilesetKey: string;
+  startCol: number;
+  startRow: number;
+  width: number;
+  height: number;
+  x: number; // 맵 타일 X 좌표
+  y: number; // 맵 타일 Y 좌표
+  layer: 'base' | 'decor';
+  zIndex?: number; // 앞뒤 순서 제어용 z-index
+}
+
 export interface MapDefinition {
   id: string;
   name: string;
@@ -8,6 +21,7 @@ export interface MapDefinition {
   decorLayer: number[][]; // 2D array for decorations
   collision: boolean[][]; // 2D array of colliders (true = solid)
   spawnPoints: { x: number; y: number }[];
+  objects?: MapObjectInstance[];
 }
 
 export const DEFAULT_CHAR_ROW_ACTIONS: Record<string, string[]> = {

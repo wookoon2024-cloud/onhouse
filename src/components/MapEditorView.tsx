@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { type MapDefinition, maps, PRESET_MAP_TEMPLATES } from '../game/MapData';
-import { Trash2, Save, X, Undo, Redo, Pipette, Paintbrush, PaintBucket, Eraser, Info, Sparkles, Plus, Download, Upload, Pencil } from 'lucide-react';
+import { type MapDefinition, type MapObjectInstance, maps, PRESET_MAP_TEMPLATES } from '../game/MapData';
+import { Trash2, Save, X, Undo, Redo, Pipette, Paintbrush, PaintBucket, Eraser, Info, Sparkles, Plus, Download, Upload, Pencil, MousePointer, Copy, Layers, MoveUp, MoveDown } from 'lucide-react';
 import { getTileDrawInfo, getTilesetInfo } from '../game/CanvasGame';
 
 import interiorTilesUrl from '../assets/interior_tiles.png';
@@ -58,8 +58,18 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   // Brush & Tools
   const [selectedTile, setSelectedTile] = useState<number>(1199);
   const [brushSize, setBrushSize] = useState<number>(1);
-  const [tool, setTool] = useState<'brush' | 'bucket' | 'eyedropper'>('brush');
+  const [tool, setTool] = useState<'brush' | 'bucket' | 'eyedropper' | 'select'>('brush');
   const [autoCollision, setAutoCollision] = useState<boolean>(true);
+
+  // Palette Drag Selection Box State (Step 1)
+  const [paletteDragStart, setPaletteDragStart] = useState<{ col: number; row: number } | null>(null);
+  const [paletteSelection, setPaletteSelection] = useState<{ startCol: number; startRow: number; cols: number; rows: number; tilesetKey: string } | null>(null);
+
+  // Object Selection & Smart Editing State (Step 3 & 4)
+  const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
+  const [copiedObject, setCopiedObject] = useState<MapObjectInstance | null>(null);
+  const [isDraggingObject, setIsDraggingObject] = useState<boolean>(false);
+  const [objectDragStart, setObjectDragStart] = useState<{ originX: number; originY: number; startTx: number; startTy: number } | null>(null);
 
   // Eyedropper Toast Notification
   const [pickedToast, setPickedToast] = useState<string | null>(null);
@@ -149,7 +159,144 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   const handleUndoRef = useRef<() => void>(() => {});
   const handleRedoRef = useRef<() => void>(() => {});
 
-  // Keyboard Shortcuts: Space (Pan map), Ctrl+Z (Undo), Ctrl+Y / Ctrl+Shift+Z (Redo), Alt, B, F, E, X
+  // Helper handlers for Smart Object Management (Steps 3 & 4)
+  const handleDeleteSelectedObject = (targetId?: string) => {
+    const objId = targetId || selectedObjectId;
+    if (!objId) return;
+
+    setHistory(prev => [...prev, localMap]);
+    setRedoHistory([]);
+
+    setLocalMap(prev => {
+      const obj = prev.objects?.find(o => o.id === objId);
+      if (!obj) return prev;
+
+      const newBase = prev.baseLayer.map(r => [...r]);
+      const newDecor = prev.decorLayer.map(r => [...r]);
+      const newCollision = prev.collision.map(r => [...r]);
+
+      for (let ody = 0; ody < obj.height; ody++) {
+        for (let odx = 0; odx < obj.width; odx++) {
+          const ptx = obj.x + odx;
+          const pty = obj.y + ody;
+          if (ptx >= 0 && ptx < prev.width && pty >= 0 && pty < prev.height) {
+            if (obj.layer === 'base') newBase[pty][ptx] = -1;
+            else if (obj.layer === 'decor') {
+              newDecor[pty][ptx] = -1;
+              if (autoCollision) newCollision[pty][ptx] = false;
+            }
+          }
+        }
+      }
+
+      return {
+        ...prev,
+        baseLayer: newBase,
+        decorLayer: newDecor,
+        collision: newCollision,
+        objects: (prev.objects || []).filter(o => o.id !== objId)
+      };
+    });
+
+    setSelectedObjectId(null);
+  };
+
+  const handleCopySelectedObject = () => {
+    if (!selectedObjectId) return;
+    const obj = localMap.objects?.find(o => o.id === selectedObjectId);
+    if (obj) {
+      setCopiedObject(obj);
+      setPickedToast(`'${obj.tilesetKey}' 에셋이 클립보드에 복사되었습니다! (Ctrl+V로 붙여넣기)`);
+      setTimeout(() => setPickedToast(null), 2200);
+    }
+  };
+
+  const handlePasteObject = (targetTx?: number, targetTy?: number) => {
+    if (!copiedObject) return;
+    const destX = targetTx !== undefined ? targetTx : (hoverTile ? hoverTile.x : copiedObject.x + 1);
+    const destY = targetTy !== undefined ? targetTy : (hoverTile ? hoverTile.y : copiedObject.y + 1);
+
+    const newId = `obj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const pastedObj: MapObjectInstance = {
+      ...copiedObject,
+      id: newId,
+      x: destX,
+      y: destY,
+      zIndex: Date.now()
+    };
+
+    setHistory(prev => [...prev, localMap]);
+    setRedoHistory([]);
+
+    setLocalMap(prev => {
+      const newBase = prev.baseLayer.map(r => [...r]);
+      const newDecor = prev.decorLayer.map(r => [...r]);
+      const newCollision = prev.collision.map(r => [...r]);
+
+      const tsInfo = getTilesetInfoLocal(pastedObj.tilesetKey);
+      if (tsInfo) {
+        for (let ody = 0; ody < pastedObj.height; ody++) {
+          for (let odx = 0; odx < pastedObj.width; odx++) {
+            const ptx = destX + odx;
+            const pty = destY + ody;
+            if (ptx >= 0 && ptx < prev.width && pty >= 0 && pty < prev.height) {
+              const localIdx = (pastedObj.startRow + ody) * tsInfo.cols + (pastedObj.startCol + odx);
+              const tileToPaint = getPrefixedIndex(localIdx, pastedObj.tilesetKey);
+              if (pastedObj.layer === 'base') {
+                newBase[pty][ptx] = tileToPaint;
+              } else {
+                newDecor[pty][ptx] = tileToPaint;
+                if (autoCollision) newCollision[pty][ptx] = true;
+              }
+            }
+          }
+        }
+      }
+
+      return {
+        ...prev,
+        baseLayer: newBase,
+        decorLayer: newDecor,
+        collision: newCollision,
+        objects: [...(prev.objects || []), pastedObj]
+      };
+    });
+
+    setSelectedObjectId(newId);
+    setTool('select');
+  };
+
+  const handleBringToFront = (objId?: string) => {
+    const id = objId || selectedObjectId;
+    if (!id) return;
+    setLocalMap(prev => {
+      const objs = prev.objects || [];
+      const maxZ = Math.max(...objs.map(o => o.zIndex || 0), 0);
+      return {
+        ...prev,
+        objects: objs.map(o => o.id === id ? { ...o, zIndex: maxZ + 1 } : o)
+      };
+    });
+    setPickedToast('오브젝트를 맨 앞으로 가져왔습니다!');
+    setTimeout(() => setPickedToast(null), 1500);
+  };
+
+  const handleSendToBack = (objId?: string) => {
+    const id = objId || selectedObjectId;
+    if (!id) return;
+    setLocalMap(prev => {
+      const objs = prev.objects || [];
+      const minZ = Math.min(...objs.map(o => o.zIndex || 0), 0);
+      return {
+        ...prev,
+        objects: objs.map(o => o.id === id ? { ...o, zIndex: minZ - 1 } : o)
+      };
+    });
+    setPickedToast('오브젝트를 맨 뒤로 보냈습니다!');
+    setTimeout(() => setPickedToast(null), 1500);
+  };
+
+  // Keyboard Shortcuts: Space (Pan map), Ctrl+Z (Undo), Ctrl+Y (Redo), Alt, B, F, E, X, V, Delete, Ctrl+C, Ctrl+V
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isInput = document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA';
@@ -185,6 +332,30 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         return;
       }
 
+      if (isCtrl && key === 'c') {
+        if (selectedObjectId) {
+          e.preventDefault();
+          handleCopySelectedObject();
+        }
+        return;
+      }
+
+      if (isCtrl && key === 'v') {
+        if (copiedObject) {
+          e.preventDefault();
+          handlePasteObject();
+        }
+        return;
+      }
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedObjectId) {
+          e.preventDefault();
+          handleDeleteSelectedObject();
+        }
+        return;
+      }
+
       if (e.key === 'Alt') {
         setIsAltPressed(true);
       }
@@ -198,6 +369,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       } else if (key === 'e' && editLayer !== 'collision') {
         setTool('eyedropper');
         if (selectedTile === -1) setSelectedTile(getPrefixedIndex(0, activeTileset));
+      } else if (key === 'v') {
+        setTool('select');
       } else if (key === 'x' && editLayer !== 'collision') {
         setSelectedTile(-1);
         setTool('brush');
@@ -402,7 +575,34 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       }
     }
 
-    // 5. Hover Cursor Tile Preview / Eyedropper Highlight
+    // 5. Objects Bounding Boxes Overlay
+    if (localMap.objects && localMap.objects.length > 0) {
+      localMap.objects.forEach(obj => {
+        const isSelected = obj.id === selectedObjectId;
+        const ox = obj.x * tileSize;
+        const oy = obj.y * tileSize;
+        const ow = obj.width * tileSize;
+        const oh = obj.height * tileSize;
+
+        ctx.save();
+        if (isSelected) {
+          ctx.strokeStyle = '#f5c2e7';
+          ctx.lineWidth = 2.5;
+          ctx.setLineDash([5, 5]);
+          ctx.fillStyle = 'rgba(245, 194, 231, 0.2)';
+          ctx.fillRect(ox, oy, ow, oh);
+          ctx.strokeRect(ox, oy, ow, oh);
+        } else if (tool === 'select') {
+          ctx.strokeStyle = 'rgba(139, 92, 246, 0.5)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([3, 3]);
+          ctx.strokeRect(ox, oy, ow, oh);
+        }
+        ctx.restore();
+      });
+    }
+
+    // 6. Hover Cursor Tile Preview / Eyedropper Highlight
     if (hoverTile && hoverTile.x >= 0 && hoverTile.x < localMap.width && hoverTile.y >= 0 && hoverTile.y < localMap.height) {
       ctx.save();
       const hx = hoverTile.x * tileSize;
@@ -416,25 +616,39 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         ctx.fillRect(hx, hy, tileSize, tileSize);
         ctx.strokeRect(hx, hy, tileSize, tileSize);
       } else {
-        const bw = Math.min(localMap.width - hoverTile.x, brushSize) * tileSize;
-        const bh = Math.min(localMap.height - hoverTile.y, brushSize) * tileSize;
+        let pCols = brushSize;
+        let pRows = brushSize;
+        let pStartCol = 0;
+        let pStartRow = 0;
+
+        const drawInfo = getTileDrawInfo(selectedTile, activeTileset);
+        const tsInfo = drawInfo ? getTilesetInfoLocal(drawInfo.tilesetKey) : null;
+
+        if (paletteSelection && paletteSelection.tilesetKey === activeTileset) {
+          pCols = paletteSelection.cols;
+          pRows = paletteSelection.rows;
+          pStartCol = paletteSelection.startCol;
+          pStartRow = paletteSelection.startRow;
+        } else if (drawInfo && tsInfo) {
+          pStartCol = drawInfo.localIdx % tsInfo.cols;
+          pStartRow = Math.floor(drawInfo.localIdx / tsInfo.cols);
+        }
+
+        const bw = Math.min(localMap.width - hoverTile.x, pCols) * tileSize;
+        const bh = Math.min(localMap.height - hoverTile.y, pRows) * tileSize;
 
         // Draw real-time multi-tile object texture preview under mouse cursor!
-        if (selectedTile !== -1 && editLayer !== 'collision') {
+        if (selectedTile !== -1 && editLayer !== 'collision' && tool !== 'select') {
           ctx.globalAlpha = 0.75;
-          const drawInfo = getTileDrawInfo(selectedTile, activeTileset);
-          if (drawInfo) {
-            const img = images[drawInfo.tilesetKey];
-            const tsInfo = getTilesetInfoLocal(drawInfo.tilesetKey);
-            if (img && tsInfo) {
-              const baseCol = drawInfo.localIdx % tsInfo.cols;
-              const baseRow = Math.floor(drawInfo.localIdx / tsInfo.cols);
-              for (let dy = 0; dy < brushSize; dy++) {
-                for (let dx = 0; dx < brushSize; dx++) {
+          if (tsInfo) {
+            const img = images[drawInfo?.tilesetKey || activeTileset];
+            if (img) {
+              for (let dy = 0; dy < pRows; dy++) {
+                for (let dx = 0; dx < pCols; dx++) {
                   const px = hoverTile.x + dx;
                   const py = hoverTile.y + dy;
-                  const targetCol = baseCol + dx;
-                  const targetRow = baseRow + dy;
+                  const targetCol = pStartCol + dx;
+                  const targetRow = pStartRow + dy;
                   if (px < localMap.width && py < localMap.height && targetCol < tsInfo.cols && targetRow < tsInfo.rows) {
                     ctx.drawImage(
                       img,
@@ -449,9 +663,9 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           ctx.globalAlpha = 1.0;
         }
 
-        ctx.strokeStyle = '#f9e2af';
+        ctx.strokeStyle = tool === 'select' ? '#f5c2e7' : '#f9e2af';
         ctx.lineWidth = 2;
-        ctx.fillStyle = 'rgba(249, 226, 175, 0.15)';
+        ctx.fillStyle = tool === 'select' ? 'rgba(245, 194, 231, 0.15)' : 'rgba(249, 226, 175, 0.15)';
         ctx.fillRect(hx, hy, bw, bh);
         ctx.strokeRect(hx, hy, bw, bh);
       }
@@ -653,6 +867,62 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     }));
   };
 
+  const handleMoveObjectTiles = (objId: string, newTx: number, newTy: number) => {
+    setLocalMap(prev => {
+      const obj = prev.objects?.find(o => o.id === objId);
+      if (!obj) return prev;
+      if (obj.x === newTx && obj.y === newTy) return prev;
+
+      const newBase = prev.baseLayer.map(r => [...r]);
+      const newDecor = prev.decorLayer.map(r => [...r]);
+      const newCollision = prev.collision.map(r => [...r]);
+
+      // Erase old tiles
+      for (let ody = 0; ody < obj.height; ody++) {
+        for (let odx = 0; odx < obj.width; odx++) {
+          const oldX = obj.x + odx;
+          const oldY = obj.y + ody;
+          if (oldX >= 0 && oldX < prev.width && oldY >= 0 && oldY < prev.height) {
+            if (obj.layer === 'base') newBase[oldY][oldX] = -1;
+            else if (obj.layer === 'decor') {
+              newDecor[oldY][oldX] = -1;
+              if (autoCollision) newCollision[oldY][oldX] = false;
+            }
+          }
+        }
+      }
+
+      // Paint new tiles at new position
+      const tsInfo = getTilesetInfoLocal(obj.tilesetKey);
+      if (tsInfo) {
+        for (let ody = 0; ody < obj.height; ody++) {
+          for (let odx = 0; odx < obj.width; odx++) {
+            const nX = newTx + odx;
+            const nY = newTy + ody;
+            if (nX >= 0 && nX < prev.width && nY >= 0 && nY < prev.height) {
+              const localIdx = (obj.startRow + ody) * tsInfo.cols + (obj.startCol + odx);
+              const tileToPaint = getPrefixedIndex(localIdx, obj.tilesetKey);
+              if (obj.layer === 'base') {
+                newBase[nY][nX] = tileToPaint;
+              } else {
+                newDecor[nY][nX] = tileToPaint;
+                if (autoCollision) newCollision[nY][nX] = true;
+              }
+            }
+          }
+        }
+      }
+
+      return {
+        ...prev,
+        baseLayer: newBase,
+        decorLayer: newDecor,
+        collision: newCollision,
+        objects: (prev.objects || []).map(o => o.id === objId ? { ...o, x: newTx, y: newTy } : o)
+      };
+    });
+  };
+
   const handlePaint = (tx: number, ty: number) => {
     if (tx < 0 || tx >= localMap.width || ty < 0 || ty >= localMap.height) return;
 
@@ -661,8 +931,26 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       const newDecor = prev.decorLayer.map(r => [...r]);
       const newCollision = prev.collision.map(r => [...r]);
 
-      for (let dy = 0; dy < brushSize; dy++) {
-        for (let dx = 0; dx < brushSize; dx++) {
+      let cols = brushSize;
+      let rows = brushSize;
+      let startCol = 0;
+      let startRow = 0;
+
+      const drawInfo = getTileDrawInfo(selectedTile, activeTileset);
+      const tsInfo = drawInfo ? getTilesetInfoLocal(drawInfo.tilesetKey) : null;
+
+      if (paletteSelection && paletteSelection.tilesetKey === activeTileset) {
+        cols = paletteSelection.cols;
+        rows = paletteSelection.rows;
+        startCol = paletteSelection.startCol;
+        startRow = paletteSelection.startRow;
+      } else if (drawInfo && tsInfo) {
+        startCol = drawInfo.localIdx % tsInfo.cols;
+        startRow = Math.floor(drawInfo.localIdx / tsInfo.cols);
+      }
+
+      for (let dy = 0; dy < rows; dy++) {
+        for (let dx = 0; dx < cols; dx++) {
           const ptx = tx + dx;
           const pty = ty + dy;
 
@@ -677,7 +965,14 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                 if (autoCollision) newCollision[pty][ptx] = false;
               }
             } else {
-              const tileToPaint = getOffsetTile(selectedTile, activeTileset, dx, dy);
+              let tileToPaint = selectedTile;
+              if (paletteSelection && paletteSelection.tilesetKey === activeTileset && tsInfo) {
+                const lIdx = (startRow + dy) * tsInfo.cols + (startCol + dx);
+                tileToPaint = getPrefixedIndex(lIdx, activeTileset);
+              } else {
+                tileToPaint = getOffsetTile(selectedTile, activeTileset, dx, dy);
+              }
+
               if (editLayer === 'base') {
                 newBase[pty][ptx] = tileToPaint;
               } else if (editLayer === 'decor') {
@@ -691,11 +986,31 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         }
       }
 
+      let nextObjects = prev.objects ? [...prev.objects] : [];
+      if ((cols > 1 || rows > 1) && selectedTile !== -1 && editLayer !== 'collision') {
+        const newObj: MapObjectInstance = {
+          id: `obj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          tilesetKey: activeTileset,
+          startCol,
+          startRow,
+          width: cols,
+          height: rows,
+          x: tx,
+          y: ty,
+          layer: editLayer === 'collision' ? 'decor' : editLayer,
+          zIndex: Date.now()
+        };
+
+        nextObjects = nextObjects.filter(o => !(o.x === tx && o.y === ty));
+        nextObjects.push(newObj);
+      }
+
       return {
         ...prev,
         baseLayer: newBase,
         decorLayer: newDecor,
-        collision: newCollision
+        collision: newCollision,
+        objects: nextObjects
       };
     });
   };
@@ -746,6 +1061,20 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       return;
     }
 
+    if (tool === 'select') {
+      const clickedObj = (localMap.objects || []).slice().reverse().find(o =>
+        tx >= o.x && tx < o.x + o.width && ty >= o.y && ty < o.y + o.height
+      );
+      if (clickedObj) {
+        setSelectedObjectId(clickedObj.id);
+        setIsDraggingObject(true);
+        setObjectDragStart({ originX: e.clientX, originY: e.clientY, startTx: clickedObj.x, startTy: clickedObj.y });
+      } else {
+        setSelectedObjectId(null);
+      }
+      return;
+    }
+
     setHistory(prev => [...prev, localMap]);
     setRedoHistory([]);
 
@@ -775,11 +1104,31 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       return { x: tx, y: ty };
     });
 
+    if (isDraggingObject && selectedObjectId && objectDragStart) {
+      const deltaTx = Math.round((e.clientX - objectDragStart.originX) / tileSize);
+      const deltaTy = Math.round((e.clientY - objectDragStart.originY) / tileSize);
+      const targetTx = Math.max(0, Math.min(localMap.width - 1, objectDragStart.startTx + deltaTx));
+      const targetTy = Math.max(0, Math.min(localMap.height - 1, objectDragStart.startTy + deltaTy));
+
+      const curObj = localMap.objects?.find(o => o.id === selectedObjectId);
+      if (curObj && (curObj.x !== targetTx || curObj.y !== targetTy)) {
+        handleMoveObjectTiles(selectedObjectId, targetTx, targetTy);
+      }
+      return;
+    }
+
     if (!isPainting.current || (tool as string) !== 'brush' || e.altKey || isAltPressed) return;
 
     if (lastPaintedCellRef.current?.x === tx && lastPaintedCellRef.current?.y === ty) return;
     lastPaintedCellRef.current = { x: tx, y: ty };
     handlePaint(tx, ty);
+  };
+
+  const handleCanvasMouseUp = () => {
+    isPainting.current = false;
+    lastPaintedCellRef.current = null;
+    setIsDraggingObject(false);
+    setObjectDragStart(null);
   };
 
   const handleCanvasMouseLeave = () => {
@@ -1262,6 +1611,21 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               >
                 <Pipette size={12} /> 스포이드
               </button>
+
+              <button
+                onClick={() => setTool('select')}
+                style={{
+                  flex: 1, padding: '8px 4px', fontSize: '10px', borderRadius: '4px',
+                  background: tool === 'select' ? 'rgba(245, 194, 231, 0.3)' : 'rgba(255,255,255,0.03)',
+                  color: tool === 'select' ? '#f5c2e7' : '#fff',
+                  border: tool === 'select' ? '1px solid #f5c2e7' : '1px solid var(--border-glass)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer',
+                  fontWeight: tool === 'select' ? 'bold' : 'normal'
+                }}
+                title="오브젝트 스마트 선택 & 이동/편집 (단축키: V)"
+              >
+                <MousePointer size={12} /> 오브젝트 (V)
+              </button>
             </div>
 
             {tool === 'brush' && (
@@ -1417,6 +1781,56 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               style={{ padding: '4px 8px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-glass)', color: '#fff', borderRadius: '4px', cursor: 'pointer' }}
             >+</button>
           </div>
+
+          {/* Floating Object Smart Edit Action Bar (Fixed on bottom center) */}
+          {selectedObjectId && (
+            <div style={{
+              position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 100,
+              background: 'rgba(20, 20, 32, 0.95)', border: '1px solid #f5c2e7',
+              borderRadius: '8px', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '8px',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)',
+              pointerEvents: 'auto', animation: 'fadeIn 0.15s ease-out'
+            }}>
+              <span style={{ fontSize: '11px', color: '#f5c2e7', fontWeight: 'bold' }}>
+                📦 오브젝트 선택됨
+              </span>
+              <div style={{ width: '1px', height: '14px', background: 'rgba(255,255,255,0.2)' }} />
+              <button
+                onClick={() => handleBringToFront()}
+                style={{ padding: '4px 8px', fontSize: '10px', borderRadius: '4px', background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid var(--border-glass)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                title="맨 앞으로 가져오기"
+              >
+                <MoveUp size={12} /> 맨 앞으로
+              </button>
+              <button
+                onClick={() => handleSendToBack()}
+                style={{ padding: '4px 8px', fontSize: '10px', borderRadius: '4px', background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid var(--border-glass)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                title="맨 뒤로 보내기"
+              >
+                <MoveDown size={12} /> 맨 뒤로
+              </button>
+              <button
+                onClick={() => handleCopySelectedObject()}
+                style={{ padding: '4px 8px', fontSize: '10px', borderRadius: '4px', background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid var(--border-glass)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                title="복사 (Ctrl+C)"
+              >
+                <Copy size={12} /> 복사
+              </button>
+              <button
+                onClick={() => handleDeleteSelectedObject()}
+                style={{ padding: '4px 8px', fontSize: '10px', borderRadius: '4px', background: 'var(--danger)', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}
+                title="삭제 (Delete)"
+              >
+                <Trash2 size={12} /> 삭제
+              </button>
+              <button
+                onClick={() => setSelectedObjectId(null)}
+                style={{ padding: '4px 6px', fontSize: '10px', borderRadius: '4px', background: 'transparent', color: '#aaa', border: 'none', cursor: 'pointer' }}
+              >
+                <X size={12} />
+              </button>
+            </div>
+          )}
 
           {/* 🧪 Eyedropper Toast Notification (Fixed on top right) */}
           {pickedToast && (
@@ -1641,10 +2055,49 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                 }}
               />
               
-              {/* Clickable Overlay Grid Cells */}
+              {/* Clickable & Drag-Selectable Overlay Grid Cells */}
               <div
-                onMouseLeave={() => setHoverPaletteTile(null)}
-                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+                onMouseDown={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const px = e.clientX - rect.left;
+                  const py = e.clientY - rect.top;
+                  const tCol = Math.floor(px / (16 * paletteZoom));
+                  const tRow = Math.floor(py / (16 * paletteZoom));
+                  if (tCol >= 0 && tCol < tilesetCols && tRow >= 0 && tRow < tilesetRows) {
+                    setPaletteDragStart({ col: tCol, row: tRow });
+                    setPaletteSelection({ startCol: tCol, startRow: tRow, cols: 1, rows: 1, tilesetKey: activeTileset });
+                    const localIdx = tRow * tilesetCols + tCol;
+                    setSelectedTile(getPrefixedIndex(localIdx, activeTileset));
+                    setSelectedObjectId(null);
+                  }
+                }}
+                onMouseMove={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const px = e.clientX - rect.left;
+                  const py = e.clientY - rect.top;
+                  const tCol = Math.min(tilesetCols - 1, Math.max(0, Math.floor(px / (16 * paletteZoom))));
+                  const tRow = Math.min(tilesetRows - 1, Math.max(0, Math.floor(py / (16 * paletteZoom))));
+                  setHoverPaletteTile({ col: tCol, row: tRow });
+
+                  if (e.buttons === 1 && paletteDragStart) {
+                    const sCol = Math.min(paletteDragStart.col, tCol);
+                    const sRow = Math.min(paletteDragStart.row, tRow);
+                    const eCol = Math.max(paletteDragStart.col, tCol);
+                    const eRow = Math.max(paletteDragStart.row, tRow);
+                    const cols = eCol - sCol + 1;
+                    const rows = eRow - sRow + 1;
+                    setPaletteSelection({ startCol: sCol, startRow: sRow, cols, rows, tilesetKey: activeTileset });
+                    const localIdx = sRow * tilesetCols + sCol;
+                    setSelectedTile(getPrefixedIndex(localIdx, activeTileset));
+                    setBrushSize(Math.max(cols, rows));
+                  }
+                }}
+                onMouseUp={() => setPaletteDragStart(null)}
+                onMouseLeave={() => {
+                  setHoverPaletteTile(null);
+                  setPaletteDragStart(null);
+                }}
+                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', userSelect: 'none' }}
               >
                 {Array.from({ length: tilesetRows }).map((_, r) => (
                   <div key={r} style={{ display: 'flex' }}>
@@ -1652,13 +2105,22 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                       const localIdx = r * tilesetCols + c;
                       const prefixedIdx = getPrefixedIndex(localIdx, activeTileset);
                       
-                      // Check if part of selected multi-tile block
-                      const selDrawInfo = getTileDrawInfo(selectedTile, activeTileset);
-                      let isSelected = selectedTile === prefixedIdx;
-                      if (selDrawInfo && selDrawInfo.tilesetKey === activeTileset) {
-                        const selCol = selDrawInfo.localIdx % tilesetCols;
-                        const selRow = Math.floor(selDrawInfo.localIdx / tilesetCols);
-                        isSelected = c >= selCol && c < selCol + brushSize && r >= selRow && r < selRow + brushSize;
+                      let isSelected = false;
+                      if (paletteSelection && paletteSelection.tilesetKey === activeTileset) {
+                        isSelected =
+                          c >= paletteSelection.startCol &&
+                          c < paletteSelection.startCol + paletteSelection.cols &&
+                          r >= paletteSelection.startRow &&
+                          r < paletteSelection.startRow + paletteSelection.rows;
+                      } else {
+                        const selDrawInfo = getTileDrawInfo(selectedTile, activeTileset);
+                        if (selDrawInfo && selDrawInfo.tilesetKey === activeTileset) {
+                          const selCol = selDrawInfo.localIdx % tilesetCols;
+                          const selRow = Math.floor(selDrawInfo.localIdx / tilesetCols);
+                          isSelected = c >= selCol && c < selCol + brushSize && r >= selRow && r < selRow + brushSize;
+                        } else {
+                          isSelected = selectedTile === prefixedIdx;
+                        }
                       }
 
                       // Check if part of hovered multi-tile block
@@ -1670,9 +2132,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                       return (
                         <div
                           key={c}
-                          onClick={() => setSelectedTile(prefixedIdx)}
-                          onMouseEnter={() => setHoverPaletteTile({ col: c, row: r })}
-                          title={`Tile ID: ${localIdx} (Row: ${r}, Col: ${c}) - Brush ${brushSize}x${brushSize}`}
+                          title={`Tile ID: ${localIdx} (Row: ${r}, Col: ${c})`}
                           style={{
                             width: `${16 * paletteZoom}px`,
                             height: `${16 * paletteZoom}px`,
@@ -1682,7 +2142,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                                 ? '1.5px solid #89dceb' 
                                 : '1px solid rgba(255,255,255,0.05)',
                             background: isSelected 
-                              ? 'rgba(139, 92, 246, 0.35)' 
+                              ? 'rgba(139, 92, 246, 0.45)' 
                               : isHovered 
                                 ? 'rgba(137, 220, 235, 0.2)' 
                                 : 'transparent',
