@@ -143,6 +143,35 @@ export default function App() {
   const [chatChannel, setChatChannel] = useState<'global' | 'map'>('global');
   const [unreadCount, setUnreadCount] = useState(0);
 
+  // 4.5 Quick Counter-Reaction Prompt state (F key interaction)
+  const [reactionPrompt, setReactionPrompt] = useState<{
+    fromId: string;
+    fromName: string;
+    emoji: string;
+    expiresAt: number;
+  } | null>(null);
+
+  const reactionPromptRef = useRef(reactionPrompt);
+  reactionPromptRef.current = reactionPrompt;
+  const promptTimerRef = useRef<any>(null);
+
+  const showReactionPrompt = (fromId: string, fromName: string, emoji: string) => {
+    if (promptTimerRef.current) clearTimeout(promptTimerRef.current);
+
+    const newPrompt = {
+      fromId,
+      fromName: fromName || '친구',
+      emoji,
+      expiresAt: Date.now() + 3000
+    };
+
+    setReactionPrompt(newPrompt);
+
+    promptTimerRef.current = setTimeout(() => {
+      setReactionPrompt((curr) => (curr && curr.expiresAt <= Date.now() ? null : curr));
+    }, 3050);
+  };
+
   // Broadcast Channel reference
   const bcRef = useRef<BroadcastChannel | null>(null);
 
@@ -155,6 +184,23 @@ export default function App() {
       chatLogScrollRef.current.scrollTop = chatLogScrollRef.current.scrollHeight;
     }
   }, [chatLogs]);
+
+  // Global F key shortcut for counter-reaction
+  useEffect(() => {
+    const handleFKey = (e: KeyboardEvent) => {
+      if (['INPUT', 'TEXTAREA'].includes((document.activeElement?.tagName || ''))) return;
+
+      if (e.key === 'f' || e.key === 'F' || e.key === 'ㄹ') {
+        if (reactionPromptRef.current && Date.now() < reactionPromptRef.current.expiresAt) {
+          e.preventDefault();
+          triggerCounterReaction();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleFKey);
+    return () => window.removeEventListener('keydown', handleFKey);
+  }, []);
 
   // Global Enter key shortcut to focus chat input
   useEffect(() => {
@@ -538,6 +584,18 @@ export default function App() {
         if (!payload) return;
         window.dispatchEvent(new CustomEvent('on_house_spawn_particle', { detail: payload }));
 
+        if (payload.toId === deviceId.current && payload.fromId && payload.fromId !== deviceId.current) {
+          const emoji = payload.emoji || (
+            payload.type === 'heart' ? '❤️' :
+            payload.type === 'greeting' ? '👋' :
+            payload.type === 'cheer' ? '👏' :
+            payload.type === 'celebrate' ? '🎉' :
+            payload.type === 'flame' ? '🔥' :
+            payload.type === 'coffee' ? '☕' : '❤️'
+          );
+          showReactionPrompt(payload.fromId, payload.fromName || '친구', emoji);
+        }
+
         if (payload.type === 'greeting' && payload.fromName) {
           setChatLogs((logs) => [
             ...logs,
@@ -567,8 +625,9 @@ export default function App() {
             ...prev,
             [payload.toId]: { text: payload.emoji, time: Date.now() }
           }));
-          if (payload.toId === deviceId.current) {
+          if (payload.toId === deviceId.current && payload.fromId && payload.fromId !== deviceId.current) {
             showToast(`[${payload.fromName}] 님이 ${payload.emoji} 반응을 보냈습니다!`);
+            showReactionPrompt(payload.fromId, payload.fromName || '친구', payload.emoji || '❤️');
           }
         }
       })
@@ -1609,6 +1668,18 @@ export default function App() {
     showToast('메모가 정상적으로 전달되었습니다.');
   };
 
+  // Trigger counter reaction to sender when F key or prompt button is pressed!
+  const triggerCounterReaction = () => {
+    const prompt = reactionPromptRef.current;
+    if (!prompt || Date.now() >= prompt.expiresAt) return;
+
+    setReactionPrompt(null);
+    if (promptTimerRef.current) clearTimeout(promptTimerRef.current);
+
+    handleSendReaction(prompt.fromId, prompt.emoji);
+    showToast(`⚡ [${prompt.fromName}] 님에게 똑같이 ${prompt.emoji} 반응을 보냈습니다!`);
+  };
+
   // Open Inbox / Mailbox
   const handleOpenMailbox = () => {
     // Find who messaged us recently and open chat with the first one
@@ -1686,6 +1757,7 @@ export default function App() {
         mapData={activeMaps[localPlayer.mapId] || activeMaps[availableMapIds[0]] || maps.room}
         brushSize={1}
         assetVersion={assetVersion}
+        reactionPrompt={reactionPrompt}
       />
 
       {/* 2. Map Selector (Top Left) */}
@@ -1698,6 +1770,43 @@ export default function App() {
       />
 
 
+
+      {/* Quick Counter-Reaction Banner (F Key Interaction) */}
+      {reactionPrompt && Date.now() < reactionPrompt.expiresAt && (
+        <button
+          type="button"
+          onClick={triggerCounterReaction}
+          style={{
+            position: 'absolute',
+            bottom: isMobile ? '120px' : '150px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 250,
+            background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.95), rgba(245, 194, 231, 0.95))',
+            color: '#11111b',
+            border: '2px solid #fff',
+            borderRadius: '20px',
+            padding: '8px 16px',
+            fontSize: '12px',
+            fontFamily: 'var(--font-pixel)',
+            fontWeight: 'bold',
+            boxShadow: '0 8px 24px rgba(139, 92, 246, 0.6), 0 0 12px rgba(255,255,255,0.8)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            outline: 'none'
+          }}
+          title="F 키를 누르거나 클릭하여 똑같이 반응하기"
+        >
+          <span style={{ background: '#11111b', color: '#fab387', padding: '2px 6px', borderRadius: '10px', fontSize: '10px' }}>
+            ⚡ (F) 상호작용
+          </span>
+          <span>
+            [{reactionPrompt.fromName}] 님에게 똑같이 {reactionPrompt.emoji} 보내기
+          </span>
+        </button>
+      )}
 
       {/* Toast Notification Banner */}
       {toastMessage && (

@@ -34,6 +34,12 @@ interface CanvasGameProps {
   mapData: MapDefinition;
   brushSize: number; // 1 = 1x1, 2 = 2x2, 3 = 3x3, etc.
   assetVersion?: number;
+  reactionPrompt?: {
+    fromId: string;
+    fromName: string;
+    emoji: string;
+    expiresAt: number;
+  } | null;
 }
 
 export const getTileDrawInfo = (idx: number, defaultTileset: string) => {
@@ -174,7 +180,8 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
   onPaintTile,
   mapData,
   brushSize,
-  assetVersion = 0
+  assetVersion = 0,
+  reactionPrompt
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -1071,6 +1078,28 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         ctx.fillText(nameText, headCenterX, currentY);
 
         currentY -= 16; // Move Y up for next layer
+
+        // 1.2 Draw "(F) 상호작용" Quick Counter-Reaction prompt if active for local player
+        if (player.id === localPlayerRef.current.id && reactionPrompt && Date.now() < reactionPrompt.expiresAt) {
+          ctx.font = 'bold 11px "DungGeunMo", monospace';
+          const promptText = `(F) 상호작용 ${reactionPrompt.emoji}`;
+          const pWidth = ctx.measureText(promptText).width + 12;
+
+          const pulse = Math.sin(Date.now() / 120) * 0.15 + 0.85;
+          ctx.fillStyle = `rgba(139, 92, 246, ${pulse})`;
+          ctx.strokeStyle = '#fab387';
+          ctx.lineWidth = 1.5;
+
+          ctx.beginPath();
+          ctx.roundRect(headCenterX - pWidth / 2, currentY - 8, pWidth, 16, 4);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(promptText, headCenterX, currentY);
+
+          currentY -= 18;
+        }
 
         // 1.5 Draw Emote Badge if active
         if (isEmoting && player.currentEmote) {
