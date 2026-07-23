@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Layers, User, X, Sparkles, ZoomIn, Plus, Trash2, Upload, Download,
   Pin, Pencil, Eraser, Palette, Save, RotateCcw, Grid, Minus,
-  Copy, Clipboard, Trash, Crop, Check, Move, FlipHorizontal, Loader2
+  Copy, Clipboard, Trash, Crop, Check, Move, FlipHorizontal, Loader2, Scissors
 } from 'lucide-react';
 import { DEFAULT_CHAR_ROW_ACTIONS, getCharRowActions } from '../game/MapData';
 import { saveHouseAssetToDB, deleteHouseAssetFromDB, getSavedHouseCode } from '../services/HouseService';
@@ -386,6 +386,14 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     img.src = currentOption.url;
   };
 
+  // ✂️ Cut Frame (Copy to Clipboard Buffer & Clear Frame Cell)
+  const handleCutFrame = (col: number, row: number) => {
+    handleCopyFrame(col, row);
+    setTimeout(() => {
+      handleDeleteFrameColumn(col, row);
+    }, 50);
+  };
+
   // 📥 Paste Copied Frame Buffer onto Target Frame
   const handlePasteFrame = (col: number, row: number) => {
     if (!copiedFrameBuffer) return;
@@ -533,6 +541,99 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     };
     img.src = currentOption.url;
   };
+
+  // Toast feedback message state
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  useEffect(() => {
+    if (toastMessage) {
+      const timer = setTimeout(() => setToastMessage(null), 2200);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
+
+  // ⌨️ Keyboard Shortcuts & Grid Arrow Navigation Listener
+  useEffect(() => {
+    if (!isOpen || activeTab !== 'character' || !currentOption) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore key events if typing in form inputs
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
+        return;
+      }
+
+      const cols = currentOption.cols;
+      const rows = currentOption.rows;
+
+      const current = selectedTileState || { col: 0, row: 0, index: 0 };
+      let newCol = current.col;
+      let newRow = current.row;
+
+      const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+
+      // 1. Ctrl+C : Copy Frame
+      if (isCtrlOrCmd && e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        handleCopyFrame(current.col, current.row);
+        setToastMessage("📋 선택한 프레임이 복사되었습니다! (Ctrl+V로 붙여넣기)");
+        return;
+      }
+
+      // 2. Ctrl+X : Cut Frame
+      if (isCtrlOrCmd && e.key.toLowerCase() === 'x') {
+        e.preventDefault();
+        handleCutFrame(current.col, current.row);
+        setToastMessage("✂️ 선택한 프레임이 잘라내기 되었습니다!");
+        return;
+      }
+
+      // 3. Ctrl+V : Paste Frame
+      if (isCtrlOrCmd && e.key.toLowerCase() === 'v') {
+        e.preventDefault();
+        if (copiedFrameBuffer) {
+          handlePasteFrame(current.col, current.row);
+          setToastMessage("📥 프레임이 붙여넣기 되었습니다!");
+        } else {
+          setToastMessage("⚠️ 복사된 프레임이 없습니다. 먼저 Ctrl+C로 복사해 주세요!");
+        }
+        return;
+      }
+
+      // 4. Delete / Backspace : Delete Frame Cell
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        handleDeleteFrameColumn(current.col, current.row);
+        setToastMessage("🗑️ 선택한 프레임이 삭제되었습니다.");
+        return;
+      }
+
+      // 5. Arrow Keys : Navigate Pink Highlight Selection Box
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        newCol = Math.max(0, current.col - 1);
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        newCol = Math.min(cols - 1, current.col + 1);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        newRow = Math.max(0, current.row - 1);
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        newRow = Math.min(rows - 1, current.row + 1);
+      } else {
+        return;
+      }
+
+      setSelectedTileState({
+        col: newCol,
+        row: newRow,
+        index: newRow * cols + newCol
+      });
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, activeTab, currentOption, selectedTileState, copiedFrameBuffer, copiedFrameRes]);
 
   // Drag & Drop Frame Swap Handler
   const handleDropTile = (e: React.DragEvent, dstCol: number, dstRow: number) => {
@@ -1964,7 +2065,10 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
           </div>
 
           <button
-            onClick={() => handleCopyFrame(contextMenuTile.col, contextMenuTile.row)}
+            onClick={() => {
+              handleCopyFrame(contextMenuTile.col, contextMenuTile.row);
+              setToastMessage("📋 선택한 프레임이 복사되었습니다! (Ctrl+V로 붙여넣기)");
+            }}
             style={{
               background: 'transparent', border: 'none', color: '#fff', padding: '6px 8px',
               fontSize: '11px', textAlign: 'left', borderRadius: '4px', cursor: 'pointer',
@@ -1972,12 +2076,30 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
             }}
             className="hover-highlight"
           >
-            <Copy size={13} style={{ color: '#89b4fa' }} /> 📋 프레임 복사하기
+            <Copy size={13} style={{ color: '#89b4fa' }} /> 📋 프레임 복사하기 (Ctrl+C)
+          </button>
+
+          <button
+            onClick={() => {
+              handleCutFrame(contextMenuTile.col, contextMenuTile.row);
+              setToastMessage("✂️ 선택한 프레임이 잘라내기 되었습니다!");
+            }}
+            style={{
+              background: 'transparent', border: 'none', color: '#fff', padding: '6px 8px',
+              fontSize: '11px', textAlign: 'left', borderRadius: '4px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: '6px'
+            }}
+            className="hover-highlight"
+          >
+            <Scissors size={13} style={{ color: '#f9e2af' }} /> ✂️ 프레임 잘라내기 (Ctrl+X)
           </button>
 
           <button
             disabled={!copiedFrameBuffer}
-            onClick={() => handlePasteFrame(contextMenuTile.col, contextMenuTile.row)}
+            onClick={() => {
+              handlePasteFrame(contextMenuTile.col, contextMenuTile.row);
+              setToastMessage("📥 프레임이 붙여넣기 되었습니다!");
+            }}
             style={{
               background: 'transparent', border: 'none',
               color: copiedFrameBuffer ? '#fff' : '#666',
@@ -1986,19 +2108,48 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
               display: 'flex', alignItems: 'center', gap: '6px'
             }}
           >
-            <Clipboard size={13} style={{ color: copiedFrameBuffer ? '#a6e3a1' : '#555' }} /> 📥 프레임 붙여넣기
+            <Clipboard size={13} style={{ color: copiedFrameBuffer ? '#a6e3a1' : '#555' }} /> 📥 프레임 붙여넣기 (Ctrl+V)
           </button>
 
           <button
-            onClick={() => handleDeleteFrameColumn(contextMenuTile.col, contextMenuTile.row)}
+            onClick={() => {
+              handleDeleteFrameColumn(contextMenuTile.col, contextMenuTile.row);
+              setToastMessage("🗑️ 프레임이 삭제되었습니다.");
+            }}
             style={{
               background: 'rgba(239,68,68,0.15)', border: 'none', color: '#ff6b6b', padding: '6px 8px',
               fontSize: '11px', textAlign: 'left', borderRadius: '4px', cursor: 'pointer',
               display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold'
             }}
           >
-            <Trash size={13} /> 🗑️ 프레임 삭제하기
+            <Trash size={13} /> 🗑️ 프레임 삭제하기 (Delete)
           </button>
+        </div>
+      )}
+
+      {/* Toast Feedback Notification Banner */}
+      {toastMessage && (
+        <div style={{
+          position: 'fixed',
+          bottom: '32px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(24, 24, 37, 0.95)',
+          border: '1px solid var(--accent)',
+          borderRadius: '8px',
+          padding: '10px 18px',
+          color: '#fff',
+          fontSize: '12px',
+          fontWeight: 'bold',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.9)',
+          zIndex: 2200,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          backdropFilter: 'blur(6px)',
+          animation: 'fadeIn 0.2s ease-in-out'
+        }}>
+          {toastMessage}
         </div>
       )}
 
