@@ -87,6 +87,25 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     }
   });
 
+  // Sync custom assets from localStorage / Realtime updates
+  useEffect(() => {
+    const syncLocalAssets = () => {
+      try {
+        const savedMaps = localStorage.getItem('on_house_custom_map_tilesets');
+        if (savedMaps) setCustomMapTilesets(JSON.parse(savedMaps));
+        const savedChars = localStorage.getItem('on_house_custom_char_sprites');
+        if (savedChars) setCustomCharSprites(JSON.parse(savedChars));
+      } catch (e) {}
+    };
+
+    window.addEventListener('storage', syncLocalAssets);
+    window.addEventListener('on_house_sprites_updated', syncLocalAssets);
+    return () => {
+      window.removeEventListener('storage', syncLocalAssets);
+      window.removeEventListener('on_house_sprites_updated', syncLocalAssets);
+    };
+  }, []);
+
   // Character Spritesheet Image Overrides (for drawn pixels or added/deleted rows/cols/size)
   const [charImageOverrides, setCharImageOverrides] = useState<Record<string, { url: string; rows: number; cols: number; size?: number }>>(() => {
     try {
@@ -913,7 +932,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   };
 
   // Save new custom asset (Supports character creation by Name Only!)
-  const handleSaveCustomAsset = (e: React.FormEvent) => {
+  const handleSaveCustomAsset = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const name = assetNameInput.trim();
@@ -957,17 +976,28 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     const assetType = uploadCategory === 'map' ? 'map_tileset' : 'char_sprite';
 
     if (uploadCategory === 'map') {
-      setCustomMapTilesets((prev) => [...prev, newOption]);
+      setCustomMapTilesets((prev) => {
+        const next = [...prev, newOption];
+        localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(next));
+        return next;
+      });
       setActiveTab('map');
       setSelectedMapId(newId);
     } else {
-      setCustomCharSprites((prev) => [...prev, newOption]);
+      setCustomCharSprites((prev) => {
+        const next = [...prev, newOption];
+        localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(next));
+        return next;
+      });
       setActiveTab('character');
       setSelectedCharId(newId);
     }
 
+    // Notify window to update CanvasGame image caches immediately
+    window.dispatchEvent(new Event('on_house_sprites_updated'));
+
     // Save to Supabase DB for this House
-    saveHouseAssetToDB(currentHouse, assetType, newOption);
+    await saveHouseAssetToDB(currentHouse, assetType, newOption);
 
     // Broadcast asset_update to all players in the same House
     try {
