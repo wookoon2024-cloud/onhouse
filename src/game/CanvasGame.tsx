@@ -651,14 +651,36 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
           const nextX = p.x + nx * moveSpeed;
           const nextY = p.y + ny * moveSpeed;
 
+          let finalX = p.x;
+          let finalY = p.y;
+
+          if (!checkCollision(nextX, p.y, map)) {
+            finalX = nextX;
+          }
+          if (!checkCollision(p.x, nextY, map)) {
+            finalY = nextY;
+          }
+
+          // If blocked by obstacle tile in both axes, stop auto-walk gracefully at boundary
+          if (finalX === p.x && finalY === p.y) {
+            autoWalkTargetRef.current = null;
+            localPlayerRef.current = {
+              ...p,
+              dir: walkDir,
+              isMoving: false
+            };
+            onMove(p.x, p.y, walkDir, false);
+            return;
+          }
+
           localPlayerRef.current = {
             ...p,
-            x: nextX,
-            y: nextY,
+            x: finalX,
+            y: finalY,
             dir: walkDir,
             isMoving: true
           };
-          onMove(nextX, nextY, walkDir, true);
+          onMove(finalX, finalY, walkDir, true);
           return;
         } else {
           // Arrived at target destination!
