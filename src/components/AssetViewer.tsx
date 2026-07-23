@@ -158,10 +158,13 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   const [showUploadModal, setShowUploadModal] = useState<boolean>(false);
   const [uploadCategory, setUploadCategory] = useState<MainCategory>('character');
   const [assetNameInput, setAssetNameInput] = useState<string>('');
-  const [tileSizeInput, setTileSizeInput] = useState<number>(16);
+  const [tileSizeInput, setTileSizeInput] = useState<number>(32);
   const [fileDataUrl, setFileDataUrl] = useState<string | null>(null);
   const [imgWidth, setImgWidth] = useState<number>(0);
   const [imgHeight, setImgHeight] = useState<number>(0);
+  const [customColsInput, setCustomColsInput] = useState<number>(4);
+  const [customRowsInput, setCustomRowsInput] = useState<number>(9);
+  const [isNormalizing, setIsNormalizing] = useState<boolean>(false);
 
   // Pixel Art Editor Modal State
   const [editingTile, setEditingTile] = useState<{ charId: string; col: number; row: number } | null>(null);
@@ -941,7 +944,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     img.src = currentOption.url;
   };
 
-  // Image file select handler
+  // Image file select handler with auto-detection for cols and rows
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -955,10 +958,170 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       img.onload = () => {
         setImgWidth(img.width);
         setImgHeight(img.height);
+
+        // Auto detect cols & rows (Default: 4 cols, auto rows based on aspect ratio)
+        const autoCols = 4;
+        const estRowH = img.width / autoCols;
+        const autoRows = estRowH > 0 ? Math.round(img.height / estRowH) : 9;
+        setCustomColsInput(autoCols);
+        setCustomRowsInput(autoRows > 0 ? autoRows : 9);
       };
       img.src = result;
     };
     reader.readAsDataURL(file);
+  };
+
+  // Smart Auto-Trim & Normalizer Algorithm for Custom Sprite Sheets
+  const handleAutoNormalizeSpriteSheet = () => {
+    if (!fileDataUrl) return;
+    setIsNormalizing(true);
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const targetCols = customColsInput || 4;
+      const targetRows = customRowsInput || 9;
+      const tSize = tileSizeInput || 32;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        setIsNormalizing(false);
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0);
+      const imgData = ctx.getImageData(0, 0, img.width, img.height);
+      const data = imgData.data;
+
+      // 1. Find overall non-background content bounding box
+      let minX = img.width;
+      let minY = img.height;
+      let maxX = 0;
+      let maxY = 0;
+
+      for (let y = 0; y < img.height; y++) {
+        for (let x = 0; x < img.width; x++) {
+          const idx = (y * img.width + x) * 4;
+          const a = data[idx + 3];
+          const r = data[idx];
+          const g = data[idx + 1];
+          const b = data[idx + 2];
+
+          const isContent = a > 15 && !(r < 18 && g < 18 && b < 18);
+          if (isContent) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+
+      if (minX >= maxX || minY >= maxY) {
+        minX = 0;
+        minY = 0;
+        maxX = img.width - 1;
+        maxY = img.height - 1;
+      }
+
+      const contentW = maxX - minX + 1;
+      const contentH = maxY - minY + 1;
+
+      // 2. Divide content bounding box into targetCols x targetRows
+      const cellW = contentW / targetCols;
+      const cellH = contentH / targetRows;
+
+      // 3. Create normalized sprite sheet canvas: targetCols * tSize x targetRows * tSize
+      const normCanvas = document.createElement('canvas');
+      normCanvas.width = targetCols * tSize;
+      normCanvas.height = targetRows * tSize;
+      const normCtx = normCanvas.getContext('2d');
+      if (!normCtx) {
+        setIsNormalizing(false);
+        return;
+      }
+
+      normCtx.imageSmoothingEnabled = false;
+
+      // 4. For each cell (r, c), extract sub-image, find frame tight bounds, and center inside tSize x tSize
+      for (let r = 0; r < targetRows; r++) {
+        for (let c = 0; c < targetCols; c++) {
+          const srcCellX = Math.floor(minX + c * cellW);
+          const srcCellY = Math.floor(minY + r * cellH);
+          const srcCellW = Math.max(1, Math.floor(cellW));
+          const srcCellH = Math.max(1, Math.floor(cellH));
+
+          let fMinX = srcCellW;
+          let fMinY = srcCellH;
+          let fMaxX = 0;
+          let fMaxY = 0;
+          let hasPixels = false;
+
+          for (let cy = 0; cy < srcCellH; cy++) {
+            for (let cx = 0; cx < srcCellW; cx++) {
+              const px = srcCellX + cx;
+              const py = srcCellY + cy;
+              if (px < img.width && py < img.height) {
+                const idx = (py * img.width + px) * 4;
+                const a = data[idx + 3];
+                const cr = data[idx];
+                const cg = data[idx + 1];
+                const cb = data[idx + 2];
+                if (a > 15 && !(cr < 18 && cg < 18 && cb < 18)) {
+                  hasPixels = true;
+                  if (cx < fMinX) fMinX = cx;
+                  if (cx > fMaxX) fMaxX = cx;
+                  if (cy < fMinY) fMinY = cy;
+                  if (cy > fMaxY) fMaxY = cy;
+                }
+              }
+            }
+          }
+
+          const dstCellX = c * tSize;
+          const dstCellY = r * tSize;
+
+          if (hasPixels && fMinX <= fMaxX && fMinY <= fMaxY) {
+            const frameSrcX = srcCellX + fMinX;
+            const frameSrcY = srcCellY + fMinY;
+            const frameSrcW = fMaxX - fMinX + 1;
+            const frameSrcH = fMaxY - fMinY + 1;
+
+            const scale = Math.min((tSize - 2) / frameSrcW, (tSize - 2) / frameSrcH, 1.5);
+            const drawW = Math.round(frameSrcW * scale);
+            const drawH = Math.round(frameSrcH * scale);
+
+            const drawX = dstCellX + Math.floor((tSize - drawW) / 2);
+            const drawY = dstCellY + Math.floor((tSize - drawH) / 2);
+
+            normCtx.drawImage(
+              img,
+              frameSrcX, frameSrcY, frameSrcW, frameSrcH,
+              drawX, drawY, drawW, drawH
+            );
+          } else {
+            const drawX = dstCellX + Math.floor((tSize - srcCellW) / 2);
+            const drawY = dstCellY + Math.floor((tSize - srcCellH) / 2);
+            normCtx.drawImage(
+              img,
+              srcCellX, srcCellY, srcCellW, srcCellH,
+              drawX, drawY, srcCellW, srcCellH
+            );
+          }
+        }
+      }
+
+      const normalizedDataUrl = normCanvas.toDataURL();
+      setFileDataUrl(normalizedDataUrl);
+      setImgWidth(normCanvas.width);
+      setImgHeight(normCanvas.height);
+      setIsNormalizing(false);
+      alert(`✨ 스마트 보정 완료!\n여백을 자동으로 제거하고 ${targetCols}열 x ${targetRows}행 (${tSize}x${tSize}px) 정격 규격 스프라이트 시트로 보정하였습니다.`);
+    };
+    img.src = fileDataUrl;
   };
 
   // Generate default character template spritesheet if no image uploaded
@@ -1003,7 +1166,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     let finalUrl = fileDataUrl;
     let cols = 4;
     let rows = 7;
-    const tSize = tileSizeInput || 16;
+    const tSize = tileSizeInput || 32;
 
     if (uploadCategory === 'character' && !fileDataUrl) {
       const template = createDefaultCharTemplate(tSize);
@@ -1011,8 +1174,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       cols = template.cols;
       rows = template.rows;
     } else if (fileDataUrl) {
-      cols = Math.max(1, Math.floor(imgWidth / tSize));
-      rows = Math.max(1, Math.floor(imgHeight / tSize));
+      cols = customColsInput || Math.max(1, Math.floor(imgWidth / tSize));
+      rows = customRowsInput || Math.max(1, Math.floor(imgHeight / tSize));
     } else {
       alert("맵 타일셋의 경우 이미지 파일을 선택해 주세요!");
       return;
@@ -2440,11 +2603,58 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
 
               {fileDataUrl && (
                 <div style={{ background: 'rgba(255,255,255,0.04)', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-glass)', display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  <img src={fileDataUrl} alt="Preview" style={{ width: '48px', height: '48px', objectFit: 'contain', background: '#000', borderRadius: '4px' }} />
+                  <img src={fileDataUrl} alt="Preview" style={{ width: '48px', height: '48px', objectFit: 'contain', background: '#000', borderRadius: '4px', imageRendering: 'pixelated' }} />
                   <div style={{ fontSize: '11px', color: '#ccc', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <div>원본 크기: <strong>{imgWidth} x {imgHeight} px</strong></div>
-                    <div>감지된 타일: <strong style={{ color: 'var(--accent)' }}>{Math.max(1, Math.floor(imgWidth / tileSizeInput))}열 x {Math.max(1, Math.floor(imgHeight / tileSizeInput))}행</strong></div>
+                    <div>현재 이미지 크기: <strong>{imgWidth} x {imgHeight} px</strong></div>
+                    <div>설정된 타일: <strong style={{ color: 'var(--accent)' }}>{customColsInput}열 x {customRowsInput}행 ({tileSizeInput}px 규격)</strong></div>
                   </div>
+                </div>
+              )}
+
+              {fileDataUrl && uploadCategory === 'character' && (
+                <div style={{ background: 'rgba(139, 92, 246, 0.12)', border: '1px solid var(--accent)', padding: '12px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Sparkles size={14} /> ✨ 스마트 픽셀 자동 보정 (여백 제거 & 규격화)
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '10px', color: '#aaa', display: 'block', marginBottom: '2px' }}>가로 열 수 (Cols)</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={16}
+                        value={customColsInput}
+                        onChange={(e) => setCustomColsInput(parseInt(e.target.value, 10) || 4)}
+                        style={{ width: '100%', background: '#0d0d12', border: '1px solid var(--border-glass)', borderRadius: '4px', padding: '4px 8px', color: '#fff', fontSize: '11px', textAlign: 'center' }}
+                      />
+                    </div>
+
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '10px', color: '#aaa', display: 'block', marginBottom: '2px' }}>세로 행 수 (Rows)</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={32}
+                        value={customRowsInput}
+                        onChange={(e) => setCustomRowsInput(parseInt(e.target.value, 10) || 9)}
+                        style={{ width: '100%', background: '#0d0d12', border: '1px solid var(--border-glass)', borderRadius: '4px', padding: '4px 8px', color: '#fff', fontSize: '11px', textAlign: 'center' }}
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleAutoNormalizeSpriteSheet}
+                    disabled={isNormalizing}
+                    style={{
+                      padding: '8px', background: 'var(--accent)', border: 'none', borderRadius: '6px',
+                      color: '#000', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
+                    }}
+                  >
+                    <Sparkles size={13} /> {isNormalizing ? '보정 처리 중...' : `✨ 여백 제거 & ${customColsInput}열 x ${customRowsInput}행 픽셀 규격화 자동 보정`}
+                  </button>
                 </div>
               )}
 
