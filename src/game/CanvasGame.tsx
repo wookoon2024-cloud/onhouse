@@ -229,36 +229,43 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
       const { type, fromPos, toPos } = detail;
 
       if (type === 'heart' && fromPos && toPos) {
-        // Spawn 3 flying hearts with curved arc trajectories
-        for (let i = 0; i < 3; i++) {
+        // Center particles over character head/body (+16px offset)
+        const sX = fromPos.x + 16;
+        const sY = fromPos.y + 8;
+        const tX = toPos.x + 16;
+        const tY = toPos.y + 8;
+
+        for (let i = 0; i < 4; i++) {
           particlesRef.current.push({
             id: 'heart_' + now + '_' + i,
             type: 'heart',
-            startX: fromPos.x,
-            startY: fromPos.y - 12,
-            targetX: toPos.x,
-            targetY: toPos.y - 20,
+            startX: sX,
+            startY: sY,
+            targetX: tX,
+            targetY: tY,
             icon: i % 2 === 0 ? '❤️' : '💖',
-            startTime: now + i * 120,
-            duration: 1100,
-            arcOffset: (i - 1) * 35,
+            startTime: now + i * 100,
+            duration: 1150,
+            arcOffset: (i - 1.5) * 32,
             scale: 1
           });
         }
       } else if (type === 'cheer' && fromPos) {
-        // Spawn 3 clapping icons around character
+        const sX = fromPos.x + 16;
+        const sY = fromPos.y + 16;
+
         const offsets = [
-          { x: -22, y: -25, icon: '👏' },
+          { x: -20, y: -25, icon: '👏' },
           { x: 0, y: -42, icon: '👏' },
-          { x: 22, y: -25, icon: '👏' }
+          { x: 20, y: -25, icon: '👏' }
         ];
 
         offsets.forEach((off, idx) => {
           particlesRef.current.push({
             id: 'cheer_' + now + '_' + idx,
             type: 'cheer',
-            startX: fromPos.x,
-            startY: fromPos.y,
+            startX: sX,
+            startY: sY,
             icon: off.icon,
             startTime: now + idx * 80,
             duration: 1600,
@@ -269,11 +276,30 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
       }
     };
 
+    const handleWalkTo = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail && detail.x !== undefined && detail.y !== undefined) {
+        autoWalkTargetRef.current = {
+          targetX: detail.x,
+          targetY: detail.y,
+          onArrival: detail.onArrival
+        };
+      }
+    };
+
     window.addEventListener('on_house_spawn_particle', handleSpawnParticle);
+    window.addEventListener('on_house_walk_to', handleWalkTo);
     return () => {
       window.removeEventListener('on_house_spawn_particle', handleSpawnParticle);
+      window.removeEventListener('on_house_walk_to', handleWalkTo);
     };
   }, []);
+
+  const autoWalkTargetRef = useRef<{
+    targetX: number;
+    targetY: number;
+    onArrival?: () => void;
+  } | null>(null);
 
   useEffect(() => {
     // Only sync position from prop if map changed or if player is NOT moving locally
@@ -535,6 +561,62 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
       const moveDown = keysPressed.current['s'] || keysPressed.current['arrowdown'];
       const moveLeft = keysPressed.current['a'] || keysPressed.current['arrowleft'];
       const moveRight = keysPressed.current['d'] || keysPressed.current['arrowright'];
+
+      if (moveUp || moveDown || moveLeft || moveRight) {
+        autoWalkTargetRef.current = null;
+      }
+
+      // AUTOMATIC WALK DESTINATION (e.g. for Greeting "인사하기" walk animation!)
+      if (autoWalkTargetRef.current) {
+        const dest = autoWalkTargetRef.current;
+        const diffX = dest.targetX - p.x;
+        const diffY = dest.targetY - p.y;
+        const dist = Math.sqrt(diffX * diffX + diffY * diffY);
+
+        if (dist > 6) {
+          const moveSpeed = 120 * dt; // Smooth walk speed (120px/s)
+          const nx = diffX / dist;
+          const ny = diffY / dist;
+
+          let walkDir: 'up' | 'down' | 'left' | 'right' = 'right';
+          if (Math.abs(diffX) > Math.abs(diffY)) {
+            walkDir = diffX > 0 ? 'right' : 'left';
+          } else {
+            walkDir = diffY > 0 ? 'down' : 'up';
+          }
+
+          const nextX = p.x + nx * moveSpeed;
+          const nextY = p.y + ny * moveSpeed;
+
+          localPlayerRef.current = {
+            ...p,
+            x: nextX,
+            y: nextY,
+            dir: walkDir,
+            isMoving: true
+          };
+          onMove(nextX, nextY, walkDir, true);
+          return;
+        } else {
+          // Arrived at target destination!
+          const onArrivalFunc = dest.onArrival;
+          autoWalkTargetRef.current = null;
+
+          localPlayerRef.current = {
+            ...p,
+            x: dest.targetX,
+            y: dest.targetY,
+            dir: 'right',
+            isMoving: false
+          };
+          onMove(dest.targetX, dest.targetY, 'right', false);
+
+          if (onArrivalFunc) {
+            onArrivalFunc();
+          }
+          return;
+        }
+      }
 
       // Walk speed: 96 pixels per second (smooth 1.6px per frame at 60fps)
       const MOVE_SPEED = 96;

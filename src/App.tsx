@@ -31,6 +31,8 @@ interface ChatLogMessage {
   senderName: string;
   text: string;
   time: number;
+  channel?: 'global' | 'map';
+  mapName?: string;
 }
 
 export default function App() {
@@ -138,6 +140,7 @@ export default function App() {
   const [chatLogs, setChatLogs] = useState<ChatLogMessage[]>([]);
   const [chatBubbles, setChatBubbles] = useState<Record<string, { text: string; time: number }>>({});
   const [chatInput, setChatInput] = useState('');
+  const [chatChannel, setChatChannel] = useState<'global' | 'map'>('global');
   const [unreadCount, setUnreadCount] = useState(0);
 
   // Broadcast Channel reference
@@ -398,8 +401,14 @@ export default function App() {
       })
       .on('broadcast', { event: 'chat' }, ({ payload }) => {
         if (!payload || payload.id === deviceId.current) return;
+
+        // If chat channel is 'map', ignore if the sender is NOT on the same map as local player!
+        if (payload.channel === 'map' && payload.mapId !== localPlayerRef.current.mapId) {
+          return;
+        }
+
         if (payload.text && !payload.text.startsWith('/')) {
-          if (payload.senderName !== '🚀 시스템') {
+          if (payload.senderName !== '🚀 시스템' && (!payload.mapId || payload.mapId === localPlayerRef.current.mapId)) {
             setChatBubbles((prev) => ({
               ...prev,
               [payload.id]: { text: payload.text, time: Date.now() }
@@ -412,7 +421,9 @@ export default function App() {
               id: 'chat_rec_' + Date.now() + Math.random(),
               senderName: payload.senderName || '다른 플레이어',
               text: payload.text,
-              time: Date.now()
+              time: Date.now(),
+              channel: payload.channel || 'global',
+              mapName: payload.mapName
             }
           ]);
         }
@@ -739,6 +750,9 @@ export default function App() {
           break;
 
         case 'chat':
+          if (msg.channel === 'map' && msg.mapId !== localPlayerRef.current.mapId) {
+            break;
+          }
           setOtherPlayers((prev) => {
             const p = prev[msg.playerId];
             if (!p) return prev;
@@ -764,7 +778,9 @@ export default function App() {
               id: 'chat_' + Math.random().toString(36).substring(2, 11),
               senderName: msg.senderName,
               text: msg.text,
-              time: Date.now()
+              time: Date.now(),
+              channel: msg.channel || 'global',
+              mapName: msg.mapName
             }
           ]);
           break;
@@ -1177,6 +1193,9 @@ export default function App() {
       }));
     }
 
+    const currentMapObj = activeMaps[localPlayer.mapId];
+    const mapName = currentMapObj ? currentMapObj.name : localPlayer.mapId;
+
     // Add to logs
     setChatLogs((prev) => [
       ...prev,
@@ -1184,7 +1203,9 @@ export default function App() {
         id: 'chat_me_' + Date.now(),
         senderName: localPlayer.nickname,
         text,
-        time: Date.now()
+        time: Date.now(),
+        channel: chatChannel,
+        mapName: mapName
       }
     ]);
 
@@ -1196,7 +1217,11 @@ export default function App() {
         payload: {
           id: deviceId.current,
           senderName: localPlayer.nickname,
-          text
+          text,
+          channel: chatChannel,
+          mapId: localPlayer.mapId,
+          mapName: mapName,
+          timestamp: Date.now()
         }
       });
     } catch (e) {}
@@ -1206,7 +1231,9 @@ export default function App() {
       type: 'chat',
       playerId: deviceId.current,
       senderName: localPlayer.nickname,
-      text
+      text,
+      channel: chatChannel,
+      mapId: localPlayer.mapId
     });
 
     setChatInput('');
@@ -1354,62 +1381,66 @@ export default function App() {
         showToast(`[${targetPlayer.nickname}] 님에게 ❤️ 하트를 날렸습니다!`);
       }
     } else if (emoji === '👋' || emoji === '인사하기') {
-      // 2. Greeting: Walk in front of target player and say "안녕하세요! 👋"
+      // 2. Greeting: Walk in front of target player smoothly, then say "안녕하세요! 👋"
       if (targetPlayer) {
         const destX = Math.max(16, targetPlayer.x - 28);
         const destY = targetPlayer.y;
 
-        // Move local player character in front of target
-        setLocalPlayer((prev) => ({
-          ...prev,
-          x: destX,
-          y: destY,
-          dir: 'right'
-        }));
+        showToast(`[${targetPlayer.nickname}] 님에게 걸어가는 중...`);
 
-        setChatBubbles((prev) => ({
-          ...prev,
-          [deviceId.current]: { text: '안녕하세요! 👋', time: Date.now() }
-        }));
+        // Dispatch smooth step-by-step walk event to Canvas physics engine
+        window.dispatchEvent(new CustomEvent('on_house_walk_to', {
+          detail: {
+            x: destX,
+            y: destY,
+            onArrival: () => {
+              // Trigger speech bubble upon arrival
+              setChatBubbles((prev) => ({
+                ...prev,
+                [deviceId.current]: { text: '안녕하세요! 👋', time: Date.now() }
+              }));
 
-        setChatLogs((logs) => [
-          ...logs,
-          {
-            id: 'sys_greet_' + Date.now(),
-            senderName: '🚀 시스템',
-            text: `${localPlayer.nickname}님이 [${targetPlayer.nickname}] 님에게 다가가 인사를 건넸습니다: "안녕하세요! 👋"`,
-            time: Date.now()
-          }
-        ]);
+              setChatLogs((logs) => [
+                ...logs,
+                {
+                  id: 'sys_greet_' + Date.now(),
+                  senderName: '🚀 시스템',
+                  text: `${localPlayer.nickname}님이 [${targetPlayer.nickname}] 님에게 다가가 인사를 건넸습니다: "안녕하세요! 👋"`,
+                  time: Date.now()
+                }
+              ]);
 
-        const payload = {
-          type: 'greeting',
-          fromId: deviceId.current,
-          fromName: localPlayer.nickname,
-          fromPos: { x: destX, y: destY },
-          toId: targetId,
-          toName: targetPlayer.nickname,
-          toPos: { x: targetPlayer.x, y: targetPlayer.y }
-        };
+              const payload = {
+                type: 'greeting',
+                fromId: deviceId.current,
+                fromName: localPlayer.nickname,
+                fromPos: { x: destX, y: destY },
+                toId: targetId,
+                toName: targetPlayer.nickname,
+                toPos: { x: targetPlayer.x, y: targetPlayer.y }
+              };
 
-        try {
-          supabase.channel(`house:${houseCode}`).send({
-            type: 'broadcast',
-            event: 'reaction_anim',
-            payload
-          });
-          supabase.channel(`house:${houseCode}`).send({
-            type: 'broadcast',
-            event: 'chat',
-            payload: {
-              id: deviceId.current,
-              senderName: localPlayer.nickname,
-              text: '안녕하세요! 👋'
+              try {
+                supabase.channel(`house:${houseCode}`).send({
+                  type: 'broadcast',
+                  event: 'reaction_anim',
+                  payload
+                });
+                supabase.channel(`house:${houseCode}`).send({
+                  type: 'broadcast',
+                  event: 'chat',
+                  payload: {
+                    id: deviceId.current,
+                    senderName: localPlayer.nickname,
+                    text: '안녕하세요! 👋'
+                  }
+                });
+              } catch (e) {}
+
+              showToast(`[${targetPlayer.nickname}] 님에게 "안녕하세요! 👋" 하고 인사를 건넸습니다!`);
             }
-          });
-        } catch (e) {}
-
-        showToast(`[${targetPlayer.nickname}] 님에게 다가가 "안녕하세요! 👋" 하고 인사를 건넸습니다!`);
+          }
+        }));
       }
     } else if (emoji === '👏' || emoji === '응원하기') {
       // 3. Cheering: Clapping 3 icons burst around character
@@ -1654,7 +1685,12 @@ export default function App() {
                   alignItems: 'baseline'
                 }}
               >
-                <span style={{ color: '#fab387', fontWeight: 'bold', whiteSpace: 'nowrap', flexShrink: 0 }}>[전체]</span>
+                <span style={{
+                  color: log.channel === 'map' ? '#a6e3a1' : '#fab387',
+                  fontWeight: 'bold', whiteSpace: 'nowrap', flexShrink: 0
+                }}>
+                  [{log.channel === 'map' ? `맵${log.mapName ? '·' + log.mapName : ''}` : '전체'}]
+                </span>
                 <span style={{ color: '#a6e3a1', fontWeight: 'bold', whiteSpace: 'nowrap', flexShrink: 0 }}>{log.senderName} :</span>
                 <span style={{ wordBreak: 'break-word', color: '#e6e9ef' }}>{log.text}</span>
               </div>
@@ -1672,14 +1708,24 @@ export default function App() {
           overflowX: 'auto',
           maxWidth: '100%'
         }}>
-          <span style={{
-            fontSize: '10px', fontWeight: 'bold', color: '#fab387',
-            background: 'rgba(250, 179, 135, 0.15)', padding: '2px 5px',
-            borderRadius: '2px', border: '1px solid rgba(250, 179, 135, 0.3)',
-            flexShrink: 0, whiteSpace: 'nowrap'
-          }}>
-            [전체]
-          </span>
+          {/* Chat Channel Mode Selector ([전체] vs [맵]) */}
+          <button
+            type="button"
+            onClick={() => setChatChannel((mode) => mode === 'global' ? 'map' : 'global')}
+            style={{
+              fontSize: '10px', fontWeight: 'bold',
+              color: chatChannel === 'global' ? '#fab387' : '#a6e3a1',
+              background: chatChannel === 'global' ? 'rgba(250, 179, 135, 0.15)' : 'rgba(166, 227, 161, 0.15)',
+              padding: '2px 6px',
+              borderRadius: '3px',
+              border: chatChannel === 'global' ? '1px solid rgba(250, 179, 135, 0.4)' : '1px solid rgba(166, 227, 161, 0.4)',
+              flexShrink: 0, whiteSpace: 'nowrap', cursor: 'pointer',
+              outline: 'none', transition: 'all 0.15s ease'
+            }}
+            title="채팅 범위 전환 (클릭 시 [전체] / [맵] 대화 전환)"
+          >
+            {chatChannel === 'global' ? '[전체]' : '[맵]'}
+          </button>
 
           {/* Status Picker (😊) */}
           <div style={{ flexShrink: 0 }}>
@@ -1717,7 +1763,11 @@ export default function App() {
               type="text"
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
-              placeholder={isMobile ? "메시지 입력..." : "메시지를 입력하세요 (Enter 키로 전송)..."}
+              placeholder={
+                isMobile
+                  ? `[${chatChannel === 'global' ? '전체' : '맵'}] 입력...`
+                  : `[${chatChannel === 'global' ? '전체' : '맵'}] 메시지를 입력하세요 (Enter 키로 전송)...`
+              }
               style={{
                 width: '100%',
                 background: 'rgba(0, 0, 0, 0.45)',
