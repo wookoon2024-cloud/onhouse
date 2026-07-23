@@ -548,6 +548,16 @@ export default function App() {
               time: Date.now()
             }
           ]);
+        } else if (payload.type === 'coffee' && payload.fromName) {
+          setChatLogs((logs) => [
+            ...logs,
+            {
+              id: 'sys_coffee_' + Date.now() + Math.random(),
+              senderName: '🚀 시스템',
+              text: `${payload.fromName}님이 [${payload.toName || '상대방'}] 님에게 다가가 물었습니다: "커피 한 잔 하실래요? ☕"`,
+              time: Date.now()
+            }
+          ]);
         }
       })
       .on('broadcast', { event: 'reaction' }, ({ payload }) => {
@@ -1464,6 +1474,118 @@ export default function App() {
       } catch (e) {}
 
       showToast(`[${targetPlayer?.nickname || '친구'}] 님을 👏 열렬히 응원했습니다!`);
+    } else if (emoji === '🎉' || emoji === '축하하기') {
+      // 4. Celebrate: Fireworks burst around target friend character!
+      const payload = {
+        type: 'celebrate',
+        fromId: deviceId.current,
+        fromName: localPlayer.nickname,
+        fromPos: { x: localPlayer.x, y: localPlayer.y },
+        toId: targetId,
+        toName: targetPlayer?.nickname,
+        toPos: targetPlayer ? { x: targetPlayer.x, y: targetPlayer.y } : { x: localPlayer.x, y: localPlayer.y }
+      };
+
+      window.dispatchEvent(new CustomEvent('on_house_spawn_particle', { detail: payload }));
+
+      try {
+        supabase.channel(`house:${houseCode}`).send({
+          type: 'broadcast',
+          event: 'reaction_anim',
+          payload
+        });
+      } catch (e) {}
+
+      showToast(`[${targetPlayer?.nickname || '친구'}] 님을 🎉 화려하게 축하해 주었습니다!`);
+    } else if (emoji === '🔥' || emoji === '불타오름') {
+      // 5. Flame: Character-sized roaring fire sizzles around local player!
+      const payload = {
+        type: 'flame',
+        fromId: deviceId.current,
+        fromName: localPlayer.nickname,
+        fromPos: { x: localPlayer.x, y: localPlayer.y }
+      };
+
+      window.dispatchEvent(new CustomEvent('on_house_spawn_particle', { detail: payload }));
+
+      try {
+        supabase.channel(`house:${houseCode}`).send({
+          type: 'broadcast',
+          event: 'reaction_anim',
+          payload
+        });
+      } catch (e) {}
+
+      showToast(`🔥 [${localPlayer.nickname}] 캐릭터 뒤에 이글이글 불꽃이 타오릅니다!`);
+    } else if (emoji === '☕' || emoji === '커피한잔') {
+      // 6. Coffee: Walk in front of target friend smoothly and ask "커피 한 잔 하실래요? ☕"
+      if (targetPlayer) {
+        const destX = Math.max(16, targetPlayer.x - 28);
+        const destY = targetPlayer.y;
+
+        showToast(`[${targetPlayer.nickname}] 님에게 걸어가는 중... ☕`);
+
+        window.dispatchEvent(new CustomEvent('on_house_walk_to', {
+          detail: {
+            x: destX,
+            y: destY,
+            onArrival: () => {
+              setChatBubbles((prev) => ({
+                ...prev,
+                [deviceId.current]: { text: '커피 한 잔 하실래요? ☕', time: Date.now() }
+              }));
+
+              const currentMapObj = activeMaps[localPlayer.mapId];
+              const mapName = currentMapObj ? currentMapObj.name : localPlayer.mapId;
+
+              setChatLogs((logs) => [
+                ...logs,
+                {
+                  id: 'sys_coffee_' + Date.now(),
+                  senderName: '🚀 시스템',
+                  text: `${localPlayer.nickname}님이 [${targetPlayer.nickname}] 님에게 다가가 물었습니다: "커피 한 잔 하실래요? ☕"`,
+                  time: Date.now(),
+                  channel: chatChannel,
+                  mapName: mapName
+                }
+              ]);
+
+              const payload = {
+                type: 'coffee',
+                fromId: deviceId.current,
+                fromName: localPlayer.nickname,
+                fromPos: { x: destX, y: destY },
+                toId: targetId,
+                toName: targetPlayer.nickname,
+                toPos: { x: targetPlayer.x, y: targetPlayer.y }
+              };
+
+              try {
+                supabase.channel(`house:${houseCode}`).send({
+                  type: 'broadcast',
+                  event: 'reaction_anim',
+                  payload
+                });
+                supabase.channel(`house:${houseCode}`).send({
+                  type: 'broadcast',
+                  event: 'chat',
+                  payload: {
+                    id: deviceId.current,
+                    senderName: localPlayer.nickname,
+                    text: '커피 한 잔 하실래요? ☕',
+                    channel: chatChannel,
+                    mapId: localPlayer.mapId,
+                    mapName: mapName,
+                    timestamp: Date.now()
+                  }
+                });
+              } catch (e) {}
+
+              showToast(`[${targetPlayer.nickname}] 님에게 "커피 한 잔 하실래요? ☕" 라고 물었습니다!`);
+            }
+          }
+        }));
+      }
     } else {
       // Standard emote fallback
       try {

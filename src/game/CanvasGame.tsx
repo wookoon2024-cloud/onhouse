@@ -204,10 +204,10 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
   const lastSyncTimeRef = useRef<number>(0);
   const smoothRemotePosRef = useRef<Record<string, { x: number; y: number; isMoving: boolean }>>({});
 
-  // Active animated visual particles (flying hearts, cheering claps)
+  // Active animated visual particles (flying hearts, cheering claps, celebrate fireworks, flame effects)
   const particlesRef = useRef<Array<{
     id: string;
-    type: 'heart' | 'cheer' | 'burst';
+    type: 'heart' | 'cheer' | 'celebrate' | 'flame' | 'burst';
     startX: number;
     startY: number;
     targetX?: number;
@@ -274,6 +274,59 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
             duration: 1600,
             offsetX: off.x,
             scale: tileScale > 1.5 ? 1.2 : 1
+          });
+        });
+      } else if (type === 'celebrate') {
+        // Celebrate / Fireworks burst around target friend character!
+        const target = toPos || fromPos;
+        if (target) {
+          const sX = target.x * tileScale + vSize / 2;
+          const sY = target.y * tileScale + vSize / 3;
+
+          const icons = ['🎉', '🎆', '✨', '🎊', '⭐', '🎇', '✨', '🎉', '🎊', '⭐'];
+          const count = icons.length;
+
+          for (let i = 0; i < count; i++) {
+            const angle = (i / count) * Math.PI * 2 + (Math.random() * 0.4 - 0.2);
+            const radius = (20 + Math.random() * 25) * tileScale;
+            particlesRef.current.push({
+              id: 'celebrate_' + now + '_' + i,
+              type: 'celebrate',
+              startX: sX,
+              startY: sY,
+              targetX: sX + Math.cos(angle) * radius,
+              targetY: sY + Math.sin(angle) * radius - (15 * tileScale),
+              icon: icons[i],
+              startTime: now + Math.random() * 120,
+              duration: 1400,
+              scale: tileScale > 1.5 ? 1.3 : 1
+            });
+          }
+        }
+      } else if (type === 'flame' && fromPos) {
+        // Flame / Sizzling Fire effect around character
+        const sX = fromPos.x * tileScale + vSize / 2;
+        const sY = fromPos.y * tileScale + vSize / 2;
+
+        const flameIcons = ['🔥', '💥', '🔥', '🔥'];
+        const offsets = [
+          { x: 0, y: 0, scale: 2.4 },
+          { x: -12 * tileScale, y: 4 * tileScale, scale: 1.6 },
+          { x: 12 * tileScale, y: 4 * tileScale, scale: 1.6 },
+          { x: 0, y: -10 * tileScale, scale: 2.0 }
+        ];
+
+        flameIcons.forEach((icon, idx) => {
+          particlesRef.current.push({
+            id: 'flame_' + now + '_' + idx,
+            type: 'flame',
+            startX: sX,
+            startY: sY,
+            icon,
+            startTime: now + idx * 60,
+            duration: 1800,
+            offsetX: offsets[idx].x,
+            scale: offsets[idx].scale * (tileScale > 1.5 ? 1.1 : 1)
           });
         });
       }
@@ -1123,6 +1176,20 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
           py = pt.startY - (10 * tScale) - progress * (28 * tScale) + Math.sin(progress * Math.PI * 3) * 3;
           scale = (pt.scale || 1.1) + Math.sin(progress * Math.PI) * 0.3;
           opacity = progress > 0.7 ? (1 - progress) / 0.3 : 1;
+        } else if (pt.type === 'celebrate' && pt.targetX !== undefined && pt.targetY !== undefined) {
+          const tScale = getTileScale();
+          // Fireworks explosion burst trajectory with gravity drop
+          px = pt.startX + (pt.targetX - pt.startX) * progress;
+          py = pt.startY + (pt.targetY - pt.startY) * progress + (progress * progress * 22 * tScale);
+          scale = (pt.scale || 1.3) * Math.sin(progress * Math.PI) * 1.4;
+          opacity = progress > 0.75 ? (1 - progress) / 0.25 : 1;
+        } else if (pt.type === 'flame') {
+          const tScale = getTileScale();
+          // Character-sized roaring flame flickering & blazing upward
+          px = pt.startX + (pt.offsetX || 0) + Math.sin(progress * Math.PI * 12) * (4 * tScale);
+          py = pt.startY + (4 * tScale) - (progress * 24 * tScale);
+          scale = (pt.scale || 2.2) * (0.85 + Math.sin(progress * Math.PI) * 0.4);
+          opacity = progress > 0.8 ? (1 - progress) / 0.2 : (0.85 + Math.sin(progress * Math.PI * 14) * 0.15);
         }
 
         ctx.save();
