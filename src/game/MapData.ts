@@ -13,26 +13,16 @@ export interface MapObjectInstance {
 
 export function cleanDuplicateObjects(objects?: MapObjectInstance[]): MapObjectInstance[] {
   if (!objects || objects.length === 0) return [];
+  const seenIds = new Set<string>();
+  const seenPos = new Set<string>();
   const result: MapObjectInstance[] = [];
 
   for (let i = objects.length - 1; i >= 0; i--) {
     const candidate = objects[i];
-    const isDuplicate = result.some(existing => {
-      if (
-        existing.tilesetKey === candidate.tilesetKey &&
-        existing.startCol === candidate.startCol &&
-        existing.startRow === candidate.startRow &&
-        existing.width === candidate.width &&
-        existing.height === candidate.height
-      ) {
-        const dx = Math.abs(existing.x - candidate.x);
-        const dy = Math.abs(existing.y - candidate.y);
-        return dx < candidate.width && dy < candidate.height;
-      }
-      return false;
-    });
-
-    if (!isDuplicate) {
+    const posKey = `${candidate.x}_${candidate.y}_${candidate.tilesetKey}_${candidate.startCol}_${candidate.startRow}`;
+    if (!seenIds.has(candidate.id) && !seenPos.has(posKey)) {
+      seenIds.add(candidate.id);
+      seenPos.add(posKey);
       result.unshift(candidate);
     }
   }

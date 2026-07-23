@@ -692,11 +692,13 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           ctx.globalAlpha = 1.0;
         }
 
-        ctx.strokeStyle = tool === 'select' ? '#f5c2e7' : '#f9e2af';
-        ctx.lineWidth = 2;
-        ctx.fillStyle = tool === 'select' ? 'rgba(245, 194, 231, 0.15)' : 'rgba(249, 226, 175, 0.15)';
-        ctx.fillRect(hx, hy, bw, bh);
-        ctx.strokeRect(hx, hy, bw, bh);
+        if (tool !== 'select') {
+          ctx.strokeStyle = '#f9e2af';
+          ctx.lineWidth = 2;
+          ctx.fillStyle = 'rgba(249, 226, 175, 0.15)';
+          ctx.fillRect(hx, hy, bw, bh);
+          ctx.strokeRect(hx, hy, bw, bh);
+        }
       }
       ctx.restore();
     }
@@ -1044,6 +1046,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         // Remove any exact overlapping same-origin object if replacing
         nextObjects = nextObjects.filter(o => !(o.x === tx && o.y === ty));
         nextObjects.push(newObj);
+        setSelectedObjectId(newObj.id);
       }
 
       return {
@@ -1125,6 +1128,11 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       isPainting.current = true;
       lastPaintedCellRef.current = { x: tx, y: ty };
       handlePaint(tx, ty);
+
+      if (paletteSelection || brushSize > 1) {
+        setPaletteSelection(null);
+        setTool('select');
+      }
     }
   };
 
