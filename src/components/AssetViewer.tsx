@@ -1384,7 +1384,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
 
   // Current row action names array for selected character
   const currentCharRowActions = charRowActions[currentSelectedId] || getCharRowActions(currentSelectedId);
-  const baseBoardSize = 320;
+  const baseBoardSize = 256;
   const boardSize = Math.round(baseBoardSize * editorZoom);
   const cellSizePx = boardSize / editorGridRes;
 
@@ -2030,28 +2030,28 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
 
           <div style={{
             background: '#181825', border: '1px solid rgba(255, 255, 255, 0.2)',
-            borderRadius: '16px', padding: '24px', display: 'flex', gap: '24px',
+            borderRadius: '16px', padding: '16px', display: 'flex', gap: '16px',
+            maxWidth: '520px', width: '92vw', maxHeight: '92vh', overflowY: 'auto',
             boxShadow: '0 20px 60px rgba(0, 0, 0, 0.95)', color: '#fff'
           }}>
             {/* Left: Pixel Grid Studio Drawing Board */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#89b4fa', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Pencil size={16} /> 픽셀 도트 그리드 (행 {editingTile.row}, 열 {editingTile.col})
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px', minWidth: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#89b4fa', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Pencil size={15} /> 픽셀 도트 (행 {editingTile.row}, 열 {editingTile.col})
                 </div>
 
                 {/* Grid Zoom & Resolution Selectors */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                   {/* Zoom Scale Selector */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.4)', padding: '3px 6px', borderRadius: '6px', border: '1px solid var(--border-glass)' }}>
-                    <ZoomIn size={13} style={{ color: 'var(--accent)', marginRight: '2px' }} />
-                    <span style={{ fontSize: '10px', color: '#aaa', marginRight: '4px' }}>보기 확대:</span>
-                    {([1.0, 1.5, 2.0, 3.0, 4.0] as const).map((z) => (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '2px', background: 'rgba(0,0,0,0.4)', padding: '2px 4px', borderRadius: '4px', border: '1px solid var(--border-glass)' }}>
+                    <ZoomIn size={11} style={{ color: 'var(--accent)', marginRight: '2px' }} />
+                    {([1.0, 1.5, 2.0, 3.0] as const).map((z) => (
                       <button
                         key={z}
                         onClick={() => setEditorZoom(z)}
                         style={{
-                          padding: '3px 6px', fontSize: '10px', borderRadius: '4px', border: 'none',
+                          padding: '2px 5px', fontSize: '9px', borderRadius: '3px', border: 'none',
                           background: editorZoom === z ? 'var(--accent)' : 'transparent',
                           color: editorZoom === z ? '#000' : '#ccc', cursor: 'pointer', fontWeight: 'bold'
                         }}
@@ -2062,15 +2062,14 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                   </div>
 
                   {/* Grid Resolution Selector (16x16, 32x32, 64x64) */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.4)', padding: '3px 6px', borderRadius: '6px', border: '1px solid var(--border-glass)' }}>
-                    <Grid size={13} style={{ color: 'var(--accent)', marginRight: '2px' }} />
-                    <span style={{ fontSize: '10px', color: '#aaa', marginRight: '4px' }}>해상도:</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '2px', background: 'rgba(0,0,0,0.4)', padding: '2px 4px', borderRadius: '4px', border: '1px solid var(--border-glass)' }}>
+                    <Grid size={11} style={{ color: 'var(--accent)', marginRight: '2px' }} />
                     {([16, 32, 64] as const).map((res) => (
                       <button
                         key={res}
                         onClick={() => handleChangeGridRes(res)}
                         style={{
-                          padding: '3px 8px', fontSize: '10px', borderRadius: '4px', border: 'none',
+                          padding: '2px 6px', fontSize: '9px', borderRadius: '3px', border: 'none',
                           background: editorGridRes === res ? 'var(--accent)' : 'transparent',
                           color: editorGridRes === res ? '#000' : '#ccc', cursor: 'pointer', fontWeight: 'bold'
                         }}
@@ -2083,27 +2082,27 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
               </div>
 
               {/* Drawing Tools Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                   <button
                     onClick={() => setDrawTool('pencil')}
                     style={{
-                      padding: '5px 10px', fontSize: '11px', borderRadius: '4px',
+                      padding: '4px 8px', fontSize: '10px', borderRadius: '4px',
                       background: drawTool === 'pencil' ? 'var(--primary)' : 'rgba(255,255,255,0.08)',
-                      color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+                      color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px'
                     }}
                   >
-                    <Pencil size={12} /> 연필
+                    <Pencil size={11} /> 연필
                   </button>
                   <button
                     onClick={() => setDrawTool('eraser')}
                     style={{
-                      padding: '5px 10px', fontSize: '11px', borderRadius: '4px',
+                      padding: '4px 8px', fontSize: '10px', borderRadius: '4px',
                       background: drawTool === 'eraser' ? 'var(--primary)' : 'rgba(255,255,255,0.08)',
-                      color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+                      color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px'
                     }}
                   >
-                    <Eraser size={12} /> 지우개
+                    <Eraser size={11} /> 지우개
                   </button>
                   <button
                     onClick={() => {
@@ -2112,47 +2111,47 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                     }}
                     title="그려진 도트 그림 좌우 반전"
                     style={{
-                      padding: '5px 10px', fontSize: '11px', borderRadius: '4px',
+                      padding: '4px 8px', fontSize: '10px', borderRadius: '4px',
                       background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid var(--border-glass)',
-                      cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px'
                     }}
                   >
-                    <FlipHorizontal size={12} /> ↔️ 좌우 반전
+                    <FlipHorizontal size={11} /> ↔️ 반전
                   </button>
                   <button
                     onClick={() => setPixelGrid(Array.from({ length: editorGridRes }, () => Array(editorGridRes).fill('transparent')))}
                     style={{
-                      padding: '5px 10px', fontSize: '11px', borderRadius: '4px',
+                      padding: '4px 8px', fontSize: '10px', borderRadius: '4px',
                       background: 'rgba(239, 68, 68, 0.2)', color: '#ff6b6b', border: '1px solid var(--danger)',
-                      cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px'
                     }}
                   >
-                    <RotateCcw size={12} /> 초기화
+                    <RotateCcw size={11} /> 초기화
                   </button>
                   <button
                     onClick={() => editorFileInputRef.current?.click()}
                     style={{
-                      padding: '5px 10px', fontSize: '11px', borderRadius: '4px',
+                      padding: '4px 8px', fontSize: '10px', borderRadius: '4px',
                       background: 'rgba(139, 92, 246, 0.25)', color: 'var(--accent)',
-                      border: '1px solid var(--accent)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
+                      border: '1px solid var(--accent)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px',
                       fontWeight: 'bold'
                     }}
                   >
-                    <Upload size={12} /> 📁 이미지 불러오기
+                    <Upload size={11} /> 📁 불러오기
                   </button>
                 </div>
 
-                <div style={{ fontSize: '10px', color: '#aaa' }}>
-                  현재 격자: <strong style={{ color: 'var(--accent)' }}>{editorGridRes} x {editorGridRes}</strong> (셀 크기 {cellSizePx.toFixed(1)}px | 확대 {editorZoom}x)
+                <div style={{ fontSize: '9px', color: '#aaa' }}>
+                  <strong style={{ color: 'var(--accent)' }}>{editorGridRes}x{editorGridRes}</strong> ({cellSizePx.toFixed(1)}px/셀 | {editorZoom}x)
                 </div>
               </div>
 
               {/* Zoomable & Scrollable Cell Grid Container */}
               <div style={{
-                maxWidth: '480px', maxHeight: '480px', overflow: 'auto',
+                maxWidth: '320px', maxHeight: '320px', overflow: 'auto',
                 background: '#0a0a0f', borderRadius: '8px', border: '1px solid var(--border-glass)',
-                padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.8)'
+                padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.8)', margin: '0 auto'
               }}>
                 <div
                   onMouseDown={() => setIsMouseDown(true)}
@@ -2200,13 +2199,13 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
             </div>
 
             {/* Right: Color Palette & Actions */}
-            <div style={{ width: '220px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '6px', borderBottom: '1px solid var(--border-glass)', paddingBottom: '8px' }}>
-                <Palette size={15} /> 팔레트 색상
+            <div style={{ width: '160px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '4px', borderBottom: '1px solid var(--border-glass)', paddingBottom: '6px' }}>
+                <Palette size={14} /> 팔레트 색상
               </div>
 
               {/* Color swatches */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px' }}>
                 {PALETTE_COLORS.map((c) => (
                   <button
                     key={c}
@@ -2218,11 +2217,11 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                       }
                     }}
                     style={{
-                      height: '28px', borderRadius: '4px',
+                      height: '24px', borderRadius: '3px',
                       background: c === 'transparent' ? '#222' : c,
                       border: selectedColor === c && drawTool === 'pencil' ? '2px solid #fff' : '1px solid rgba(255,255,255,0.2)',
-                      cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
-                      color: c === 'transparent' ? '#aaa' : 'transparent', fontSize: '9px'
+                      cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.4)',
+                      color: c === 'transparent' ? '#aaa' : 'transparent', fontSize: '8px'
                     }}
                   >
                     {c === 'transparent' ? '지우개' : ''}
@@ -2231,8 +2230,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
               </div>
 
               {/* Custom Color Picker */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.05)', padding: '6px 8px', borderRadius: '6px' }}>
-                <span style={{ fontSize: '11px', color: '#ccc' }}>커스텀 색상:</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.05)', padding: '4px 6px', borderRadius: '4px' }}>
+                <span style={{ fontSize: '10px', color: '#ccc' }}>커스텀:</span>
                 <input
                   type="color"
                   value={selectedColor}
@@ -2240,19 +2239,19 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                     setSelectedColor(e.target.value);
                     setDrawTool('pencil');
                   }}
-                  style={{ width: '32px', height: '24px', border: 'none', background: 'none', cursor: 'pointer' }}
+                  style={{ width: '28px', height: '20px', border: 'none', background: 'none', cursor: 'pointer' }}
                 />
               </div>
 
               {/* Live Preview */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', borderTop: '1px solid var(--border-glass)', paddingTop: '10px' }}>
-                <span style={{ fontSize: '11px', color: '#aaa' }}>라이브 4x 확대 미리보기</span>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', borderTop: '1px solid var(--border-glass)', paddingTop: '8px' }}>
+                <span style={{ fontSize: '10px', color: '#aaa' }}>실시간 미리보기</span>
                 <div
                   style={{
-                    width: '64px', height: '64px', border: '2px solid var(--accent)', borderRadius: '4px',
+                    width: '48px', height: '48px', border: '2px solid var(--accent)', borderRadius: '4px',
                     display: 'grid',
-                    gridTemplateColumns: `repeat(${editorGridRes}, ${64 / editorGridRes}px)`,
-                    gridTemplateRows: `repeat(${editorGridRes}, ${64 / editorGridRes}px)`,
+                    gridTemplateColumns: `repeat(${editorGridRes}, ${48 / editorGridRes}px)`,
+                    gridTemplateRows: `repeat(${editorGridRes}, ${48 / editorGridRes}px)`,
                     background: '#111', overflow: 'hidden'
                   }}
                 >
@@ -2265,22 +2264,22 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
               </div>
 
               {/* Save / Cancel buttons */}
-              <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <button
                   onClick={handleSavePixelEditor}
                   style={{
-                    padding: '10px', background: 'var(--primary)', border: 'none', borderRadius: '6px',
-                    color: '#fff', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+                    padding: '8px', background: 'var(--primary)', border: 'none', borderRadius: '6px',
+                    color: '#fff', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
                   }}
                 >
-                  <Save size={14} /> 💾 에셋에 도트 반영
+                  <Save size={13} /> 💾 도트 반영
                 </button>
                 <button
                   onClick={() => setEditingTile(null)}
                   style={{
-                    padding: '8px', background: 'rgba(255,255,255,0.08)', border: '1px solid var(--border-glass)',
-                    borderRadius: '6px', color: '#ccc', fontSize: '11px', cursor: 'pointer'
+                    padding: '6px', background: 'rgba(255,255,255,0.08)', border: '1px solid var(--border-glass)',
+                    borderRadius: '6px', color: '#ccc', fontSize: '10px', cursor: 'pointer'
                   }}
                 >
                   취소
