@@ -235,17 +235,34 @@ export default function App() {
       }
     });
 
-    // 2. Load house custom assets from Supabase DB
+    // 2. Load house custom assets from Supabase DB & merge with local cache
     fetchHouseAssets(houseCode).then(({ mapTilesets, charSprites }) => {
       let updated = false;
-      if (mapTilesets.length > 0) {
-        localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(mapTilesets));
+      
+      // Merge map tilesets by ID
+      const savedMaps = localStorage.getItem('on_house_custom_map_tilesets');
+      const localMapsList: any[] = savedMaps ? JSON.parse(savedMaps) : [];
+      const mapMap = new Map();
+      localMapsList.forEach(m => mapMap.set(m.id, m));
+      mapTilesets.forEach(m => mapMap.set(m.id, m));
+      const mergedMaps = Array.from(mapMap.values());
+      if (mergedMaps.length > 0) {
+        localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(mergedMaps));
         updated = true;
       }
-      if (charSprites.length > 0) {
-        localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(charSprites));
+
+      // Merge character sprites by ID
+      const savedChars = localStorage.getItem('on_house_custom_char_sprites');
+      const localCharsList: any[] = savedChars ? JSON.parse(savedChars) : [];
+      const charMap = new Map();
+      localCharsList.forEach(c => charMap.set(c.id, c));
+      charSprites.forEach(c => charMap.set(c.id, c));
+      const mergedChars = Array.from(charMap.values());
+      if (mergedChars.length > 0) {
+        localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(mergedChars));
         updated = true;
       }
+
       if (updated) {
         setAssetVersion((v) => v + 1);
       }

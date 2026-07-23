@@ -182,8 +182,11 @@ export const saveHouseAssetToDB = async (houseCode: string, assetType: 'map_tile
 
     if (error) {
       console.error('Failed to save asset to Supabase:', error.message);
+      return { success: false, error: error.message };
     }
-  } catch (err) {
+    return { success: true };
+  } catch (err: any) {
     console.error('Error in saveHouseAssetToDB:', err);
+    return { success: false, error: err?.message || 'DB 에셋 저장 실패' };
   }
 };
