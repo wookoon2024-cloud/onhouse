@@ -1213,8 +1213,8 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
           ctx.filter = 'none';
         }
 
-        // Get custom configured display size for this character (default 16px tile scale)
-        const baseCharSize = getCharDisplaySize(player.spriteType);
+        // Get custom configured display size for this specific player (default 16px tile scale)
+        const baseCharSize = player.charSize || getCharDisplaySize(player.spriteType) || 16;
         const charDrawW = Math.round((baseCharSize / 16) * vSize);
         const charDrawH = Math.round((baseCharSize / 16) * vSize);
 

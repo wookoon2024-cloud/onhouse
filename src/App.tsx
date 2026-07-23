@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { CanvasGame } from './game/CanvasGame';
-import { type MapDefinition, maps, PRESET_MAP_TEMPLATES, createCustomMap, getCharRowActions } from './game/MapData';
+import { type MapDefinition, maps, PRESET_MAP_TEMPLATES, createCustomMap, getCharRowActions, getCharDisplaySize } from './game/MapData';
 import {
   type PlayerState,
   getOrCreateDeviceId,
@@ -114,7 +114,8 @@ export default function App() {
       isOnline: true,
       isMobile: isMobileDevice,
       statusMessage: savedStatus,
-      lastActive: Date.now()
+      lastActive: Date.now(),
+      charSize: getCharDisplaySize(savedSprite)
     };
   });
 
@@ -927,6 +928,22 @@ export default function App() {
     const unreads = allDMs.filter(dm => dm.toId === deviceId.current && !dm.read);
     setUnreadCount(unreads.length);
   };
+
+  // Auto-sync charSize when character display size is updated in Pixel Editor
+  useEffect(() => {
+    const handleSpriteUpdate = () => {
+      setLocalPlayer((prev) => {
+        const nextSize = getCharDisplaySize(prev.spriteType);
+        if (prev.charSize === nextSize) return prev;
+        const updated = { ...prev, charSize: nextSize };
+        sendPlayerSync(updated);
+        return updated;
+      });
+    };
+
+    window.addEventListener('on_house_sprites_updated', handleSpriteUpdate);
+    return () => window.removeEventListener('on_house_sprites_updated', handleSpriteUpdate);
+  }, []);
 
   // Initialize sync channel per house code
   useEffect(() => {
@@ -2107,7 +2124,15 @@ export default function App() {
       {isCustomizing && (
         <Customizer
           player={localPlayer}
-          onChange={(updates) => setLocalPlayer((prev) => ({ ...prev, ...updates }))}
+          onChange={(updates) => {
+            setLocalPlayer((prev) => {
+              const nextSprite = updates.spriteType || prev.spriteType;
+              const nextSize = getCharDisplaySize(nextSprite);
+              const updated = { ...prev, ...updates, charSize: nextSize };
+              sendPlayerSync(updated);
+              return updated;
+            });
+          }}
           onClose={() => setIsCustomizing(false)}
         />
       )}

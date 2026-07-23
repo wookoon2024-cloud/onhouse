@@ -14,6 +14,7 @@ export interface PlayerState {
   lastActive: number; // timestamp
   currentEmote?: string | null; // active emote action e.g. "환호", "공격"
   emoteUntil?: number | null; // expiration timestamp for emote animation
+  charSize?: number; // custom map display size in px (default 16)
 }
 
 export interface DirectMessage {
