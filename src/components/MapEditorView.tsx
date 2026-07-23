@@ -1595,8 +1595,15 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                 key={layer}
                 onClick={() => {
                   setEditLayer(layer);
-                  if (layer === 'collision') setSelectedTile(1);
-                  else if (selectedTile === 1 || selectedTile === 0 || selectedTile === -1) setSelectedTile(getPrefixedIndex(0, activeTileset));
+                  if (layer === 'collision') {
+                    setSelectedTile(1);
+                    setTool('brush');
+                    setSelectedObjectId(null);
+                    setPaletteSelection(null);
+                    setShowCollision(true);
+                  } else if (selectedTile === 1 || selectedTile === 0 || selectedTile === -1) {
+                    setSelectedTile(getPrefixedIndex(0, activeTileset));
+                  }
                 }}
                 style={{
                   width: '100%', padding: '10px', fontSize: '11px', borderRadius: '4px',
@@ -1746,7 +1753,14 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               ) : (
                 <div style={{ display: 'flex', gap: '6px', width: '100%' }}>
                   <button
-                    onClick={() => setSelectedTile(1)}
+                    onClick={() => {
+                      setEditLayer('collision');
+                      setSelectedTile(1);
+                      setTool('brush');
+                      setSelectedObjectId(null);
+                      setPaletteSelection(null);
+                      setShowCollision(true);
+                    }}
                     style={{
                       flex: 1, padding: '8px', fontSize: '11px', borderRadius: '4px',
                       background: selectedTile === 1 ? 'var(--danger)' : 'rgba(255,255,255,0.03)',
@@ -1757,7 +1771,14 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                     🚫 충돌 벽 추가
                   </button>
                   <button
-                    onClick={() => setSelectedTile(0)}
+                    onClick={() => {
+                      setEditLayer('collision');
+                      setSelectedTile(0);
+                      setTool('brush');
+                      setSelectedObjectId(null);
+                      setPaletteSelection(null);
+                      setShowCollision(true);
+                    }}
                     style={{
                       flex: 1, padding: '8px', fontSize: '11px', borderRadius: '4px',
                       background: selectedTile === 0 ? 'var(--primary)' : 'rgba(255,255,255,0.03)',
