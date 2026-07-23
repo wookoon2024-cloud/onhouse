@@ -997,6 +997,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                 newDecor[pty][ptx] = -1;
                 if (autoCollision) newCollision[pty][ptx] = false;
               }
+              // Erase any object overlapping eraser position
+              nextObjects = nextObjects.filter(o => !(ptx >= o.x && ptx < o.x + o.width && pty >= o.y && pty < o.y + o.height));
             } else {
               let tileToPaint = selectedTile;
               if (paletteSelection && paletteSelection.tilesetKey === activeTileset && tsInfo) {
