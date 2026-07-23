@@ -1628,8 +1628,23 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               🖌️ 그리기 도구 설정
             </h4>
             
-            {/* Tool Switcher Row */}
-            <div style={{ display: 'flex', gap: '4px' }}>
+            {/* Tool Switcher Row (5 Tools: 선택, 브러시, 채우기, 스포이드, 오브젝트) */}
+            <div style={{ display: 'flex', gap: '3px' }}>
+              <button
+                onClick={() => setTool('select')}
+                style={{
+                  flex: 1, padding: '7px 2px', fontSize: '10px', borderRadius: '4px',
+                  background: tool === 'select' ? 'rgba(245, 194, 231, 0.3)' : 'rgba(255,255,255,0.03)',
+                  color: tool === 'select' ? '#f5c2e7' : '#fff',
+                  border: tool === 'select' ? '1px solid #f5c2e7' : '1px solid var(--border-glass)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', cursor: 'pointer',
+                  fontWeight: tool === 'select' ? 'bold' : 'normal'
+                }}
+                title="오브젝트 스마트 선택 & 이동/편집 (단축키: V)"
+              >
+                <MousePointer size={11} /> 선택(V)
+              </button>
+
               <button
                 onClick={() => {
                   setTool('brush');
@@ -1637,16 +1652,16 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                 }}
                 disabled={editLayer === 'collision'}
                 style={{
-                  flex: 1, padding: '8px 4px', fontSize: '10px', borderRadius: '4px',
+                  flex: 1, padding: '7px 2px', fontSize: '10px', borderRadius: '4px',
                   background: tool === 'brush' && selectedTile !== -1 && editLayer !== 'collision' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(255,255,255,0.03)',
                   color: tool === 'brush' && selectedTile !== -1 && editLayer !== 'collision' ? 'var(--accent)' : '#fff',
                   border: tool === 'brush' && selectedTile !== -1 && editLayer !== 'collision' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', cursor: 'pointer',
                   opacity: editLayer === 'collision' ? 0.4 : 1
                 }}
-                title="브러시 (단축키: B)"
+                title="일반 브러시 타일 그리기 (단축키: B)"
               >
-                <Paintbrush size={12} /> 브러시 (B)
+                <Paintbrush size={11} /> 브러시(B)
               </button>
 
               <button
@@ -1656,16 +1671,16 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                 }}
                 disabled={editLayer === 'collision'}
                 style={{
-                  flex: 1, padding: '8px 4px', fontSize: '10px', borderRadius: '4px',
+                  flex: 1, padding: '7px 2px', fontSize: '10px', borderRadius: '4px',
                   background: tool === 'bucket' && selectedTile !== -1 && editLayer !== 'collision' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(255,255,255,0.03)',
                   color: tool === 'bucket' && selectedTile !== -1 && editLayer !== 'collision' ? 'var(--accent)' : '#fff',
                   border: tool === 'bucket' && selectedTile !== -1 && editLayer !== 'collision' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', cursor: 'pointer',
                   opacity: editLayer === 'collision' ? 0.4 : 1
                 }}
-                title="채우기 (단축키: F)"
+                title="영역 채우기 (단축키: F)"
               >
-                <PaintBucket size={12} /> 채우기 (F)
+                <PaintBucket size={11} /> 채우기(F)
               </button>
 
               <button
@@ -1675,31 +1690,36 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                 }}
                 disabled={editLayer === 'collision'}
                 style={{
-                  flex: 1, padding: '8px 4px', fontSize: '10px', borderRadius: '4px',
+                  flex: 1, padding: '7px 2px', fontSize: '10px', borderRadius: '4px',
                   background: (tool === 'eyedropper' || isAltPressed) && editLayer !== 'collision' ? 'rgba(137, 220, 235, 0.3)' : 'rgba(255,255,255,0.03)',
                   color: (tool === 'eyedropper' || isAltPressed) && editLayer !== 'collision' ? '#89dceb' : '#fff',
                   border: (tool === 'eyedropper' || isAltPressed) && editLayer !== 'collision' ? '1px solid #89dceb' : '1px solid var(--border-glass)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer',
-                  fontWeight: 'bold', opacity: editLayer === 'collision' ? 0.4 : 1
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', cursor: 'pointer',
+                  opacity: editLayer === 'collision' ? 0.4 : 1
                 }}
                 title="스포이드 (단축키: Alt + 클릭 / E)"
               >
-                <Pipette size={12} /> 스포이드
+                <Pipette size={11} /> 스포이드
               </button>
 
               <button
-                onClick={() => setTool('select')}
-                style={{
-                  flex: 1, padding: '8px 4px', fontSize: '10px', borderRadius: '4px',
-                  background: tool === 'select' ? 'rgba(245, 194, 231, 0.3)' : 'rgba(255,255,255,0.03)',
-                  color: tool === 'select' ? '#f5c2e7' : '#fff',
-                  border: tool === 'select' ? '1px solid #f5c2e7' : '1px solid var(--border-glass)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer',
-                  fontWeight: tool === 'select' ? 'bold' : 'normal'
+                onClick={() => {
+                  setTool('object');
+                  if (selectedTile === -1) setSelectedTile(getPrefixedIndex(0, activeTileset));
                 }}
-                title="오브젝트 스마트 선택 & 이동/편집 (단축키: V)"
+                disabled={editLayer === 'collision'}
+                style={{
+                  flex: 1, padding: '7px 2px', fontSize: '10px', borderRadius: '4px',
+                  background: tool === 'object' ? 'rgba(250, 179, 135, 0.3)' : 'rgba(255,255,255,0.03)',
+                  color: tool === 'object' ? '#fab387' : '#fff',
+                  border: tool === 'object' ? '1px solid #fab387' : '1px solid var(--border-glass)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', cursor: 'pointer',
+                  fontWeight: tool === 'object' ? 'bold' : 'normal',
+                  opacity: editLayer === 'collision' ? 0.4 : 1
+                }}
+                title="독립 오브젝트 스탬프 배치 (단축키: O)"
               >
-                <MousePointer size={12} /> 오브젝트 (V)
+                <Layers size={11} /> 오브젝트(O)
               </button>
             </div>
 
