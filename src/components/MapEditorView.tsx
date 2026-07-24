@@ -1327,7 +1327,6 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
     if (tool === "select") {
       const isAltHeld = e.altKey || isAltPressed;
-
       if (isAltHeld) {
         // Alt + Drag in select mode -> ONLY WAY to start Map Box Multi-Tile Drag Selection!
         setSelectedObjectId(null);
@@ -1342,10 +1341,14 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       setMapBoxSelectStart(null);
       setMapBoxSelection(null);
 
-      // A. Check existing MapObjectInstance at (tx, ty)
-      const clickedObj = (localMap.objects || []).slice().reverse().find(o =>
-        tx >= o.x && tx < o.x + o.width && ty >= o.y && ty < o.y + o.height
-      );
+      // A. Check existing MapObjectInstance at (tx, ty) strictly matching current editLayer!
+      const clickedObj = (localMap.objects || []).slice().reverse().find(o => {
+        const matchesPos = tx >= o.x && tx < o.x + o.width && ty >= o.y && ty < o.y + o.height;
+        if (!matchesPos) return false;
+        if (editLayer === "base") return o.layer === "base";
+        if (editLayer === "decor") return o.layer !== "base";
+        return true;
+      });
 
       if (clickedObj) {
         setSelectedObjectId(clickedObj.id);
@@ -1371,12 +1374,21 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         return;
       }
 
-      // B. Check 1x1 tile on decorLayer or baseLayer at (tx, ty) to move it
+      // B. Check 1x1 tile at (tx, ty) strictly matching current editLayer!
       const dTile = localMap.decorLayer[ty] ? localMap.decorLayer[ty][tx] : -1;
       const bTile = localMap.baseLayer[ty] ? localMap.baseLayer[ty][tx] : -1;
-      const defaultBase = localMap.tileset === 'interior' ? 1199 : 2000;
-      const isBasePick = editLayer === 'base' || (dTile === -1 && bTile !== -1 && bTile !== defaultBase);
-      const targetTile = isBasePick ? bTile : dTile;
+      const defaultBase = localMap.tileset === "interior" ? 1199 : 2000;
+
+      let isBasePick = false;
+      let targetTile = -1;
+
+      if (editLayer === "base") {
+        isBasePick = true;
+        targetTile = (bTile !== -1 && bTile !== defaultBase) ? bTile : -1;
+      } else if (editLayer === "decor") {
+        isBasePick = false;
+        targetTile = dTile;
+      }
 
       if (targetTile !== -1 && targetTile !== 1199 && targetTile !== 2000) {
         setHistory(prev => [...prev, localMap]);
