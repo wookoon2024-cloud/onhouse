@@ -2178,47 +2178,63 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           {/* Floating Object Smart Edit Action Bar (Fixed on bottom center) */}
           {selectedObjectId && (
             <div style={{
-              position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 100,
-              background: 'rgba(20, 20, 32, 0.95)', border: '1px solid #ffd700',
-              borderRadius: '8px', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '8px',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)',
-              pointerEvents: 'auto', animation: 'fadeIn 0.15s ease-out'
+              position: "absolute", bottom: "24px", left: "50%", transform: "translateX(-50%)", zIndex: 100,
+              background: "rgba(20, 20, 32, 0.95)", border: "1px solid #ffd700",
+              borderRadius: "8px", padding: "6px 14px", display: "flex", alignItems: "center", gap: "8px",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.6)", backdropFilter: "blur(10px)",
+              pointerEvents: "auto", animation: "fadeIn 0.15s ease-out", whiteSpace: "nowrap"
             }}>
-              <span style={{ fontSize: '11px', color: '#ffd700', fontWeight: 'bold' }}>
-                📦 오브젝트 선택됨
+              <span style={{ fontSize: "11px", color: "#ffd700", fontWeight: "bold", whiteSpace: "nowrap" }}>
+                📦 오브젝트
               </span>
-              <div style={{ width: '1px', height: '14px', background: 'rgba(255,255,255,0.2)' }} />
+              <div style={{ width: "1px", height: "14px", background: "rgba(255,255,255,0.2)" }} />
               <button
                 onClick={() => handleBringToFront()}
-                style={{ padding: '4px 8px', fontSize: '10px', borderRadius: '4px', background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid var(--border-glass)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-                title="맨 앞으로 가져오기"
+                style={{
+                  padding: "5px 12px", fontSize: "11px", borderRadius: "4px", background: "rgba(255,255,255,0.08)",
+                  color: "#fff", border: "1px solid var(--border-glass)", cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap"
+                }}
+                title="앞으로 가져오기"
               >
-                <MoveUp size={12} /> 맨 앞으로
+                <MoveUp size={12} /> 앞으로
               </button>
               <button
                 onClick={() => handleSendToBack()}
-                style={{ padding: '4px 8px', fontSize: '10px', borderRadius: '4px', background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid var(--border-glass)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-                title="맨 뒤로 보내기"
+                style={{
+                  padding: "5px 12px", fontSize: "11px", borderRadius: "4px", background: "rgba(255,255,255,0.08)",
+                  color: "#fff", border: "1px solid var(--border-glass)", cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap"
+                }}
+                title="뒤로 보내기"
               >
-                <MoveDown size={12} /> 맨 뒤로
+                <MoveDown size={12} /> 뒤로
               </button>
               <button
                 onClick={() => handleCopySelectedObject()}
-                style={{ padding: '4px 8px', fontSize: '10px', borderRadius: '4px', background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid var(--border-glass)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                style={{
+                  padding: "5px 12px", fontSize: "11px", borderRadius: "4px", background: "rgba(255,255,255,0.08)",
+                  color: "#fff", border: "1px solid var(--border-glass)", cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap"
+                }}
                 title="복사 (Ctrl+C)"
               >
                 <Copy size={12} /> 복사
               </button>
               <button
                 onClick={() => handleDeleteSelectedObject()}
-                style={{ padding: '4px 8px', fontSize: '10px', borderRadius: '4px', background: 'var(--danger)', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' }}
+                style={{
+                  padding: "5px 12px", fontSize: "11px", borderRadius: "4px", background: "var(--danger)",
+                  color: "#fff", border: "none", cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: "4px", fontWeight: "bold", whiteSpace: "nowrap"
+                }}
                 title="삭제 (Delete)"
               >
                 <Trash2 size={12} /> 삭제
               </button>
               <button
                 onClick={() => setSelectedObjectId(null)}
-                style={{ padding: '4px 6px', fontSize: '10px', borderRadius: '4px', background: 'transparent', color: '#aaa', border: 'none', cursor: 'pointer' }}
+                style={{ padding: "4px 6px", fontSize: "10px", borderRadius: "4px", background: "transparent", color: "#aaa", border: "none", cursor: "pointer", whiteSpace: "nowrap" }}
               >
                 <X size={12} />
               </button>
