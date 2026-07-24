@@ -71,6 +71,10 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   const [isDraggingObject, setIsDraggingObject] = useState<boolean>(false);
   const [objectDragStart, setObjectDragStart] = useState<{ originX: number; originY: number; startTx: number; startTy: number } | null>(null);
 
+  // Map Canvas Box Drag Selection State (For merging 1x1 map tiles directly into a single object!)
+  const [mapBoxSelectStart, setMapBoxSelectStart] = useState<{ tx: number; ty: number } | null>(null);
+  const [mapBoxSelection, setMapBoxSelection] = useState<{ startCol: number; startRow: number; cols: number; rows: number } | null>(null);
+
   // Eyedropper Toast Notification
   const [pickedToast, setPickedToast] = useState<string | null>(null);
   const [isAltPressed, setIsAltPressed] = useState<boolean>(false);
@@ -650,7 +654,6 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           ctx.setLineDash([6, 6]);
           ctx.fillStyle = 'rgba(255, 215, 0, 0.22)';
           ctx.fillRect(ox, oy, ow, oh);
-          ctx.strokeRect(ox, oy, ow, oh);
         } else if (tool === 'select') {
           // 2) Unselected Object Guide: Bright Neon Cyan (#00e5ff)
           ctx.strokeStyle = '#00e5ff';
@@ -660,6 +663,23 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         }
         ctx.restore();
       });
+    }
+
+    // 5.5 Map Canvas Box Selection Drag Highlight (Electric Gold #ffd700)
+    if (mapBoxSelection && tool === 'select') {
+      const bx = mapBoxSelection.startCol * tileSize;
+      const by = mapBoxSelection.startRow * tileSize;
+      const bw = mapBoxSelection.cols * tileSize;
+      const bh = mapBoxSelection.rows * tileSize;
+
+      ctx.save();
+      ctx.strokeStyle = '#ffd700';
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([5, 5]);
+      ctx.fillStyle = 'rgba(255, 215, 0, 0.25)';
+      ctx.fillRect(bx, by, bw, bh);
+      ctx.strokeRect(bx, by, bw, bh);
+      ctx.restore();
     }
 
     // 6. Hover Cursor Tile Preview / Eyedropper Highlight
@@ -1152,11 +1172,98 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     isPanningViewport.current = false;
   };
 
+  // ✨ Merge dragged map tiles into a single unified MapObjectInstance!
+  const handleConvertBoxToSingleObject = () => {
+    if (!mapBoxSelection) return;
+    const { startCol, startRow, cols, rows } = mapBoxSelection;
+
+    setHistory(prev => [...prev, localMap]);
+    setRedoHistory([]);
+
+    setLocalMap(prev => {
+      const newDecor = prev.decorLayer.map(r => [...r]);
+      let nextObjects = prev.objects ? [...prev.objects] : [];
+
+      // Determine primary tile in the selection box to identify tileset
+      let sampleTileIdx = -1;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const curTx = startCol + c;
+          const curTy = startRow + r;
+          if (curTx >= 0 && curTx < prev.width && curTy >= 0 && curTy < prev.height) {
+            const dIdx = prev.decorLayer[curTy][curTx];
+            const bIdx = prev.baseLayer[curTy][curTx];
+            if (dIdx !== -1) {
+              sampleTileIdx = dIdx;
+              break;
+            } else if (bIdx !== -1 && sampleTileIdx === -1) {
+              sampleTileIdx = bIdx;
+            }
+          }
+        }
+        if (sampleTileIdx !== -1 && sampleTileIdx !== 1199 && sampleTileIdx !== 2000) break;
+      }
+
+      if (sampleTileIdx === -1) sampleTileIdx = selectedTile !== -1 ? selectedTile : getPrefixedIndex(0, activeTileset);
+
+      const drawInfo = getTileDrawInfo(sampleTileIdx, activeTileset);
+      const targetTsKey = drawInfo?.tilesetKey || activeTileset;
+      const tsInfo = getTilesetInfoLocal(targetTsKey);
+
+      let objStartCol = 0;
+      let objStartRow = 0;
+      if (drawInfo && tsInfo) {
+        objStartCol = drawInfo.localIdx % tsInfo.cols;
+        objStartRow = Math.floor(drawInfo.localIdx / tsInfo.cols);
+      }
+
+      // Clear decor tiles in range so they are cleanly replaced by unified object
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const curTx = startCol + c;
+          const curTy = startRow + r;
+          if (curTx >= 0 && curTx < prev.width && curTy >= 0 && curTy < prev.height) {
+            newDecor[curTy][curTx] = -1;
+          }
+        }
+      }
+
+      const newObj: MapObjectInstance = {
+        id: `obj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        tilesetKey: targetTsKey,
+        startCol: objStartCol,
+        startRow: objStartRow,
+        width: cols,
+        height: rows,
+        x: startCol,
+        y: startRow,
+        layer: editLayer === 'base' ? 'base' : 'decor',
+        zIndex: Date.now()
+      };
+
+      // Filter out any small sub-objects previously contained in this box
+      nextObjects = nextObjects.filter(o => !(o.x >= startCol && o.x + o.width <= startCol + cols && o.y >= startRow && o.y + o.height <= startRow + rows));
+      nextObjects.push(newObj);
+      setSelectedObjectId(newObj.id);
+
+      return {
+        ...prev,
+        decorLayer: newDecor,
+        objects: nextObjects
+      };
+    });
+
+    setMapBoxSelection(null);
+    setPickedToast(`✨ 맵 영역 (${cols}x${rows}) 타일이 1개의 오브젝트로 묶였습니다!`);
+    setTimeout(() => setPickedToast(null), 3000);
+  };
+
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     // Right click cancels stamp preview and switches to select mode
     if (e.button === 2) {
       e.preventDefault();
       setPaletteSelection(null);
+      setMapBoxSelection(null);
       setTool('select');
       return;
     }
@@ -1187,11 +1294,15 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         setSelectedObjectId(clickedObj.id);
         setIsDraggingObject(true);
         setObjectDragStart({ originX: e.clientX, originY: e.clientY, startTx: clickedObj.x, startTy: clickedObj.y });
+        setMapBoxSelectStart(null);
+        setMapBoxSelection(null);
       } else {
-        // Click on empty ground -> DESELECT!
+        // Click on empty ground -> Start Map Box Selection Drag!
         setSelectedObjectId(null);
         setIsDraggingObject(false);
         setObjectDragStart(null);
+        setMapBoxSelectStart({ tx, ty });
+        setMapBoxSelection({ startCol: tx, startRow: ty, cols: 1, rows: 1 });
       }
       return;
     }
@@ -1245,6 +1356,18 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       return;
     }
 
+    // Drag to select box area on map in select mode
+    if (tool === 'select' && mapBoxSelectStart && e.buttons === 1) {
+      const sCol = Math.min(mapBoxSelectStart.tx, tx);
+      const sRow = Math.min(mapBoxSelectStart.ty, ty);
+      const eCol = Math.max(mapBoxSelectStart.tx, tx);
+      const eRow = Math.max(mapBoxSelectStart.ty, ty);
+      const cols = eCol - sCol + 1;
+      const rows = eRow - sRow + 1;
+      setMapBoxSelection({ startCol: sCol, startRow: sRow, cols, rows });
+      return;
+    }
+
     if (!isPainting.current || (tool as string) !== 'brush' || e.altKey || isAltPressed) return;
 
     // Do NOT drag-spawn multi-tile objects on MouseMove!
@@ -1261,6 +1384,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     lastPaintedCellRef.current = null;
     setIsDraggingObject(false);
     setObjectDragStart(null);
+    setMapBoxSelectStart(null);
   };
 
   const handleCanvasMouseLeave = () => {
@@ -1959,12 +2083,12 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           {selectedObjectId && (
             <div style={{
               position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 100,
-              background: 'rgba(20, 20, 32, 0.95)', border: '1px solid #f5c2e7',
+              background: 'rgba(20, 20, 32, 0.95)', border: '1px solid #ffd700',
               borderRadius: '8px', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '8px',
               boxShadow: '0 8px 32px rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)',
               pointerEvents: 'auto', animation: 'fadeIn 0.15s ease-out'
             }}>
-              <span style={{ fontSize: '11px', color: '#f5c2e7', fontWeight: 'bold' }}>
+              <span style={{ fontSize: '11px', color: '#ffd700', fontWeight: 'bold' }}>
                 📦 오브젝트 선택됨
               </span>
               <div style={{ width: '1px', height: '14px', background: 'rgba(255,255,255,0.2)' }} />
@@ -1998,6 +2122,39 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               </button>
               <button
                 onClick={() => setSelectedObjectId(null)}
+                style={{ padding: '4px 6px', fontSize: '10px', borderRadius: '4px', background: 'transparent', color: '#aaa', border: 'none', cursor: 'pointer' }}
+              >
+                <X size={12} />
+              </button>
+            </div>
+          )}
+
+          {/* Floating Map Drag-Box Selection Action Bar (Group tiles into Single Object) */}
+          {mapBoxSelection && !selectedObjectId && (
+            <div style={{
+              position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 100,
+              background: 'rgba(20, 20, 32, 0.95)', border: '1px solid #ffd700',
+              borderRadius: '8px', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: '10px',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)',
+              pointerEvents: 'auto', animation: 'fadeIn 0.15s ease-out'
+            }}>
+              <span style={{ fontSize: '11px', color: '#ffd700', fontWeight: 'bold' }}>
+                📦 맵 범위 선택됨 ({mapBoxSelection.cols}x{mapBoxSelection.rows})
+              </span>
+              <div style={{ width: '1px', height: '14px', background: 'rgba(255,255,255,0.2)' }} />
+              <button
+                onClick={handleConvertBoxToSingleObject}
+                style={{
+                  padding: '5px 12px', fontSize: '11px', borderRadius: '4px',
+                  background: 'var(--primary)', color: '#fff', border: '1px solid var(--primary-hover)',
+                  fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
+                }}
+                title="선택한 맵 타일들을 1개의 독립 오브젝트로 통합 묶기"
+              >
+                <Layers size={13} /> ✨ 1개의 오브젝트로 묶기
+              </button>
+              <button
+                onClick={() => setMapBoxSelection(null)}
                 style={{ padding: '4px 6px', fontSize: '10px', borderRadius: '4px', background: 'transparent', color: '#aaa', border: 'none', cursor: 'pointer' }}
               >
                 <X size={12} />
