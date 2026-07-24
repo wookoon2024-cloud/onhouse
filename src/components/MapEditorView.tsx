@@ -1527,18 +1527,18 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     }}>
       {/* 1. Photoshop-Style Compact Header Toolbar */}
       <div style={{
-        padding: '4px 16px 0px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)',
-        background: 'rgba(20, 20, 32, 0.98)', display: 'flex', justifyContent: 'space-between',
-        alignItems: 'flex-end', minHeight: '38px', zIndex: 10
+        padding: "4px 16px 0px 16px", borderBottom: "1px solid rgba(255,255,255,0.1)",
+        background: "rgba(20, 20, 32, 0.98)", display: "flex", justifyContent: "space-between",
+        alignItems: "flex-end", minHeight: "38px", zIndex: 10
       }}>
         {/* Left Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '4px' }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", paddingBottom: "4px" }}>
           <button
             onClick={handleCancel}
             style={{
-              padding: '4px 10px', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border-glass)',
-              borderRadius: '4px', color: '#fff', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px',
-              cursor: 'pointer'
+              padding: "4px 10px", background: "rgba(255,255,255,0.06)", border: "1px solid var(--border-glass)",
+              borderRadius: "4px", color: "#fff", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px",
+              cursor: "pointer"
             }}
           >
             <X size={13} /> 닫기
@@ -1546,17 +1546,45 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           <button
             onClick={handleSave}
             style={{
-              padding: '4px 12px', background: 'var(--primary)', border: '1px solid var(--primary-hover)',
-              borderRadius: '4px', color: '#fff', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px',
-              fontWeight: 'normal', cursor: 'pointer'
+              padding: "4px 12px", background: "var(--primary)", border: "1px solid var(--primary-hover)",
+              borderRadius: "4px", color: "#fff", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px",
+              fontWeight: "normal", cursor: "pointer"
             }}
           >
             <Save size={13} /> 저장하기
           </button>
+
+          {/* Undo & Redo Icons attached right next to 저장하기 */}
+          <div style={{ display: "flex", alignItems: "center", gap: "2px", marginLeft: "6px" }}>
+            <button
+              onClick={handleUndo}
+              disabled={history.length === 0}
+              style={{
+                padding: "4px 8px", background: "rgba(255,255,255,0.06)", border: "1px solid var(--border-glass)",
+                borderRadius: "4px 0 0 4px", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: history.length === 0 ? "not-allowed" : "pointer", opacity: history.length === 0 ? 0.3 : 1
+              }}
+              title="실행 취소 (Ctrl + Z)"
+            >
+              <Undo size={13} />
+            </button>
+            <button
+              onClick={handleRedo}
+              disabled={redoHistory.length === 0}
+              style={{
+                padding: "4px 8px", background: "rgba(255,255,255,0.06)", border: "1px solid var(--border-glass)",
+                borderLeft: "none", borderRadius: "0 4px 4px 0", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: redoHistory.length === 0 ? "not-allowed" : "pointer", opacity: redoHistory.length === 0 ? 0.3 : 1
+              }}
+              title="다시 실행 (Ctrl + Y)"
+            >
+              <Redo size={13} />
+            </button>
+          </div>
         </div>
 
         {/* Center: Photoshop Document Tabs with Compact Add Button */}
-        <div style={{ display: 'flex', gap: '2px', alignItems: 'flex-end' }}>
+        <div style={{ display: "flex", gap: "2px", alignItems: "flex-end" }}>
           {availableMapIds.map((mId) => {
             const mapObj = activeMaps[mId];
             const name = mapObj ? mapObj.name : mId;
@@ -1567,16 +1595,16 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               <div
                 key={mId}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: '4px',
-                  padding: '5px 10px', borderRadius: '6px 6px 0 0',
-                  background: isSelected ? '#1e1e2e' : 'rgba(255, 255, 255, 0.03)',
-                  color: isSelected ? '#fff' : 'rgba(255, 255, 255, 0.65)',
-                  borderTop: isSelected ? '2px solid #89b4fa' : '2px solid transparent',
-                  borderLeft: isSelected ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(255,255,255,0.03)',
-                  borderRight: isSelected ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(255,255,255,0.03)',
-                  borderBottom: 'none',
-                  transition: 'all 0.15s ease',
-                  cursor: 'pointer'
+                  display: "flex", alignItems: "center", gap: "4px",
+                  padding: "5px 10px", borderRadius: "6px 6px 0 0",
+                  background: isSelected ? "#1e1e2e" : "rgba(255, 255, 255, 0.03)",
+                  color: isSelected ? "#fff" : "rgba(255, 255, 255, 0.65)",
+                  borderTop: isSelected ? "2px solid #89b4fa" : "2px solid transparent",
+                  borderLeft: isSelected ? "1px solid rgba(255,255,255,0.1)" : "1px solid rgba(255,255,255,0.03)",
+                  borderRight: isSelected ? "1px solid rgba(255,255,255,0.1)" : "1px solid rgba(255,255,255,0.03)",
+                  borderBottom: "none",
+                  transition: "all 0.15s ease",
+                  cursor: "pointer"
                 }}
                 onClick={() => {
                   if (!isSelected) {
@@ -1590,7 +1618,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                   }
                 }}
               >
-                <span style={{ fontSize: '11px', fontWeight: isSelected ? 'bold' : 'normal' }}>
+                <span style={{ fontSize: "11px", fontWeight: isSelected ? "bold" : "normal" }}>
                   {name}
                 </span>
 
@@ -1610,16 +1638,16 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                   }}
                   title="맵 이름 변경"
                   style={{
-                    background: 'none', border: 'none',
-                    color: 'rgba(255, 255, 255, 0.4)',
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    padding: '1px', borderRadius: '3px', marginLeft: '2px'
+                    background: "none", border: "none",
+                    color: "rgba(255, 255, 255, 0.4)",
+                    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                    padding: "1px", borderRadius: "3px", marginLeft: "2px"
                   }}
                   onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLElement).style.color = '#89b4fa';
+                    (e.currentTarget as HTMLElement).style.color = "#89b4fa";
                   }}
                   onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLElement).style.color = 'rgba(255, 255, 255, 0.4)';
+                    (e.currentTarget as HTMLElement).style.color = "rgba(255, 255, 255, 0.4)";
                   }}
                 >
                   <Pencil size={10} />
@@ -1679,46 +1707,21 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
             </button>
           )}
         </div>
-          <button
-            onClick={handleUndo}
-            disabled={history.length === 0}
-            style={{
-              padding: '4px 10px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-glass)',
-              borderRadius: '4px', color: '#fff', display: 'flex', alignItems: 'center', gap: '4px',
-              cursor: history.length === 0 ? 'not-allowed' : 'pointer', opacity: history.length === 0 ? 0.3 : 1
-            }}
-            title="실행 취소 (Ctrl + Z)"
-          >
-            <Undo size={13} />
-          </button>
 
-          <button
-            onClick={handleRedo}
-            disabled={redoHistory.length === 0}
-            style={{
-              padding: '4px 10px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-glass)',
-              borderRadius: '4px', color: '#fff', display: 'flex', alignItems: 'center', gap: '4px',
-              cursor: redoHistory.length === 0 ? 'not-allowed' : 'pointer', opacity: redoHistory.length === 0 ? 0.3 : 1
-            }}
-            title="다시 실행 (Ctrl + Y)"
-          >
-            <Redo size={13} />
-          </button>
-
-          <div style={{ width: '1px', height: '18px', background: 'var(--border-glass)', margin: '0 2px' }} />
-
+        {/* Right Actions: Reset */}
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", paddingBottom: "4px" }}>
           <button
             onClick={handleResetToDefault}
             style={{
-              padding: '4px 10px', background: 'rgba(243, 139, 168, 0.1)', color: 'var(--danger)',
-              border: '1px solid rgba(243, 139, 168, 0.25)', borderRadius: '4px', fontSize: '11px',
-              display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer'
+              padding: "4px 10px", background: "rgba(243, 139, 168, 0.1)", color: "var(--danger)",
+              border: "1px solid rgba(243, 139, 168, 0.25)", borderRadius: "4px", fontSize: "11px",
+              display: "flex", alignItems: "center", gap: "4px", cursor: "pointer"
             }}
           >
             <Trash2 size={13} /> 리셋
           </button>
         </div>
-
+      </div>
       {/* 2. Main Editor Workspace (3-column layout) */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         
