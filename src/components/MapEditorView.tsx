@@ -1255,7 +1255,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       }
 
       // Capture exact tile grid for custom combined object & erase original map cells
-      const defaultBase = prev.tileset === 'interior' ? 1199 : 2000;
+      const emptyBase = 1199; // 100% Black Empty Base Tile!
       const newBase = prev.baseLayer.map(r => [...r]);
       const tilesGrid: number[][] = [];
       for (let r = 0; r < rows; r++) {
@@ -1269,7 +1269,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
             rowTiles.push(dIdx !== -1 ? dIdx : bIdx);
             newDecor[curTy][curTx] = -1;
             if (editLayer === 'base' || dIdx === -1) {
-              newBase[curTy][curTx] = defaultBase;
+              newBase[curTy][curTx] = emptyBase; // 🎯 Erase to 1199 (Black Empty Tile)!
             }
           } else {
             rowTiles.push(-1);
