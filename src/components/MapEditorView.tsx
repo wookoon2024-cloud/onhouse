@@ -2111,6 +2111,70 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               </>
             )}
 
+            {/* Tab 2: 📐 크기 (지도 크기) */}
+            {leftSidebarTab === "size" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <h4 style={{ fontSize: "11px", color: "var(--accent)", margin: "0 0 4px 0", borderBottom: "1px solid var(--border-glass)", paddingBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span style={{ fontSize: "9px", opacity: 0.7 }}>▪</span> 지도 크기
+                </h4>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: "9px", color: "var(--text-secondary)", marginBottom: "4px" }}>가로 (너비)</div>
+                    <input
+                      type="number"
+                      value={widthInput}
+                      onChange={(e) => setWidthInput(e.target.value)}
+                      style={{
+                        width: "100%", background: "#0a0a0f", border: "1px solid var(--border-glass)",
+                        borderRadius: "4px", padding: "6px 10px", fontSize: "12px", color: "#fff", textAlign: "center"
+                      }}
+                    />
+                  </div>
+                  <span style={{ fontSize: "12px", marginTop: "16px", color: "var(--text-muted)" }}>x</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: "9px", color: "var(--text-secondary)", marginBottom: "4px" }}>세로 (높이)</div>
+                    <input
+                      type="number"
+                      value={heightInput}
+                      onChange={(e) => setHeightInput(e.target.value)}
+                      style={{
+                        width: "100%", background: "#0a0a0f", border: "1px solid var(--border-glass)",
+                        borderRadius: "4px", padding: "6px 10px", fontSize: "12px", color: "#fff", textAlign: "center"
+                      }}
+                    />
+                  </div>
+                </div>
+                <button
+                  onClick={handleResizeMap}
+                  style={{
+                    width: "100%", padding: "8px", background: "var(--primary)", color: "#fff",
+                    border: "1px solid var(--primary-hover)", borderRadius: "4px", fontSize: "11px",
+                    fontWeight: "normal", cursor: "pointer", marginTop: "4px"
+                  }}
+                >
+                  크기 변경 적용
+                </button>
+              </div>
+            )}
+
+            {/* Tab 3: 👁️ 옵션 (화면 뷰 옵션) */}
+            {leftSidebarTab === "option" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <h4 style={{ fontSize: "11px", color: "var(--accent)", margin: "0 0 4px 0", borderBottom: "1px solid var(--border-glass)", paddingBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span style={{ fontSize: "9px", opacity: 0.7 }}>▪</span> 화면 뷰 옵션
+                </h4>
+                <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", cursor: "pointer", whiteSpace: "nowrap" }}>
+                  <input type="checkbox" checked={showGrid} onChange={e => setShowGrid(e.target.checked)} /> 그리드 격자선 보이기
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", cursor: "pointer", whiteSpace: "nowrap" }}>
+                  <input type="checkbox" checked={showDecor} onChange={e => setShowDecor(e.target.checked)} /> 가구/장식 레이어 노출
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", cursor: "pointer", whiteSpace: "nowrap" }}>
+                  <input type="checkbox" checked={showCollision} onChange={e => setShowCollision(e.target.checked)} /> 벽/통행 경계선 노출 (선명한 빨간색 🔴)
+                </label>
+              </div>
+            )}
+
             {/* Handy Shortcuts Guide Panel at bottom */}
             <div style={{
               marginTop: 'auto', padding: '10px 12px', background: 'rgba(255, 255, 255, 0.03)',
