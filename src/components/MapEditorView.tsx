@@ -2184,7 +2184,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               <div style={{ color: 'var(--accent)', fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
                 <Info size={12} /> 단축키 팁 (Quick Keys)
               </div>
-              <div>• <strong style={{ color: '#89dceb' }}>Space + 드래그 / 우클릭</strong>: 지도 이동</div>
+              <div>• <strong style={{ color: '#89dceb' }}>Space+드래그 / 우클릭</strong>: 지도 이동</div>
               <div>• <strong style={{ color: '#a6e3a1' }}>Ctrl + Z / Y</strong>: 되돌리기/다시실행</div>
               <div>• <strong style={{ color: '#f9e2af' }}>Alt + 클릭</strong>: 스포이드</div>
               <div>• <strong>V</strong>:선택 <strong>B</strong>:브러시 <strong>F</strong>:채우기 <strong>X</strong>:지우개</div>
