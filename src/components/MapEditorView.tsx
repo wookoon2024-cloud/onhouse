@@ -1548,7 +1548,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
             style={{
               padding: '4px 12px', background: 'var(--primary)', border: '1px solid var(--primary-hover)',
               borderRadius: '4px', color: '#fff', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px',
-              fontWeight: 'bold', cursor: 'pointer'
+              fontWeight: 'normal', cursor: 'pointer'
             }}
           >
             <Save size={13} /> 저장하기
@@ -1662,26 +1662,23 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               onClick={() => setShowAddModal(true)}
               title="새 맵 추가 (최대 4개)"
               style={{
-                display: 'flex', alignItems: 'center', gap: '3px',
-                padding: '5px 10px', borderRadius: '6px 6px 0 0',
-                background: 'rgba(255, 255, 255, 0.03)',
-                color: 'var(--accent)',
-                borderTop: '2px solid transparent',
-                borderLeft: '1px solid rgba(255,255,255,0.03)',
-                borderRight: '1px solid rgba(255,255,255,0.03)',
-                borderBottom: 'none',
-                cursor: 'pointer', transition: 'all 0.15s ease',
-                fontSize: '11px', fontWeight: 'bold'
+                display: "flex", alignItems: "center", gap: "3px",
+                padding: "5px 10px", borderRadius: "6px 6px 0 0",
+                background: "rgba(255, 255, 255, 0.03)",
+                color: "var(--accent)",
+                borderTop: "2px solid transparent",
+                borderLeft: "1px solid rgba(255,255,255,0.03)",
+                borderRight: "1px solid rgba(255,255,255,0.03)",
+                borderBottom: "none",
+                cursor: "pointer", transition: "all 0.15s ease",
+                fontSize: "11px", fontWeight: "normal"
               }}
             >
               <Plus size={12} />
-              <span>+ 추가</span>
+              <span>추가</span>
             </button>
           )}
         </div>
-
-        {/* Right Actions: Undo, Redo, Reset */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '4px' }}>
           <button
             onClick={handleUndo}
             disabled={history.length === 0}
@@ -1721,7 +1718,6 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
             <Trash2 size={13} /> 리셋
           </button>
         </div>
-      </div>
 
       {/* 2. Main Editor Workspace (3-column layout) */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
@@ -1787,7 +1783,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                       background: editLayer === 'base' ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255,255,255,0.03)',
                       color: editLayer === 'base' ? 'var(--accent)' : '#fff',
                       border: editLayer === 'base' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
-                      textAlign: 'left', cursor: 'pointer', fontWeight: 'bold'
+                      textAlign: 'left', cursor: 'pointer', fontWeight: 'normal'
                     }}
                   >
                     1단계 레이어(바닥)
@@ -1807,7 +1803,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                       background: editLayer === 'decor' ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255,255,255,0.03)',
                       color: editLayer === 'decor' ? 'var(--accent)' : '#fff',
                       border: editLayer === 'decor' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
-                      textAlign: 'left', cursor: 'pointer', fontWeight: 'bold'
+                      textAlign: 'left', cursor: 'pointer', fontWeight: 'normal'
                     }}
                   >
                     2단계 레이어(장식)
@@ -1829,7 +1825,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                         background: editLayer === 'collision' ? 'rgba(243, 139, 168, 0.2)' : 'rgba(255,255,255,0.03)',
                         color: editLayer === 'collision' ? '#f38ba8' : '#fff',
                         border: editLayer === 'collision' ? '1px solid #f38ba8' : '1px solid var(--border-glass)',
-                        textAlign: 'left', cursor: 'pointer', fontWeight: 'bold', whiteSpace: 'nowrap'
+                        textAlign: 'left', cursor: 'pointer', fontWeight: 'normal', whiteSpace: 'nowrap'
                       }}
                     >
                       이동 불가지역
@@ -1849,7 +1845,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                         background: editLayer === 'collision' && selectedTile === 1 ? 'var(--danger)' : 'rgba(255,255,255,0.04)',
                         color: editLayer === 'collision' && selectedTile === 1 ? '#fff' : 'rgba(255,255,255,0.7)',
                         border: editLayer === 'collision' && selectedTile === 1 ? '1px solid var(--danger)' : '1px solid var(--border-glass)',
-                        fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap'
+                        fontWeight: 'normal', cursor: 'pointer', whiteSpace: 'nowrap'
                       }}
                       title="이동 불가지역 (충돌 벽) 추가"
                     >
@@ -1870,7 +1866,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                         background: editLayer === 'collision' && selectedTile === 0 ? '#a6e3a1' : 'rgba(255,255,255,0.04)',
                         color: editLayer === 'collision' && selectedTile === 0 ? '#000' : 'rgba(255,255,255,0.7)',
                         border: editLayer === 'collision' && selectedTile === 0 ? '1px solid #a6e3a1' : '1px solid var(--border-glass)',
-                        fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap'
+                        fontWeight: 'normal', cursor: 'pointer', whiteSpace: 'nowrap'
                       }}
                       title="이동 불가지역 (충돌 벽) 제거"
                     >
@@ -2039,7 +2035,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                             background: isSelected ? 'var(--accent)' : 'rgba(255,255,255,0.03)',
                             color: isSelected ? '#000' : '#fff',
                             border: isSelected ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
-                            fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.15s ease'
+                            fontWeight: 'normal', cursor: 'pointer', transition: 'all 0.15s ease'
                           }}
                         >
                           {sz}x{sz}
@@ -2102,7 +2098,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                             marginLeft: 'auto', padding: '3px 8px', fontSize: '10px', borderRadius: '3px',
                             background: isCustomSelected ? '#f5c2e7' : 'var(--primary)',
                             color: isCustomSelected ? '#000' : '#fff',
-                            border: 'none', fontWeight: 'bold', cursor: 'pointer',
+                            border: 'none', fontWeight: 'normal', cursor: 'pointer',
                             transition: 'all 0.15s ease'
                           }}
                         >
@@ -2121,7 +2117,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               borderRadius: '6px', border: '1px solid var(--border-glass)', fontSize: '10px',
               color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '4px'
             }}>
-              <div style={{ color: 'var(--accent)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
+              <div style={{ color: 'var(--accent)', fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
                 <Info size={12} /> 단축키 팁 (Quick Keys)
               </div>
               <div>• <strong style={{ color: '#89dceb' }}>Space + 드래그 / 우클릭</strong>: 지도 이동</div>
@@ -2153,7 +2149,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                   background: zoom === zVal ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
                   color: zoom === zVal ? '#fff' : 'var(--text-secondary)',
                   border: zoom === zVal ? '1px solid var(--primary-hover)' : '1px solid var(--border-glass)',
-                  fontWeight: 'bold', cursor: 'pointer'
+                  fontWeight: 'normal', cursor: 'pointer'
                 }}
               >
                 {Math.round(zVal * 100)}%
@@ -2166,7 +2162,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               onClick={() => setZoom(prev => Math.max(0.5, parseFloat((prev - 0.25).toFixed(2))))}
               style={{ padding: '4px 8px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-glass)', color: '#fff', borderRadius: '4px', cursor: 'pointer' }}
             >-</button>
-            <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--accent)', minWidth: '40px', textAlign: 'center' }}>
+            <span style={{ fontSize: '11px', fontWeight: 'normal', color: 'var(--accent)', minWidth: '40px', textAlign: 'center' }}>
               {Math.round(zoom * 100)}%
             </span>
             <button
@@ -2184,7 +2180,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               boxShadow: "0 8px 32px rgba(0,0,0,0.6)", backdropFilter: "blur(10px)",
               pointerEvents: "auto", animation: "fadeIn 0.15s ease-out", whiteSpace: "nowrap"
             }}>
-              <span style={{ fontSize: "11px", color: "#ffd700", fontWeight: "bold", whiteSpace: "nowrap" }}>
+              <span style={{ fontSize: "11px", color: "#ffd700", fontWeight: "normal", whiteSpace: "nowrap" }}>
                 📦 오브젝트
               </span>
               <div style={{ width: "1px", height: "14px", background: "rgba(255,255,255,0.2)" }} />
@@ -2226,7 +2222,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                 style={{
                   padding: "5px 12px", fontSize: "11px", borderRadius: "4px", background: "var(--danger)",
                   color: "#fff", border: "none", cursor: "pointer",
-                  display: "flex", alignItems: "center", gap: "4px", fontWeight: "bold", whiteSpace: "nowrap"
+                  display: "flex", alignItems: "center", gap: "4px", fontWeight: "normal", whiteSpace: "nowrap"
                 }}
                 title="삭제 (Delete)"
               >
@@ -2250,7 +2246,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               boxShadow: '0 8px 32px rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)',
               pointerEvents: 'auto', animation: 'fadeIn 0.15s ease-out'
             }}>
-              <span style={{ fontSize: '11px', color: '#ffd700', fontWeight: 'bold' }}>
+              <span style={{ fontSize: '11px', color: '#ffd700', fontWeight: 'normal' }}>
                 📦 맵 범위 선택됨 ({mapBoxSelection.cols}x{mapBoxSelection.rows})
               </span>
               <div style={{ width: '1px', height: '14px', background: 'rgba(255,255,255,0.2)' }} />
@@ -2259,7 +2255,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                 style={{
                   padding: '5px 12px', fontSize: '11px', borderRadius: '4px',
                   background: 'var(--primary)', color: '#fff', border: '1px solid var(--primary-hover)',
-                  fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
+                  fontWeight: 'normal', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
                 }}
                 title="선택한 맵 타일들을 1개의 독립 오브젝트로 통합 묶기"
               >
@@ -2279,7 +2275,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
             <div style={{
               position: 'absolute', top: '16px', right: '16px', zIndex: 12,
               background: 'rgba(137, 220, 235, 0.95)', color: '#11111b', padding: '8px 16px', borderRadius: '8px',
-              fontWeight: 'bold', fontSize: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
+              fontWeight: 'normal', fontSize: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
               display: 'flex', alignItems: 'center', gap: '6px', animation: 'fadeIn 0.2s ease-out'
             }}>
               <Sparkles size={14} /> {pickedToast}
@@ -2353,7 +2349,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
             padding: '12px 16px', borderBottom: '1px solid var(--border-glass)',
             background: 'rgba(30, 30, 46, 0.9)', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
           }}>
-            <div style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 'normal', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '6px' }}>
               🎨 타일셋 브러시 ({paletteWidth}px)
             </div>
             
@@ -2368,7 +2364,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                     padding: '2px 5px', fontSize: '9px', borderRadius: '3px',
                     background: paletteZoom === pZoom ? 'var(--accent)' : 'rgba(255,255,255,0.05)',
                     color: paletteZoom === pZoom ? '#000' : '#fff', border: '1px solid var(--border-glass)',
-                    fontWeight: 'bold', cursor: 'pointer'
+                    fontWeight: 'normal', cursor: 'pointer'
                   }}
                 >
                   {pZoom}x
@@ -2474,7 +2470,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
                 현재 선택된 브러시 ({brushSize}x{brushSize} 크기)
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 'bold', marginTop: '2px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 'normal', marginTop: '2px' }}>
                 {selectedTile === -1 ? '지우개 🧽' : `${tileDetails.label} [${brushSize}x${brushSize} 멀티타일]` }
               </div>
             </div>
@@ -2620,7 +2616,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-              <div style={{ fontSize: '14px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ fontSize: '14px', fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Sparkles size={16} style={{ color: 'var(--accent)' }} />
                 <span>에디터 맵 추가 (현재 {availableMapIds.length} / 최대 4개)</span>
               </div>
@@ -2660,7 +2656,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                     }}
                   >
                     <span>{template.name}</span>
-                    <span style={{ fontSize: '10px', color: isAlreadyAdded ? '#555' : 'var(--accent)', fontWeight: 'bold' }}>
+                    <span style={{ fontSize: '10px', color: isAlreadyAdded ? '#555' : 'var(--accent)', fontWeight: 'normal' }}>
                       {isAlreadyAdded ? '추가됨' : '+ 선택 추가'}
                     </span>
                   </button>
@@ -2696,7 +2692,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                   style={{
                     padding: '8px 14px', background: 'var(--primary)', border: 'none',
                     borderRadius: '6px', color: '#fff', fontSize: '12px', cursor: 'pointer',
-                    fontWeight: 'bold', whiteSpace: 'nowrap'
+                    fontWeight: 'normal', whiteSpace: 'nowrap'
                   }}
                 >
                   생성
