@@ -2327,6 +2327,76 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                     );
                   })()}
                 </div>
+                {/* Section 4: 현재 선택된 브러시 (Placed under Section 3 브러시 크기!) */}
+                {(() => {
+                  const selInfo = getTileDrawInfo(selectedTile, activeTileset);
+                  const tsInfo = selInfo ? getTilesetInfoLocal(selInfo.tilesetKey) : null;
+                  const tsCols = tsInfo ? tsInfo.cols : tilesetCols;
+                  const startCol = selInfo ? (selInfo.localIdx % tsCols) : 0;
+                  const startRow = selInfo ? Math.floor(selInfo.localIdx / tsCols) : 0;
+                  const curCols = (paletteSelection && paletteSelection.tilesetKey === activeTileset && paletteSelection.cols > 1) ? paletteSelection.cols : (brushSize || 1);
+                  const curRows = (paletteSelection && paletteSelection.tilesetKey === activeTileset && paletteSelection.rows > 1) ? paletteSelection.rows : (brushSize || 1);
+
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "6px" }}>
+                      <h4 style={{ fontSize: "11px", color: "var(--accent)", margin: "0 0 2px 0", borderBottom: "1px solid var(--border-glass)", paddingBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span style={{ fontSize: "9px", opacity: 0.7 }}>▪</span> 현재 선택된 브러시
+                      </h4>
+                      <div style={{
+                        padding: "8px 10px", borderRadius: "6px",
+                        background: "rgba(15, 15, 25, 0.6)", border: "1px solid var(--border-glass)",
+                        display: "flex", alignItems: "center", gap: "10px"
+                      }}>
+                        <div style={{
+                          width: `${Math.max(36, Math.min(54, curCols * 18))}px`,
+                          height: `${Math.max(36, Math.min(54, curRows * 18))}px`,
+                          border: "2px solid var(--accent)",
+                          borderRadius: "6px", background: "#000", display: "grid",
+                          gridTemplateColumns: `repeat(${curCols}, 1fr)`,
+                          overflow: "hidden", imageRendering: "pixelated", padding: "1px", boxSizing: "border-box", flexShrink: 0
+                        }}>
+                          {selectedTile !== -1 ? (
+                            Array.from({ length: curCols * curRows }).map((_, i) => {
+                              const dx = i % curCols;
+                              const dy = Math.floor(i / curCols);
+                              const cellCol = startCol + dx;
+                              const cellRow = startRow + dy;
+                              const cellLocalIdx = cellRow * tsCols + cellCol;
+                              const subTile = getPrefixedIndex(cellLocalIdx, activeTileset);
+                              const subInfo = getTileDrawInfo(subTile, activeTileset);
+                              if (!subInfo) return <div key={i} />;
+                              const subTsInfo = getTilesetInfoLocal(subInfo.tilesetKey);
+                              const subCol = subInfo.localIdx % subTsInfo.cols;
+                              const subRow = Math.floor(subInfo.localIdx / subTsInfo.cols);
+                              return (
+                                <div key={i} style={{
+                                  width: "100%", height: "100%",
+                                  backgroundImage: `url(${subTsInfo.url})`,
+                                  backgroundPosition: `-${subCol * 100}% -${subRow * 100}%`,
+                                  backgroundSize: `${subTsInfo.cols * 100}% ${subTsInfo.rows * 100}%`,
+                                  imageRendering: "pixelated"
+                                }} />
+                              );
+                            })
+                          ) : (
+                            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", width: "100%", height: "100%" }}>
+                              <span style={{ fontSize: "16px" }}>🧽</span>
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ minWidth: 0, overflow: "hidden" }}>
+                          <div style={{ fontSize: "9px", color: "var(--text-secondary)" }}>
+                            {curCols}x{curRows} 크기 브러시
+                          </div>
+                          <div style={{ fontSize: "10px", color: "var(--accent)", fontWeight: "bold", marginTop: "2px", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+                            {selectedTile === -1 ? "지우개 🧽" : `${tileDetails.label}`}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
               </>
             )}
 
@@ -2709,71 +2779,6 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               )}
             </select>
           </div>
-
-          {/* Active Selected Tile Preview Box */}
-          {(() => {
-            const selInfo = getTileDrawInfo(selectedTile, activeTileset);
-            const tsInfo = selInfo ? getTilesetInfoLocal(selInfo.tilesetKey) : null;
-            const tsCols = tsInfo ? tsInfo.cols : tilesetCols;
-            const startCol = selInfo ? (selInfo.localIdx % tsCols) : 0;
-            const startRow = selInfo ? Math.floor(selInfo.localIdx / tsCols) : 0;
-            const curCols = (paletteSelection && paletteSelection.tilesetKey === activeTileset && paletteSelection.cols > 1) ? paletteSelection.cols : (brushSize || 1);
-            const curRows = (paletteSelection && paletteSelection.tilesetKey === activeTileset && paletteSelection.rows > 1) ? paletteSelection.rows : (brushSize || 1);
-
-            return (
-              <div style={{
-                padding: "10px 16px", borderBottom: "1px solid var(--border-glass)",
-                background: "rgba(15, 15, 25, 0.6)", display: "flex", alignItems: "center", gap: "12px"
-              }}>
-                <div style={{
-                  width: `${Math.max(36, Math.min(64, curCols * 18))}px`,
-                  height: `${Math.max(36, Math.min(64, curRows * 18))}px`,
-                  border: "2px solid var(--accent)",
-                  borderRadius: "6px", background: "#000", display: "grid",
-                  gridTemplateColumns: `repeat(${curCols}, 1fr)`,
-                  overflow: "hidden", imageRendering: "pixelated", padding: "1px", boxSizing: "border-box"
-                }}>
-                  {selectedTile !== -1 ? (
-                    Array.from({ length: curCols * curRows }).map((_, i) => {
-                      const dx = i % curCols;
-                      const dy = Math.floor(i / curCols);
-                      const cellCol = startCol + dx;
-                      const cellRow = startRow + dy;
-                      const cellLocalIdx = cellRow * tsCols + cellCol;
-                      const subTile = getPrefixedIndex(cellLocalIdx, activeTileset);
-                      const subInfo = getTileDrawInfo(subTile, activeTileset);
-                      if (!subInfo) return <div key={i} />;
-                      const subTsInfo = getTilesetInfoLocal(subInfo.tilesetKey);
-                      const subCol = subInfo.localIdx % subTsInfo.cols;
-                      const subRow = Math.floor(subInfo.localIdx / subTsInfo.cols);
-                      return (
-                        <div key={i} style={{
-                          width: "100%", height: "100%",
-                          backgroundImage: `url(${subTsInfo.url})`,
-                          backgroundPosition: `-${subCol * 100}% -${subRow * 100}%`,
-                          backgroundSize: `${subTsInfo.cols * 100}% ${subTsInfo.rows * 100}%`,
-                          imageRendering: "pixelated"
-                        }} />
-                      );
-                    })
-                  ) : (
-                    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", width: "100%", height: "100%" }}>
-                      <span style={{ fontSize: "16px" }}>🧽</span>
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <div style={{ fontSize: "10px", color: "var(--text-secondary)" }}>
-                    현재 선택된 브러시 ({curCols}x{curRows} 크기)
-                  </div>
-                  <div style={{ fontSize: "11px", color: "var(--accent)", fontWeight: "normal", marginTop: "2px" }}>
-                    {selectedTile === -1 ? "지우개 🧽" : `${tileDetails.label} [${curCols}x${curRows} 멀티타일]`}
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-
 
           {/* Scrollable Visual Tileset Grid Sheet (Direct Cell Rendering & 100% Precise Hit Testing) */}
           <div style={{ flex: 1, padding: "16px", overflowY: "auto", background: "#0d0d12" }}>
