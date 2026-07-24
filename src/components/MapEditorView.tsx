@@ -2419,39 +2419,22 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
             
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               {/* Palette Tile Zoom Scale */}
-              <span style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>타일 크기:</span>
-              {([1.5, 2.0, 2.6, 3.0] as const).map((pZoom) => (
+              <span style={{ fontSize: "9px", color: "var(--text-secondary)" }}>타일 크기:</span>
+              {([1.5, 2.0, 3.0] as const).map((pZoom) => (
                 <button
                   key={pZoom}
                   onClick={() => setPaletteZoom(pZoom)}
                   style={{
-                    padding: '2px 5px', fontSize: '9px', borderRadius: '3px',
-                    background: paletteZoom === pZoom ? 'var(--accent)' : 'rgba(255,255,255,0.05)',
-                    color: paletteZoom === pZoom ? '#000' : '#fff', border: '1px solid var(--border-glass)',
-                    fontWeight: 'normal', cursor: 'pointer'
+                    padding: "2px 5px", fontSize: "9px", borderRadius: "3px",
+                    background: paletteZoom === pZoom ? "var(--accent)" : "rgba(255,255,255,0.05)",
+                    color: paletteZoom === pZoom ? "#000" : "#fff", border: "1px solid var(--border-glass)",
+                    fontWeight: "normal", cursor: "pointer"
                   }}
                 >
                   {pZoom}x
                 </button>
               ))}
-
-              <div style={{ width: '1px', height: '12px', background: 'var(--border-glass)', margin: '0 2px' }} />
-
-              {/* Palette Preset Widths */}
-              {([320, 520, 750] as const).map((pw) => (
-                <button
-                  key={pw}
-                  onClick={() => setPaletteWidth(pw)}
-                  style={{
-                    padding: '2px 5px', fontSize: '9px', borderRadius: '3px',
-                    background: paletteWidth === pw ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
-                    color: '#fff', border: '1px solid var(--border-glass)', cursor: 'pointer'
-                  }}
-                >
-                  {pw === 320 ? '보통' : pw === 520 ? '넓게' : '최대'}
-                </button>
-              ))}
-            </div>
+          </div>
           </div>
 
           {/* Tileset Category Dropdown Selector */}
