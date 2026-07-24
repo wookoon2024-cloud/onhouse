@@ -528,21 +528,41 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           const tileW = Math.max(1, Math.floor(img.width / tsInfo.cols));
           const tileH = Math.max(1, Math.floor(img.height / tsInfo.rows));
 
-          for (let ody = 0; ody < obj.height; ody++) {
-            for (let odx = 0; odx < obj.width; odx++) {
-              const targetTx = obj.x + odx;
-              const targetTy = obj.y + ody;
-              if (targetTx >= 0 && targetTx < localMap.width && targetTy >= 0 && targetTy < localMap.height) {
-                const srcX = (obj.startCol + odx) * tileW;
-                const srcY = (obj.startRow + ody) * tileH;
-                ctx.drawImage(
-                  img,
-                  srcX, srcY, tileW, tileH,
-                  targetTx * tileSize, targetTy * tileSize, tileSize, tileSize
-                );
+            for (let ody = 0; ody < obj.height; ody++) {
+              for (let odx = 0; odx < obj.width; odx++) {
+                const targetTx = obj.x + odx;
+                const targetTy = obj.y + ody;
+                if (targetTx >= 0 && targetTx < localMap.width && targetTy >= 0 && targetTy < localMap.height) {
+                  if (obj.tiles && obj.tiles[ody] && obj.tiles[ody][odx] !== undefined) {
+                    const tileIdx = obj.tiles[ody][odx];
+                    if (tileIdx !== -1) {
+                      const drawInfo = getTileDrawInfo(tileIdx, obj.tilesetKey || localMap.tileset);
+                      if (drawInfo) {
+                        const tImg = images[drawInfo.tilesetKey];
+                        if (tImg) {
+                          const tsInfo = getTilesetInfoLocal(drawInfo.tilesetKey);
+                          const srcX = (drawInfo.localIdx % tsInfo.cols) * 16;
+                          const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * 16;
+                          ctx.drawImage(
+                            tImg,
+                            srcX, srcY, 16, 16,
+                            targetTx * tileSize, targetTy * tileSize, tileSize, tileSize
+                          );
+                        }
+                      }
+                    }
+                  } else {
+                    const srcX = (obj.startCol + odx) * tileW;
+                    const srcY = (obj.startRow + ody) * tileH;
+                    ctx.drawImage(
+                      img,
+                      srcX, srcY, tileW, tileH,
+                      targetTx * tileSize, targetTy * tileSize, tileSize, tileSize
+                    );
+                  }
+                }
               }
             }
-          }
         }
       });
     }
@@ -591,13 +611,33 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                 const targetTx = obj.x + odx;
                 const targetTy = obj.y + ody;
                 if (targetTx >= 0 && targetTx < localMap.width && targetTy >= 0 && targetTy < localMap.height) {
-                  const srcX = (obj.startCol + odx) * tileW;
-                  const srcY = (obj.startRow + ody) * tileH;
-                  ctx.drawImage(
-                    img,
-                    srcX, srcY, tileW, tileH,
-                    targetTx * tileSize, targetTy * tileSize, tileSize, tileSize
-                  );
+                  if (obj.tiles && obj.tiles[ody] && obj.tiles[ody][odx] !== undefined) {
+                    const tileIdx = obj.tiles[ody][odx];
+                    if (tileIdx !== -1) {
+                      const drawInfo = getTileDrawInfo(tileIdx, obj.tilesetKey || localMap.tileset);
+                      if (drawInfo) {
+                        const tImg = images[drawInfo.tilesetKey];
+                        if (tImg) {
+                          const tsInfo = getTilesetInfoLocal(drawInfo.tilesetKey);
+                          const srcX = (drawInfo.localIdx % tsInfo.cols) * 16;
+                          const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * 16;
+                          ctx.drawImage(
+                            tImg,
+                            srcX, srcY, 16, 16,
+                            targetTx * tileSize, targetTy * tileSize, tileSize, tileSize
+                          );
+                        }
+                      }
+                    }
+                  } else {
+                    const srcX = (obj.startCol + odx) * tileW;
+                    const srcY = (obj.startRow + ody) * tileH;
+                    ctx.drawImage(
+                      img,
+                      srcX, srcY, tileW, tileH,
+                      targetTx * tileSize, targetTy * tileSize, tileSize, tileSize
+                    );
+                  }
                 }
               }
             }
@@ -1219,15 +1259,23 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         objStartRow = Math.floor(drawInfo.localIdx / tsInfo.cols);
       }
 
-      // Clear decor tiles in range so they are cleanly replaced by unified object
+      // Capture exact tile grid for custom combined object
+      const tilesGrid: number[][] = [];
       for (let r = 0; r < rows; r++) {
+        const rowTiles: number[] = [];
         for (let c = 0; c < cols; c++) {
           const curTx = startCol + c;
           const curTy = startRow + r;
           if (curTx >= 0 && curTx < prev.width && curTy >= 0 && curTy < prev.height) {
+            const dIdx = prev.decorLayer[curTy][curTx];
+            const bIdx = prev.baseLayer[curTy][curTx];
+            rowTiles.push(dIdx !== -1 ? dIdx : bIdx);
             newDecor[curTy][curTx] = -1;
+          } else {
+            rowTiles.push(-1);
           }
         }
+        tilesGrid.push(rowTiles);
       }
 
       const newObj: MapObjectInstance = {
@@ -1239,8 +1287,9 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         height: rows,
         x: startCol,
         y: startRow,
-        layer: editLayer === 'base' ? 'base' : 'decor',
-        zIndex: Date.now()
+        layer: editLayer === "base" ? "base" : "decor",
+        zIndex: Date.now(),
+        tiles: tilesGrid
       };
 
       // Filter out any small sub-objects previously contained in this box
