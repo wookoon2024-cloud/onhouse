@@ -2791,52 +2791,17 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                 }}
               />
               
-              {/* Clickable & Drag-Selectable Overlay Grid Cells */}
+              {/* Clickable & Drag-Selectable Direct DOM Cell Grid Overlay */}
               <div
-                onMouseDown={(e) => {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const px = e.clientX - rect.left;
-                  const py = e.clientY - rect.top;
-                  const tCol = Math.floor(px / (16 * paletteZoom));
-                  const tRow = Math.floor(py / (16 * paletteZoom));
-                  if (tCol >= 0 && tCol < tilesetCols && tRow >= 0 && tRow < tilesetRows) {
-                    setPaletteDragStart({ col: tCol, row: tRow });
-                    setPaletteSelection({ startCol: tCol, startRow: tRow, cols: 1, rows: 1, tilesetKey: activeTileset });
-                    const localIdx = tRow * tilesetCols + tCol;
-                    setSelectedTile(getPrefixedIndex(localIdx, activeTileset));
-                    setSelectedObjectId(null);
-                  }
-                }}
-                onMouseMove={(e) => {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const px = e.clientX - rect.left;
-                  const py = e.clientY - rect.top;
-                  const tCol = Math.min(tilesetCols - 1, Math.max(0, Math.floor(px / (16 * paletteZoom))));
-                  const tRow = Math.min(tilesetRows - 1, Math.max(0, Math.floor(py / (16 * paletteZoom))));
-                  setHoverPaletteTile({ col: tCol, row: tRow });
-
-                  if (e.buttons === 1 && paletteDragStart) {
-                    const sCol = Math.min(paletteDragStart.col, tCol);
-                    const sRow = Math.min(paletteDragStart.row, tRow);
-                    const eCol = Math.max(paletteDragStart.col, tCol);
-                    const eRow = Math.max(paletteDragStart.row, tRow);
-                    const cols = eCol - sCol + 1;
-                    const rows = eRow - sRow + 1;
-                    setPaletteSelection({ startCol: sCol, startRow: sRow, cols, rows, tilesetKey: activeTileset });
-                    const localIdx = sRow * tilesetCols + sCol;
-                    setSelectedTile(getPrefixedIndex(localIdx, activeTileset));
-                    setBrushSize(Math.max(cols, rows));
-                  }
-                }}
-                onMouseUp={() => setPaletteDragStart(null)}
                 onMouseLeave={() => {
                   setHoverPaletteTile(null);
                   setPaletteDragStart(null);
                 }}
-                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', userSelect: 'none' }}
+                onMouseUp={() => setPaletteDragStart(null)}
+                style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", userSelect: "none" }}
               >
                 {Array.from({ length: tilesetRows }).map((_, r) => (
-                  <div key={r} style={{ display: 'flex' }}>
+                  <div key={r} style={{ display: "flex" }}>
                     {Array.from({ length: tilesetCols }).map((_, c) => {
                       const localIdx = r * tilesetCols + c;
                       const prefixedIdx = getPrefixedIndex(localIdx, activeTileset);
@@ -2849,7 +2814,6 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                       const isSelected = (selectedTile !== -1 && selCol !== -1) &&
                         (c >= selCol && c < selCol + curCols && r >= selRow && r < selRow + curRows);
 
-                      // Single-cell hover outline: ONLY show when NOT actively dragging
                       let isHovered = false;
                       if (hoverPaletteTile && !paletteDragStart && !isSelected) {
                         isHovered = c === hoverPaletteTile.col && r === hoverPaletteTile.row;
@@ -2859,20 +2823,42 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                         <div
                           key={c}
                           title={`Tile ID: ${localIdx} (Row: ${r}, Col: ${c})`}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setPaletteDragStart({ col: c, row: r });
+                            setPaletteSelection({ startCol: c, startRow: r, cols: 1, rows: 1, tilesetKey: activeTileset });
+                            setSelectedTile(prefixedIdx);
+                            setSelectedObjectId(null);
+                          }}
+                          onMouseEnter={() => {
+                            setHoverPaletteTile({ col: c, row: r });
+                            if (paletteDragStart) {
+                              const sCol = Math.min(paletteDragStart.col, c);
+                              const sRow = Math.min(paletteDragStart.row, r);
+                              const eCol = Math.max(paletteDragStart.col, c);
+                              const eRow = Math.max(paletteDragStart.row, r);
+                              const cols = eCol - sCol + 1;
+                              const rows = eRow - sRow + 1;
+                              setPaletteSelection({ startCol: sCol, startRow: sRow, cols, rows, tilesetKey: activeTileset });
+                              const sLocalIdx = sRow * tilesetCols + sCol;
+                              setSelectedTile(getPrefixedIndex(sLocalIdx, activeTileset));
+                              setBrushSize(Math.max(cols, rows));
+                            }
+                          }}
                           style={{
                             width: `${16 * paletteZoom}px`,
                             height: `${16 * paletteZoom}px`,
                             border: isSelected 
-                              ? '2px solid var(--accent)' 
+                              ? "2px solid var(--accent)" 
                               : isHovered 
-                                ? '1.5px solid #89dceb' 
-                                : '1px solid rgba(255,255,255,0.05)',
+                                ? "1.5px solid #89dceb" 
+                                : "1px solid rgba(255,255,255,0.05)",
                             background: isSelected 
-                              ? 'rgba(139, 92, 246, 0.45)' 
+                              ? "rgba(139, 92, 246, 0.45)" 
                               : isHovered 
-                                ? 'rgba(137, 220, 235, 0.2)' 
-                                : 'transparent',
-                            boxSizing: 'border-box', cursor: 'pointer', transition: 'border-color 0.05s'
+                                ? "rgba(137, 220, 235, 0.2)" 
+                                : "transparent",
+                            boxSizing: "border-box", cursor: "pointer", transition: "border-color 0.05s"
                           }}
                         />
                       );
