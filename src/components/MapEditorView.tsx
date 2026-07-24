@@ -1030,6 +1030,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       if (!obj) return prev;
       if (obj.x === newTx && obj.y === newTy) return prev;
 
+      const newBase = prev.baseLayer.map(r => [...r]);
+      const newDecor = prev.decorLayer.map(r => [...r]);
       const newCollision = prev.collision.map(r => [...r]);
 
       // 1) Record object's current collision pattern before moving
@@ -1043,12 +1045,14 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         }
       }
 
-      // 2) Remove collision from old position (only for cells that belonged to object's collision footprint)
+      // 2) Erase base/decor tiles to 100% pure black ground (-1) & remove collision from old position
       for (let dy = 0; dy < obj.height; dy++) {
         for (let dx = 0; dx < obj.width; dx++) {
           const oldX = obj.x + dx;
           const oldY = obj.y + dy;
           if (oldX >= 0 && oldX < prev.width && oldY >= 0 && oldY < prev.height) {
+            newDecor[oldY][oldX] = -1;
+            newBase[oldY][oldX] = -1; // 🎯 100% Pure Black Canvas Ground (-1)!
             if (objCollisionMap[dy][dx]) {
               newCollision[oldY][oldX] = false;
             }
@@ -1071,6 +1075,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
       return {
         ...prev,
+        baseLayer: newBase,
+        decorLayer: newDecor,
         collision: newCollision,
         objects: (prev.objects || []).map(o => o.id === objId ? { ...o, x: newTx, y: newTy } : o)
       };
@@ -1255,7 +1261,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       }
 
       // Capture exact tile grid for custom combined object & erase original map cells to 100% black empty
-      const emptyBase = 1199; // 100% Black Empty Base Tile!
+      const emptyBase = -1; // 100% Pure Black Canvas Ground (-1)!
       const newBase = prev.baseLayer.map(r => [...r]);
       const tilesGrid: number[][] = [];
       for (let r = 0; r < rows; r++) {
