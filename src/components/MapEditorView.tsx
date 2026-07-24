@@ -59,6 +59,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   // Brush & Tools
   const [selectedTile, setSelectedTile] = useState<number>(1199);
   const [brushSize, setBrushSize] = useState<number>(1);
+  const [customBrushInput, setCustomBrushInput] = useState<string>('5');
   const [tool, setTool] = useState<'brush' | 'bucket' | 'eyedropper' | 'select'>('brush');
   const [autoCollision, setAutoCollision] = useState<boolean>(true);
 
@@ -1763,13 +1764,13 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           {/* Tab Body Scrollable Container */}
           <div style={{ flex: 1, padding: '14px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px' }}>
             
-            {/* Tab 1: ⚙️ 기본 (편집 타겟 레이어 & 그리기 도구 설정) */}
+            {/* Tab 1: ⚙️ 기본 (레이어, 도구, 브러시 크기 설정) */}
             {leftSidebarTab === 'basic' && (
               <>
-                {/* Section 1: Edit Layer Selector */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <h4 style={{ fontSize: '11px', color: 'var(--accent)', margin: '0 0 4px 0', borderBottom: '1px solid var(--border-glass)', paddingBottom: '4px' }}>
-                    🧱 편집 타겟 레이어
+                {/* Section 1: 레이어 (Layer Selector - compact vertical gap, clean labels) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <h4 style={{ fontSize: '11px', color: 'var(--accent)', margin: '0 0 2px 0', borderBottom: '1px solid var(--border-glass)', paddingBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '9px', opacity: 0.7 }}>▪</span> 레이어
                   </h4>
                   {(['base', 'decor', 'collision'] as const).map((layer) => (
                     <button
@@ -1787,79 +1788,43 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                         }
                       }}
                       style={{
-                        width: '100%', padding: '9px 10px', fontSize: '11px', borderRadius: '4px',
+                        width: '100%', padding: '7px 10px', fontSize: '11px', borderRadius: '4px',
                         background: editLayer === layer ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255,255,255,0.03)',
                         color: editLayer === layer ? 'var(--accent)' : '#fff',
                         border: editLayer === layer ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
                         textAlign: 'left', cursor: 'pointer', fontWeight: 'bold'
                       }}
                     >
-                      {layer === 'base' ? '🧱 1층 바닥 (Base)' : layer === 'decor' ? '🛋️ 2층 가구/장식 (Decor)' : '🚫 통행 장벽/벽 (Collision)'}
+                      {layer === 'base' ? '1단계 레이어(바닥)' : layer === 'decor' ? '2단계 레이어(장식)' : '이동 불가지역'}
                     </button>
                   ))}
                 </div>
 
-                {/* Section 2: Draw Tools Setup */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <h4 style={{ fontSize: '11px', color: 'var(--accent)', margin: '0 0 4px 0', borderBottom: '1px solid var(--border-glass)', paddingBottom: '4px' }}>
-                    🖌️ 그리기 도구 설정
+                {/* Section 2: 그리기 도구 설정 (Vertical Tools Stack: 선택 -> 스포이드 -> 브러시 -> 채우기 -> 오브젝트 -> 지우개) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+                  <h4 style={{ fontSize: '11px', color: 'var(--accent)', margin: '0 0 2px 0', borderBottom: '1px solid var(--border-glass)', paddingBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '9px', opacity: 0.7 }}>▪</span> 그리기 도구 설정
                   </h4>
                   
-                  {/* Tool Switcher Row (5 Tools: 선택, 브러시, 채우기, 스포이드, 오브젝트) */}
-                  <div style={{ display: 'flex', gap: '3px' }}>
+                  {/* Vertical Tool Switcher Column */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                    {/* 1. 선택(V) */}
                     <button
                       onClick={() => setTool('select')}
                       style={{
-                        flex: 1, padding: '7px 2px', fontSize: '10px', borderRadius: '4px',
+                        width: '100%', padding: '6px 10px', fontSize: '11px', borderRadius: '4px',
                         background: tool === 'select' ? 'rgba(245, 194, 231, 0.3)' : 'rgba(255,255,255,0.03)',
                         color: tool === 'select' ? '#f5c2e7' : '#fff',
                         border: tool === 'select' ? '1px solid #f5c2e7' : '1px solid var(--border-glass)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer',
                         fontWeight: tool === 'select' ? 'bold' : 'normal'
                       }}
                       title="오브젝트 스마트 선택 & 이동/편집 (단축키: V)"
                     >
-                      <MousePointer size={11} /> 선택(V)
+                      <MousePointer size={12} /> 선택(V)
                     </button>
 
-                    <button
-                      onClick={() => {
-                        setTool('brush');
-                        if (selectedTile === -1) setSelectedTile(getPrefixedIndex(0, activeTileset));
-                      }}
-                      disabled={editLayer === 'collision'}
-                      style={{
-                        flex: 1, padding: '7px 2px', fontSize: '10px', borderRadius: '4px',
-                        background: tool === 'brush' && selectedTile !== -1 && editLayer !== 'collision' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(255,255,255,0.03)',
-                        color: tool === 'brush' && selectedTile !== -1 && editLayer !== 'collision' ? 'var(--accent)' : '#fff',
-                        border: tool === 'brush' && selectedTile !== -1 && editLayer !== 'collision' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', cursor: 'pointer',
-                        opacity: editLayer === 'collision' ? 0.4 : 1
-                      }}
-                      title="일반 브러시 타일 그리기 (단축키: B)"
-                    >
-                      <Paintbrush size={11} /> 브러시(B)
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setTool('bucket');
-                        if (selectedTile === -1) setSelectedTile(getPrefixedIndex(0, activeTileset));
-                      }}
-                      disabled={editLayer === 'collision'}
-                      style={{
-                        flex: 1, padding: '7px 2px', fontSize: '10px', borderRadius: '4px',
-                        background: tool === 'bucket' && selectedTile !== -1 && editLayer !== 'collision' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(255,255,255,0.03)',
-                        color: tool === 'bucket' && selectedTile !== -1 && editLayer !== 'collision' ? 'var(--accent)' : '#fff',
-                        border: tool === 'bucket' && selectedTile !== -1 && editLayer !== 'collision' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', cursor: 'pointer',
-                        opacity: editLayer === 'collision' ? 0.4 : 1
-                      }}
-                      title="영역 채우기 (단축키: F)"
-                    >
-                      <PaintBucket size={11} /> 채우기(F)
-                    </button>
-
+                    {/* 2. 스포이드(E) */}
                     <button
                       onClick={() => {
                         setTool('eyedropper');
@@ -1867,18 +1832,59 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                       }}
                       disabled={editLayer === 'collision'}
                       style={{
-                        flex: 1, padding: '7px 2px', fontSize: '10px', borderRadius: '4px',
+                        width: '100%', padding: '6px 10px', fontSize: '11px', borderRadius: '4px',
                         background: (tool === 'eyedropper' || isAltPressed) && editLayer !== 'collision' ? 'rgba(137, 220, 235, 0.3)' : 'rgba(255,255,255,0.03)',
                         color: (tool === 'eyedropper' || isAltPressed) && editLayer !== 'collision' ? '#89dceb' : '#fff',
                         border: (tool === 'eyedropper' || isAltPressed) && editLayer !== 'collision' ? '1px solid #89dceb' : '1px solid var(--border-glass)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer',
                         opacity: editLayer === 'collision' ? 0.4 : 1
                       }}
                       title="스포이드 (단축키: Alt + 클릭 / E)"
                     >
-                      <Pipette size={11} /> 스포이드
+                      <Pipette size={12} /> 스포이드(E)
                     </button>
 
+                    {/* 3. 브러시(B) */}
+                    <button
+                      onClick={() => {
+                        setTool('brush');
+                        if (selectedTile === -1) setSelectedTile(getPrefixedIndex(0, activeTileset));
+                      }}
+                      disabled={editLayer === 'collision'}
+                      style={{
+                        width: '100%', padding: '6px 10px', fontSize: '11px', borderRadius: '4px',
+                        background: tool === 'brush' && selectedTile !== -1 && editLayer !== 'collision' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(255,255,255,0.03)',
+                        color: tool === 'brush' && selectedTile !== -1 && editLayer !== 'collision' ? 'var(--accent)' : '#fff',
+                        border: tool === 'brush' && selectedTile !== -1 && editLayer !== 'collision' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
+                        display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer',
+                        opacity: editLayer === 'collision' ? 0.4 : 1
+                      }}
+                      title="일반 브러시 타일 그리기 (단축키: B)"
+                    >
+                      <Paintbrush size={12} /> 브러시(B)
+                    </button>
+
+                    {/* 4. 채우기(F) */}
+                    <button
+                      onClick={() => {
+                        setTool('bucket');
+                        if (selectedTile === -1) setSelectedTile(getPrefixedIndex(0, activeTileset));
+                      }}
+                      disabled={editLayer === 'collision'}
+                      style={{
+                        width: '100%', padding: '6px 10px', fontSize: '11px', borderRadius: '4px',
+                        background: tool === 'bucket' && selectedTile !== -1 && editLayer !== 'collision' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(255,255,255,0.03)',
+                        color: tool === 'bucket' && selectedTile !== -1 && editLayer !== 'collision' ? 'var(--accent)' : '#fff',
+                        border: tool === 'bucket' && selectedTile !== -1 && editLayer !== 'collision' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
+                        display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer',
+                        opacity: editLayer === 'collision' ? 0.4 : 1
+                      }}
+                      title="영역 채우기 (단축키: F)"
+                    >
+                      <PaintBucket size={12} /> 채우기(F)
+                    </button>
+
+                    {/* 5. 오브젝트(O) */}
                     <button
                       onClick={() => {
                         setTool('object');
@@ -1886,73 +1892,39 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                       }}
                       disabled={editLayer === 'collision'}
                       style={{
-                        flex: 1, padding: '7px 2px', fontSize: '10px', borderRadius: '4px',
+                        width: '100%', padding: '6px 10px', fontSize: '11px', borderRadius: '4px',
                         background: tool === 'object' ? 'rgba(250, 179, 135, 0.3)' : 'rgba(255,255,255,0.03)',
                         color: tool === 'object' ? '#fab387' : '#fff',
                         border: tool === 'object' ? '1px solid #fab387' : '1px solid var(--border-glass)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer',
                         fontWeight: tool === 'object' ? 'bold' : 'normal',
                         opacity: editLayer === 'collision' ? 0.4 : 1
                       }}
                       title="독립 오브젝트 스탬프 배치 (단축키: O)"
                     >
-                      <Layers size={11} /> 오브젝트(O)
+                      <Layers size={12} /> 오브젝트(O)
                     </button>
-                  </div>
 
-                  {tool === 'brush' && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-                      <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>브러시 크기:</span>
-                      {([1, 2, 3, 4] as const).map((sz) => (
-                        <button
-                          key={sz}
-                          onClick={() => setBrushSize(sz)}
-                          style={{
-                            flex: 1, padding: '4px', fontSize: '10px', borderRadius: '4px',
-                            background: brushSize === sz ? 'var(--accent)' : 'rgba(255,255,255,0.03)',
-                            color: brushSize === sz ? '#000' : '#fff', border: '1px solid var(--border-glass)',
-                            fontWeight: 'bold', cursor: 'pointer'
-                          }}
-                        >
-                          {sz}x{sz}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
+                    {/* 6. 지우개 모드(X) - Moved underneath 오브젝트(O)! */}
                     {editLayer !== 'collision' ? (
-                      <>
-                        <button
-                          onClick={() => {
-                            setSelectedTile(-1);
-                            setTool('brush');
-                          }}
-                          style={{
-                            width: '100%', padding: '8px', fontSize: '11px', borderRadius: '4px',
-                            background: selectedTile === -1 ? 'var(--danger)' : 'rgba(255,255,255,0.03)',
-                            color: '#fff', border: selectedTile === -1 ? '1px solid var(--danger)' : '1px solid var(--border-glass)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer',
-                            fontWeight: selectedTile === -1 ? 'bold' : 'normal'
-                          }}
-                          title="지우개 (단축키: X)"
-                        >
-                          <Eraser size={13} /> 지우개 모드 (X)
-                        </button>
-
-                        {editLayer === 'decor' && (
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#ccc', cursor: 'pointer', marginTop: '6px' }}>
-                            <input
-                              type="checkbox"
-                              checked={autoCollision}
-                              onChange={(e) => setAutoCollision(e.target.checked)}
-                            />
-                            가구 배치 시 자동 충돌막 설정
-                          </label>
-                        )}
-                      </>
+                      <button
+                        onClick={() => {
+                          setSelectedTile(-1);
+                          setTool('brush');
+                        }}
+                        style={{
+                          width: '100%', padding: '6px 10px', fontSize: '11px', borderRadius: '4px',
+                          background: selectedTile === -1 ? 'var(--danger)' : 'rgba(255,255,255,0.03)',
+                          color: '#fff', border: selectedTile === -1 ? '1px solid var(--danger)' : '1px solid var(--border-glass)',
+                          display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer',
+                          fontWeight: selectedTile === -1 ? 'bold' : 'normal'
+                        }}
+                        title="지우개 (단축키: X)"
+                      >
+                        <Eraser size={12} /> 지우개 모드(X)
+                      </button>
                     ) : (
-                      <div style={{ display: 'flex', gap: '6px', width: '100%' }}>
+                      <div style={{ display: 'flex', gap: '4px', width: '100%', marginTop: '2px' }}>
                         <button
                           onClick={() => {
                             setEditLayer('collision');
@@ -1963,13 +1935,13 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                             setShowCollision(true);
                           }}
                           style={{
-                            flex: 1, padding: '8px', fontSize: '11px', borderRadius: '4px',
+                            flex: 1, padding: '6px', fontSize: '10px', borderRadius: '4px',
                             background: selectedTile === 1 ? 'var(--danger)' : 'rgba(255,255,255,0.03)',
                             color: '#fff', border: selectedTile === 1 ? '1px solid var(--danger)' : '1px solid var(--border-glass)',
                             fontWeight: selectedTile === 1 ? 'bold' : 'normal', cursor: 'pointer'
                           }}
                         >
-                          🚫 충돌 벽 추가
+                          충돌 추가
                         </button>
                         <button
                           onClick={() => {
@@ -1981,83 +1953,103 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                             setShowCollision(true);
                           }}
                           style={{
-                            flex: 1, padding: '8px', fontSize: '11px', borderRadius: '4px',
+                            flex: 1, padding: '6px', fontSize: '10px', borderRadius: '4px',
                             background: selectedTile === 0 ? 'var(--primary)' : 'rgba(255,255,255,0.03)',
                             color: '#fff', border: selectedTile === 0 ? '1px solid var(--primary)' : '1px solid var(--border-glass)',
                             fontWeight: selectedTile === 0 ? 'bold' : 'normal', cursor: 'pointer'
                           }}
                         >
-                          🟢 충돌 제거
+                          충돌 제거
                         </button>
                       </div>
                     )}
+
+                    {editLayer === 'decor' && (
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: '#ccc', cursor: 'pointer', marginTop: '4px' }}>
+                        <input
+                          type="checkbox"
+                          checked={autoCollision}
+                          onChange={(e) => setAutoCollision(e.target.checked)}
+                        />
+                        가구 배치 시 자동 충돌막 설정
+                      </label>
+                    )}
+                  </div>
+                </div>
+
+                {/* Section 3: 브러시 크기 (Title size matching Section 1 & 2!) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
+                  <h4 style={{ fontSize: '11px', color: 'var(--accent)', margin: '0 0 2px 0', borderBottom: '1px solid var(--border-glass)', paddingBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '9px', opacity: 0.7 }}>▪</span> 브러시 크기
+                  </h4>
+
+                  {/* Preset 1x1, 2x2, 3x3, 4x4 Row */}
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    {([1, 2, 3, 4] as const).map((sz) => (
+                      <button
+                        key={sz}
+                        onClick={() => {
+                          setBrushSize(sz);
+                          setCustomBrushInput(String(sz));
+                        }}
+                        style={{
+                          flex: 1, padding: '5px 2px', fontSize: '10px', borderRadius: '4px',
+                          background: brushSize === sz ? 'var(--accent)' : 'rgba(255,255,255,0.03)',
+                          color: brushSize === sz ? '#000' : '#fff', border: '1px solid var(--border-glass)',
+                          fontWeight: 'bold', cursor: 'pointer'
+                        }}
+                      >
+                        {sz}x{sz}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Custom Size Input Row: [숫자] x [숫자] [적용] */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px', background: 'rgba(255,255,255,0.02)', padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-glass)' }}>
+                    <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>사용자 정의:</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={customBrushInput}
+                      onChange={(e) => setCustomBrushInput(e.target.value)}
+                      style={{
+                        width: '36px', background: '#0a0a0f', border: '1px solid var(--border-glass)',
+                        borderRadius: '3px', padding: '3px 4px', fontSize: '11px', color: '#fff', textAlign: 'center'
+                      }}
+                    />
+                    <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>x</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={customBrushInput}
+                      onChange={(e) => setCustomBrushInput(e.target.value)}
+                      style={{
+                        width: '36px', background: '#0a0a0f', border: '1px solid var(--border-glass)',
+                        borderRadius: '3px', padding: '3px 4px', fontSize: '11px', color: '#fff', textAlign: 'center'
+                      }}
+                    />
+                    <button
+                      onClick={() => {
+                        const val = parseInt(customBrushInput, 10);
+                        if (!isNaN(val) && val >= 1 && val <= 20) {
+                          setBrushSize(val);
+                          if (tool !== 'brush') setTool('brush');
+                        } else {
+                          alert('브러시 크기는 1에서 20 사이의 숫자로 지정해 주세요.');
+                        }
+                      }}
+                      style={{
+                        marginLeft: 'auto', padding: '3px 8px', fontSize: '10px', borderRadius: '3px',
+                        background: 'var(--primary)', color: '#fff', border: 'none', fontWeight: 'bold', cursor: 'pointer'
+                      }}
+                    >
+                      적용
+                    </button>
                   </div>
                 </div>
               </>
-            )}
-
-            {/* Tab 2: 📐 크기 (지도 크기) */}
-            {leftSidebarTab === 'size' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <h4 style={{ fontSize: '11px', color: 'var(--accent)', margin: '0 0 4px 0', borderBottom: '1px solid var(--border-glass)', paddingBottom: '4px' }}>
-                  📐 지도 크기
-                </h4>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginBottom: '4px' }}>가로 (너비)</div>
-                    <input
-                      type="number"
-                      value={widthInput}
-                      onChange={(e) => setWidthInput(e.target.value)}
-                      style={{
-                        width: '100%', background: '#0a0a0f', border: '1px solid var(--border-glass)',
-                        borderRadius: '4px', padding: '6px 10px', fontSize: '12px', color: '#fff', textAlign: 'center'
-                      }}
-                    />
-                  </div>
-                  <span style={{ fontSize: '12px', marginTop: '16px', color: 'var(--text-muted)' }}>x</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginBottom: '4px' }}>세로 (높이)</div>
-                    <input
-                      type="number"
-                      value={heightInput}
-                      onChange={(e) => setHeightInput(e.target.value)}
-                      style={{
-                        width: '100%', background: '#0a0a0f', border: '1px solid var(--border-glass)',
-                        borderRadius: '4px', padding: '6px 10px', fontSize: '12px', color: '#fff', textAlign: 'center'
-                      }}
-                    />
-                  </div>
-                </div>
-                <button
-                  onClick={handleResizeMap}
-                  style={{
-                    width: '100%', padding: '8px', background: 'var(--primary)', color: '#fff',
-                    border: '1px solid var(--primary-hover)', borderRadius: '4px', fontSize: '11px',
-                    fontWeight: 'bold', cursor: 'pointer', marginTop: '4px'
-                  }}
-                >
-                  크기 변경 적용
-                </button>
-              </div>
-            )}
-
-            {/* Tab 3: 👁️ 옵션 (화면 뷰 옵션) */}
-            {leftSidebarTab === 'option' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <h4 style={{ fontSize: '11px', color: 'var(--accent)', margin: '0 0 4px 0', borderBottom: '1px solid var(--border-glass)', paddingBottom: '4px' }}>
-                  👁️ 화면 뷰 옵션
-                </h4>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={showGrid} onChange={e => setShowGrid(e.target.checked)} /> 그리드 격자선 보이기
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={showDecor} onChange={e => setShowDecor(e.target.checked)} /> 가구/장식 레이어 노출
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={showCollision} onChange={e => setShowCollision(e.target.checked)} /> 벽/통행 경계선 노출 (선명한 빨간색 🔴)
-                </label>
-              </div>
             )}
 
             {/* Handy Shortcuts Guide Panel at bottom */}
