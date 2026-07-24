@@ -498,74 +498,78 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 1. Base Floor Layer
-    for (let y = 0; y < localMap.height; y++) {
-      for (let x = 0; x < localMap.width; x++) {
-        const idx = localMap.baseLayer[y][x];
-        const drawInfo = getTileDrawInfo(idx, localMap.tileset);
-        if (drawInfo) {
-          const img = images[drawInfo.tilesetKey];
-          if (img) {
-            const tsInfo = getTilesetInfoLocal(drawInfo.tilesetKey);
-            const srcX = (drawInfo.localIdx % tsInfo.cols) * 16;
-            const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * 16;
-            ctx.drawImage(
-              img,
-              srcX, srcY, 16, 16,
-              x * tileSize, y * tileSize, tileSize, tileSize
-            );
+    // 1. Base Floor Layer (Controlled by showBase toggle!)
+    if (showBase) {
+      // 1. Base Floor Layer
+      for (let y = 0; y < localMap.height; y++) {
+        for (let x = 0; x < localMap.width; x++) {
+          const idx = localMap.baseLayer[y][x];
+          const drawInfo = getTileDrawInfo(idx, localMap.tileset);
+          if (drawInfo) {
+            const img = images[drawInfo.tilesetKey];
+            if (img) {
+              const tsInfo = getTilesetInfoLocal(drawInfo.tilesetKey);
+              const srcX = (drawInfo.localIdx % tsInfo.cols) * 16;
+              const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * 16;
+              ctx.drawImage(
+                img,
+                srcX, srcY, 16, 16,
+                x * tileSize, y * tileSize, tileSize, tileSize
+              );
+            }
           }
         }
       }
-    }
-
-    // 1.5 Base Layer Objects (obj.layer === 'base' - Ground Overlay Objects like Stepping Stones, Rugs)
-    if (localMap.objects && localMap.objects.length > 0) {
-      const baseObjects = cleanDuplicateObjects(localMap.objects.filter(o => o.layer === 'base'));
-      baseObjects.forEach(obj => {
-        const img = images[obj.tilesetKey];
-        const tsInfo = getTilesetInfoLocal(obj.tilesetKey);
-        if (img && tsInfo) {
-          const tileW = Math.max(1, Math.floor(img.width / tsInfo.cols));
-          const tileH = Math.max(1, Math.floor(img.height / tsInfo.rows));
-
-            for (let ody = 0; ody < obj.height; ody++) {
-              for (let odx = 0; odx < obj.width; odx++) {
-                const targetTx = obj.x + odx;
-                const targetTy = obj.y + ody;
-                if (targetTx >= 0 && targetTx < localMap.width && targetTy >= 0 && targetTy < localMap.height) {
-                  if (obj.tiles && obj.tiles[ody] && obj.tiles[ody][odx] !== undefined) {
-                    const tileIdx = obj.tiles[ody][odx];
-                    if (tileIdx !== -1) {
-                      const drawInfo = getTileDrawInfo(tileIdx, obj.tilesetKey || localMap.tileset);
-                      if (drawInfo) {
-                        const tImg = images[drawInfo.tilesetKey];
-                        if (tImg) {
-                          const tsInfo = getTilesetInfoLocal(drawInfo.tilesetKey);
-                          const srcX = (drawInfo.localIdx % tsInfo.cols) * 16;
-                          const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * 16;
-                          ctx.drawImage(
-                            tImg,
-                            srcX, srcY, 16, 16,
-                            targetTx * tileSize, targetTy * tileSize, tileSize, tileSize
-                          );
+  
+      // 1.5 Base Layer Objects (obj.layer === 'base' - Ground Overlay Objects like Stepping Stones, Rugs)
+      if (localMap.objects && localMap.objects.length > 0) {
+        const baseObjects = cleanDuplicateObjects(localMap.objects.filter(o => o.layer === 'base'));
+        baseObjects.forEach(obj => {
+          const img = images[obj.tilesetKey];
+          const tsInfo = getTilesetInfoLocal(obj.tilesetKey);
+          if (img && tsInfo) {
+            const tileW = Math.max(1, Math.floor(img.width / tsInfo.cols));
+            const tileH = Math.max(1, Math.floor(img.height / tsInfo.rows));
+  
+              for (let ody = 0; ody < obj.height; ody++) {
+                for (let odx = 0; odx < obj.width; odx++) {
+                  const targetTx = obj.x + odx;
+                  const targetTy = obj.y + ody;
+                  if (targetTx >= 0 && targetTx < localMap.width && targetTy >= 0 && targetTy < localMap.height) {
+                    if (obj.tiles && obj.tiles[ody] && obj.tiles[ody][odx] !== undefined) {
+                      const tileIdx = obj.tiles[ody][odx];
+                      if (tileIdx !== -1) {
+                        const drawInfo = getTileDrawInfo(tileIdx, obj.tilesetKey || localMap.tileset);
+                        if (drawInfo) {
+                          const tImg = images[drawInfo.tilesetKey];
+                          if (tImg) {
+                            const tsInfo = getTilesetInfoLocal(drawInfo.tilesetKey);
+                            const srcX = (drawInfo.localIdx % tsInfo.cols) * 16;
+                            const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * 16;
+                            ctx.drawImage(
+                              tImg,
+                              srcX, srcY, 16, 16,
+                              targetTx * tileSize, targetTy * tileSize, tileSize, tileSize
+                            );
+                          }
                         }
                       }
+                    } else {
+                      const srcX = (obj.startCol + odx) * tileW;
+                      const srcY = (obj.startRow + ody) * tileH;
+                      ctx.drawImage(
+                        img,
+                        srcX, srcY, tileW, tileH,
+                        targetTx * tileSize, targetTy * tileSize, tileSize, tileSize
+                      );
                     }
-                  } else {
-                    const srcX = (obj.startCol + odx) * tileW;
-                    const srcY = (obj.startRow + ody) * tileH;
-                    ctx.drawImage(
-                      img,
-                      srcX, srcY, tileW, tileH,
-                      targetTx * tileSize, targetTy * tileSize, tileSize, tileSize
-                    );
                   }
                 }
               }
-            }
-        }
-      });
+          }
+        });
+      }
+  
     }
 
     // 2. Decor Layer
@@ -1552,6 +1556,32 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   };
 
   // Map Resize Handler
+  // Clear All Map Contents Handler (Reset map to 100% empty black canvas)
+  const handleClearAllMapContents = () => {
+    if (!window.confirm("정말 지도의 모든 타일과 오브젝트를 삭제하고 빈 화면(검은색)으로 초기화하시겠습니까?")) {
+      return;
+    }
+    setHistory(prev => [...prev, localMap]);
+    setRedoHistory([]);
+
+    const emptyBase = Array.from({ length: localMap.height }, () => Array.from({ length: localMap.width }, () => -1));
+    const emptyDecor = Array.from({ length: localMap.height }, () => Array.from({ length: localMap.width }, () => -1));
+    const emptyCollision = Array.from({ length: localMap.height }, () => Array.from({ length: localMap.width }, () => false));
+
+    setLocalMap(prev => ({
+      ...prev,
+      baseLayer: emptyBase,
+      decorLayer: emptyDecor,
+      collision: emptyCollision,
+      objects: []
+    }));
+
+    setSelectedObjectId(null);
+    setMapBoxSelection(null);
+    setMapBoxSelectStart(null);
+    alert("지도의 모든 내역이 초기화되어 빈 화면(검은색)이 되었습니다.");
+  };
+
   const handleResizeMap = () => {
     const newW = parseInt(widthInput, 10);
     const newH = parseInt(heightInput, 10);
@@ -2343,6 +2373,23 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                 >
                   크기 변경 적용
                 </button>
+
+                {/* Map Reset Section under Map Size */}
+                <div style={{ marginTop: "16px", borderTop: "1px solid var(--border-glass)", paddingTop: "12px" }}>
+                  <h4 style={{ fontSize: "11px", color: "var(--danger)", margin: "0 0 6px 0", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ fontSize: "9px", opacity: 0.7 }}>▪</span> 지도 전체 초기화
+                  </h4>
+                  <button
+                    onClick={handleClearAllMapContents}
+                    style={{
+                      width: "100%", padding: "9px", background: "rgba(243, 139, 168, 0.15)", color: "#f38ba8",
+                      border: "1px solid #f38ba8", borderRadius: "4px", fontSize: "11px",
+                      fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px"
+                    }}
+                  >
+                    <Trash2 size={13} /> 지도에 모든 내역 초기화 (빈 화면)
+                  </button>
+                </div>
               </div>
             )}
 
