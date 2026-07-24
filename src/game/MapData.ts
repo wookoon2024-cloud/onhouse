@@ -9,6 +9,7 @@ export interface MapObjectInstance {
   y: number; // 맵 타일 Y 좌표
   layer: 'base' | 'decor';
   zIndex?: number; // 앞뒤 순서 제어용 z-index
+  tiles?: number[][]; // 커스텀 묶음 오브젝트용 2D 타일 인덱스 배열
 }
 
 export function cleanDuplicateObjects(objects?: MapObjectInstance[]): MapObjectInstance[] {
@@ -19,7 +20,9 @@ export function cleanDuplicateObjects(objects?: MapObjectInstance[]): MapObjectI
 
   for (let i = objects.length - 1; i >= 0; i--) {
     const candidate = objects[i];
-    const posKey = `${candidate.x}_${candidate.y}_${candidate.tilesetKey}_${candidate.startCol}_${candidate.startRow}`;
+    const posKey = candidate.tiles
+      ? candidate.id
+      : `${candidate.x}_${candidate.y}_${candidate.tilesetKey}_${candidate.startCol}_${candidate.startRow}`;
     if (!seenIds.has(candidate.id) && !seenPos.has(posKey)) {
       seenIds.add(candidate.id);
       seenPos.add(posKey);
