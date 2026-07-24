@@ -600,11 +600,11 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       }
     }
 
-    // 3. Collision red borders
+    // 3. Collision red borders (100% Vivid Red for clear distinction!)
     if (showCollision) {
-      ctx.fillStyle = 'rgba(243, 139, 168, 0.2)';
-      ctx.strokeStyle = 'rgba(243, 139, 168, 0.6)';
-      ctx.lineWidth = 1;
+      ctx.fillStyle = 'rgba(255, 60, 60, 0.25)';
+      ctx.strokeStyle = 'rgba(255, 60, 60, 0.9)';
+      ctx.lineWidth = 1.5;
       for (let y = 0; y < localMap.height; y++) {
         for (let x = 0; x < localMap.width; x++) {
           if (localMap.collision[y][x]) {
@@ -633,7 +633,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       }
     }
 
-    // 5. Objects Bounding Boxes Overlay
+    // 5. Objects Bounding Boxes Overlay (Selected: Gold/Yellow, Unselected: Neon Cyan!)
     if (localMap.objects && localMap.objects.length > 0) {
       localMap.objects.forEach(obj => {
         const isSelected = obj.id === selectedObjectId;
@@ -644,16 +644,18 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
         ctx.save();
         if (isSelected) {
-          ctx.strokeStyle = '#f5c2e7';
-          ctx.lineWidth = 2.5;
-          ctx.setLineDash([5, 5]);
-          ctx.fillStyle = 'rgba(245, 194, 231, 0.2)';
+          // 1) Active Selected Object: Electric Gold / Yellow (#ffd700)
+          ctx.strokeStyle = '#ffd700';
+          ctx.lineWidth = 3.0;
+          ctx.setLineDash([6, 6]);
+          ctx.fillStyle = 'rgba(255, 215, 0, 0.22)';
           ctx.fillRect(ox, oy, ow, oh);
           ctx.strokeRect(ox, oy, ow, oh);
         } else if (tool === 'select') {
-          ctx.strokeStyle = 'rgba(139, 92, 246, 0.5)';
-          ctx.lineWidth = 1;
-          ctx.setLineDash([3, 3]);
+          // 2) Unselected Object Guide: Bright Neon Cyan (#00e5ff)
+          ctx.strokeStyle = '#00e5ff';
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([4, 4]);
           ctx.strokeRect(ox, oy, ow, oh);
         }
         ctx.restore();
@@ -1813,7 +1815,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               <input type="checkbox" checked={showDecor} onChange={e => setShowDecor(e.target.checked)} /> 가구/장식 레이어 노출
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', cursor: 'pointer' }}>
-              <input type="checkbox" checked={showCollision} onChange={e => setShowCollision(e.target.checked)} /> 벽/통행 경계선 노출 (분홍색)
+              <input type="checkbox" checked={showCollision} onChange={e => setShowCollision(e.target.checked)} /> 벽/통행 경계선 노출 (선명한 빨간색 🔴)
             </label>
           </div>
 
