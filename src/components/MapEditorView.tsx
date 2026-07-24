@@ -691,16 +691,11 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         ctx.save();
         if (isSelected) {
           // 1) Active Selected Object: Electric Gold / Yellow (#ffd700)
-          ctx.strokeStyle = '#ffd700';
+          ctx.strokeStyle = "#ffd700";
           ctx.lineWidth = 3.0;
           ctx.setLineDash([6, 6]);
-          ctx.fillStyle = 'rgba(255, 215, 0, 0.22)';
+          ctx.fillStyle = "rgba(255, 215, 0, 0.22)";
           ctx.fillRect(ox, oy, ow, oh);
-        } else if (tool === 'select') {
-          // 2) Unselected Object Guide: Bright Neon Cyan (#00e5ff)
-          ctx.strokeStyle = '#00e5ff';
-          ctx.lineWidth = 1.5;
-          ctx.setLineDash([4, 4]);
           ctx.strokeRect(ox, oy, ow, oh);
         }
         ctx.restore();
@@ -2622,53 +2617,69 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           </div>
 
           {/* Active Selected Tile Preview Box */}
-          <div style={{
-            padding: '10px 16px', borderBottom: '1px solid var(--border-glass)',
-            background: 'rgba(15, 15, 25, 0.6)', display: 'flex', alignItems: 'center', gap: '12px'
-          }}>
-            <div style={{
-              width: `${Math.max(36, Math.min(64, brushSize * 18))}px`,
-              height: `${Math.max(36, Math.min(64, brushSize * 18))}px`,
-              border: '2px solid var(--accent)',
-              borderRadius: '6px', background: '#000', display: 'grid',
-              gridTemplateColumns: `repeat(${brushSize}, 1fr)`,
-              overflow: 'hidden', imageRendering: 'pixelated', padding: '1px', boxSizing: 'border-box'
-            }}>
-              {selectedTile !== -1 ? (
-                Array.from({ length: brushSize * brushSize }).map((_, i) => {
-                  const dx = i % brushSize;
-                  const dy = Math.floor(i / brushSize);
-                  const subTile = getOffsetTile(selectedTile, activeTileset, dx, dy);
-                  const subInfo = getTileDrawInfo(subTile, activeTileset);
-                  if (!subInfo) return <div key={i} />;
-                  const tsInfo = getTilesetInfoLocal(subInfo.tilesetKey);
-                  const subCol = subInfo.localIdx % tsInfo.cols;
-                  const subRow = Math.floor(subInfo.localIdx / tsInfo.cols);
-                  return (
-                    <div key={i} style={{
-                      width: '100%', height: '100%',
-                      backgroundImage: `url(${tsInfo.url})`,
-                      backgroundPosition: `-${subCol * 16}px -${subRow * 16}px`,
-                      backgroundSize: `${tsInfo.cols * 100}% auto`,
-                      imageRendering: 'pixelated'
-                    }} />
-                  );
-                })
-              ) : (
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', height: '100%' }}>
-                  <span style={{ fontSize: '16px' }}>🧽</span>
+          {(() => {
+            const curCols = (paletteSelection && paletteSelection.tilesetKey === activeTileset) ? paletteSelection.cols : (brushSize || 1);
+            const curRows = (paletteSelection && paletteSelection.tilesetKey === activeTileset) ? paletteSelection.rows : (brushSize || 1);
+            const selInfo = getTileDrawInfo(selectedTile, activeTileset);
+            const baseCol = selInfo ? (selInfo.localIdx % tilesetCols) : 0;
+            const baseRow = selInfo ? Math.floor(selInfo.localIdx / tilesetCols) : 0;
+            const startCol = (paletteSelection && paletteSelection.tilesetKey === activeTileset) ? paletteSelection.startCol : baseCol;
+            const startRow = (paletteSelection && paletteSelection.tilesetKey === activeTileset) ? paletteSelection.startRow : baseRow;
+
+            return (
+              <div style={{
+                padding: "10px 16px", borderBottom: "1px solid var(--border-glass)",
+                background: "rgba(15, 15, 25, 0.6)", display: "flex", alignItems: "center", gap: "12px"
+              }}>
+                <div style={{
+                  width: `${Math.max(36, Math.min(64, curCols * 18))}px`,
+                  height: `${Math.max(36, Math.min(64, curRows * 18))}px`,
+                  border: "2px solid var(--accent)",
+                  borderRadius: "6px", background: "#000", display: "grid",
+                  gridTemplateColumns: `repeat(${curCols}, 1fr)`,
+                  overflow: "hidden", imageRendering: "pixelated", padding: "1px", boxSizing: "border-box"
+                }}>
+                  {selectedTile !== -1 ? (
+                    Array.from({ length: curCols * curRows }).map((_, i) => {
+                      const dx = i % curCols;
+                      const dy = Math.floor(i / curCols);
+                      const cellCol = startCol + dx;
+                      const cellRow = startRow + dy;
+                      const cellLocalIdx = cellRow * tilesetCols + cellCol;
+                      const subTile = getPrefixedIndex(cellLocalIdx, activeTileset);
+                      const subInfo = getTileDrawInfo(subTile, activeTileset);
+                      if (!subInfo) return <div key={i} />;
+                      const tsInfo = getTilesetInfoLocal(subInfo.tilesetKey);
+                      const subCol = subInfo.localIdx % tsInfo.cols;
+                      const subRow = Math.floor(subInfo.localIdx / tsInfo.cols);
+                      return (
+                        <div key={i} style={{
+                          width: "100%", height: "100%",
+                          backgroundImage: `url(${tsInfo.url})`,
+                          backgroundPosition: `-${subCol * 16}px -${subRow * 16}px`,
+                          backgroundSize: `${tsInfo.cols * 100}% auto`,
+                          imageRendering: "pixelated"
+                        }} />
+                      );
+                    })
+                  ) : (
+                    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", width: "100%", height: "100%" }}>
+                      <span style={{ fontSize: "16px" }}>🧽</span>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-            <div>
-              <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
-                현재 선택된 브러시 ({brushSize}x{brushSize} 크기)
+                <div>
+                  <div style={{ fontSize: "10px", color: "var(--text-secondary)" }}>
+                    현재 선택된 브러시 ({curCols}x{curRows} 크기)
+                  </div>
+                  <div style={{ fontSize: "11px", color: "var(--accent)", fontWeight: "normal", marginTop: "2px" }}>
+                    {selectedTile === -1 ? "지우개 🧽" : `${tileDetails.label} [${curCols}x${curRows} 멀티타일]`}
+                  </div>
+                </div>
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 'normal', marginTop: '2px' }}>
-                {selectedTile === -1 ? '지우개 🧽' : `${tileDetails.label} [${brushSize}x${brushSize} 멀티타일]` }
-              </div>
-            </div>
-          </div>
+            );
+          })()}
+
 
           {/* Scrollable Visual Tileset Grid Sheet */}
           <div style={{ flex: 1, padding: '16px', overflowY: 'auto', background: '#0d0d12' }}>
