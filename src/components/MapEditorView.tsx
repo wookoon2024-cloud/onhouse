@@ -1918,45 +1918,85 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                     <span style={{ fontSize: '9px', opacity: 0.7 }}>▪</span> 레이어
                   </h4>
 
-                  {/* 1. 1단계 레이어(바닥) */}
-                  <button
-                    onClick={() => {
-                      setEditLayer('base');
-                      if (selectedTile === 1 || selectedTile === 0 || selectedTile === -1) {
-                        setSelectedTile(getPrefixedIndex(0, activeTileset));
-                      }
-                      if (tool === 'select') setTool('brush');
-                    }}
-                    style={{
-                      width: '100%', padding: '7px 10px', fontSize: '11px', borderRadius: '4px',
-                      background: editLayer === 'base' ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255,255,255,0.03)',
-                      color: editLayer === 'base' ? 'var(--accent)' : '#fff',
-                      border: editLayer === 'base' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
-                      textAlign: 'left', cursor: 'pointer', fontWeight: 'normal'
-                    }}
-                  >
-                    1단계 레이어(바닥)
-                  </button>
+                  {/* 1. 1단계 레이어(바닥) + 노출 체크박스 */}
+                  <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+                    <button
+                      onClick={() => {
+                        setEditLayer("base");
+                        if (selectedTile === 1 || selectedTile === 0 || selectedTile === -1) {
+                          setSelectedTile(getPrefixedIndex(0, activeTileset));
+                        }
+                        if (tool === "select") setTool("brush");
+                      }}
+                      style={{
+                        flex: 1, padding: "7px 10px", fontSize: "11px", borderRadius: "4px",
+                        background: editLayer === "base" ? "rgba(139, 92, 246, 0.2)" : "rgba(255,255,255,0.03)",
+                        color: editLayer === "base" ? "var(--accent)" : "#fff",
+                        border: editLayer === "base" ? "1px solid var(--accent)" : "1px solid var(--border-glass)",
+                        textAlign: "left", cursor: "pointer", fontWeight: "normal"
+                      }}
+                    >
+                      1단계 레이어(바닥)
+                    </button>
+                    <label
+                      style={{
+                        display: "flex", alignItems: "center", gap: "3px", padding: "6px 8px",
+                        fontSize: "11px", color: showBase ? "var(--accent)" : "#888",
+                        background: showBase ? "rgba(139, 92, 246, 0.1)" : "rgba(255,255,255,0.02)",
+                        border: showBase ? "1px solid var(--accent)" : "1px solid var(--border-glass)",
+                        borderRadius: "4px", cursor: "pointer", whiteSpace: "nowrap"
+                      }}
+                      title="1단계 레이어 노출/숨김"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={showBase}
+                        onChange={(e) => setShowBase(e.target.checked)}
+                        style={{ accentColor: "var(--accent)", cursor: "pointer" }}
+                      />
+                      👁️
+                    </label>
+                  </div>
 
-                  {/* 2. 2단계 레이어(장식) */}
-                  <button
-                    onClick={() => {
-                      setEditLayer('decor');
-                      if (selectedTile === 1 || selectedTile === 0 || selectedTile === -1) {
-                        setSelectedTile(getPrefixedIndex(0, activeTileset));
-                      }
-                      if (tool === 'select') setTool('brush');
-                    }}
-                    style={{
-                      width: '100%', padding: '7px 10px', fontSize: '11px', borderRadius: '4px',
-                      background: editLayer === 'decor' ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255,255,255,0.03)',
-                      color: editLayer === 'decor' ? 'var(--accent)' : '#fff',
-                      border: editLayer === 'decor' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
-                      textAlign: 'left', cursor: 'pointer', fontWeight: 'normal'
-                    }}
-                  >
-                    2단계 레이어(장식)
-                  </button>
+                  {/* 2. 2단계 레이어(장식) + 노출 체크박스 */}
+                  <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+                    <button
+                      onClick={() => {
+                        setEditLayer("decor");
+                        if (selectedTile === 1 || selectedTile === 0 || selectedTile === -1) {
+                          setSelectedTile(getPrefixedIndex(0, activeTileset));
+                        }
+                        if (tool === "select") setTool("brush");
+                      }}
+                      style={{
+                        flex: 1, padding: "7px 10px", fontSize: "11px", borderRadius: "4px",
+                        background: editLayer === "decor" ? "rgba(139, 92, 246, 0.2)" : "rgba(255,255,255,0.03)",
+                        color: editLayer === "decor" ? "var(--accent)" : "#fff",
+                        border: editLayer === "decor" ? "1px solid var(--accent)" : "1px solid var(--border-glass)",
+                        textAlign: "left", cursor: "pointer", fontWeight: "normal"
+                      }}
+                    >
+                      2단계 레이어(장식)
+                    </button>
+                    <label
+                      style={{
+                        display: "flex", alignItems: "center", gap: "3px", padding: "6px 8px",
+                        fontSize: "11px", color: showDecor ? "var(--accent)" : "#888",
+                        background: showDecor ? "rgba(139, 92, 246, 0.1)" : "rgba(255,255,255,0.02)",
+                        border: showDecor ? "1px solid var(--accent)" : "1px solid var(--border-glass)",
+                        borderRadius: "4px", cursor: "pointer", whiteSpace: "nowrap"
+                      }}
+                      title="2단계 레이어 노출/숨김"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={showDecor}
+                        onChange={(e) => setShowDecor(e.target.checked)}
+                        style={{ accentColor: "var(--accent)", cursor: "pointer" }}
+                      />
+                      👁️
+                    </label>
+                  </div>
 
                   {/* 3. 이동 불가지역 Row with [추가] and [제거] buttons right next to it! */}
                   <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
