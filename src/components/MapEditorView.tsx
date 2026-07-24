@@ -84,6 +84,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   // View Settings & Zoom (0.5x to 4.0x)
   const [zoom, setZoom] = useState<number>(2); 
   const [showGrid, setShowGrid] = useState<boolean>(true);
+  const [showBase, setShowBase] = useState<boolean>(true);
   const [showDecor, setShowDecor] = useState<boolean>(true);
   const [showCollision, setShowCollision] = useState<boolean>(true);
   
@@ -790,7 +791,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       }
       ctx.restore();
     }
-  }, [images, localMap, zoom, showGrid, showDecor, showCollision, hoverTile, isAltPressed, tool, brushSize, selectedTile, editLayer, activeTileset]);
+  }, [images, localMap, zoom, showGrid, showBase, showDecor, showCollision, hoverTile, isAltPressed, tool, brushSize, selectedTile, editLayer, activeTileset]);
 
   // Undo / Redo
   const handleUndo = () => {
