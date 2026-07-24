@@ -503,8 +503,8 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
 
   // Dynamic Tile Scale factor based on viewport width (reduced for higher density and sharpness)
   const getTileScale = () => {
-    if (dimensions.width < 768) return 1.5; // Mobile: 1.5x zoom
-    return 2; // Desktop: 2x zoom (32px tiles - High Density HD map view!)
+    if (dimensions.width < 768) return 1.5;
+    return 1.5; // 150% zoom for User Map view!
   };
 
   const handleVirtualDpadPress = (key: string, pressed: boolean) => {
