@@ -1035,25 +1035,13 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       if (!obj) return prev;
       if (obj.x === newTx && obj.y === newTy) return prev;
 
-      const newBase = prev.baseLayer.map(r => [...r]);
-      const newDecor = prev.decorLayer.map(r => [...r]);
-      const newCollision = prev.collision.map(r => [...r]);
-
       const sTx = startTx !== undefined ? startTx : obj.x;
       const sTy = startTy !== undefined ? startTy : obj.y;
 
-      // 1) Record object's current collision pattern before moving
-      const objCollisionMap: boolean[][] = [];
-      for (let dy = 0; dy < obj.height; dy++) {
-        objCollisionMap[dy] = [];
-        for (let dx = 0; dx < obj.width; dx++) {
-          const ox = sTx + dx;
-          const oy = sTy + dy;
-          objCollisionMap[dy][dx] = (ox >= 0 && ox < prev.width && oy >= 0 && oy < prev.height) ? prev.collision[oy][ox] : false;
-        }
-      }
+      const newBase = prev.baseLayer.map(r => [...r]);
+      const newDecor = prev.decorLayer.map(r => [...r]);
 
-      // 2) Erase ONLY original starting position (sTx, sTy)
+      // Erase ONLY original starting position (sTx, sTy) without altering map collision
       for (let dy = 0; dy < obj.height; dy++) {
         for (let dx = 0; dx < obj.width; dx++) {
           const oldX = sTx + dx;
@@ -1061,21 +1049,6 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           if (oldX >= 0 && oldX < prev.width && oldY >= 0 && oldY < prev.height) {
             newDecor[oldY][oldX] = -1;
             if (obj.layer === "base" || editLayer === "base") { newBase[oldY][oldX] = -1; }
-            if (objCollisionMap[dy][dx]) {
-              newCollision[oldY][oldX] = false;
-            }
-          }
-        }
-      }
-      // 3) Transfer collision pattern to new target position
-      for (let dy = 0; dy < obj.height; dy++) {
-        for (let dx = 0; dx < obj.width; dx++) {
-          const nX = newTx + dx;
-          const nY = newTy + dy;
-          if (nX >= 0 && nX < prev.width && nY >= 0 && nY < prev.height) {
-            if (objCollisionMap[dy][dx]) {
-              newCollision[nY][nX] = true;
-            }
           }
         }
       }
@@ -1084,11 +1057,11 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         ...prev,
         baseLayer: newBase,
         decorLayer: newDecor,
-        collision: newCollision,
         objects: (prev.objects || []).map(o => o.id === objId ? { ...o, x: newTx, y: newTy } : o)
       };
     });
   };
+
 
   const handlePaint = (tx: number, ty: number) => {
     if (tx < 0 || tx >= localMap.width || ty < 0 || ty >= localMap.height) return;
