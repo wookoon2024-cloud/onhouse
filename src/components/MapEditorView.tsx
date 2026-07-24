@@ -933,53 +933,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       if (!obj) return prev;
       if (obj.x === newTx && obj.y === newTy) return prev;
 
-      const newCollision = prev.collision.map(r => [...r]);
-      const newDecor = prev.decorLayer.map(r => [...r]);
-
-      // Update collision grid if autoCollision is enabled
-      if (autoCollision) {
-        for (let ody = 0; ody < obj.height; ody++) {
-          for (let odx = 0; odx < obj.width; odx++) {
-            const oldX = obj.x + odx;
-            const oldY = obj.y + ody;
-            if (oldX >= 0 && oldX < prev.width && oldY >= 0 && oldY < prev.height) {
-              newCollision[oldY][oldX] = false;
-            }
-          }
-        }
-        for (let ody = 0; ody < obj.height; ody++) {
-          for (let odx = 0; odx < obj.width; odx++) {
-            const nX = newTx + odx;
-            const nY = newTy + ody;
-            if (nX >= 0 && nX < prev.width && nY >= 0 && nY < prev.height) {
-              newCollision[nY][nX] = true;
-            }
-          }
-        }
-      }
-
-      // Clean up any duplicate baked-in decor tiles left behind by old versions at old location
-      const tsInfo = getTilesetInfoLocal(obj.tilesetKey);
-      if (tsInfo) {
-        for (let ody = 0; ody < obj.height; ody++) {
-          for (let odx = 0; odx < obj.width; odx++) {
-            const oldX = obj.x + odx;
-            const oldY = obj.y + ody;
-            if (oldX >= 0 && oldX < prev.width && oldY >= 0 && oldY < prev.height) {
-              const localIdx = (obj.startRow + ody) * tsInfo.cols + (obj.startCol + odx);
-              const expectedTile = getPrefixedIndex(localIdx, obj.tilesetKey);
-              if (newDecor[oldY][oldX] === expectedTile) {
-                newDecor[oldY][oldX] = -1;
-              }
-            }
-          }
-        }
-      }
-
       return {
         ...prev,
-        decorLayer: newDecor,
-        collision: newCollision,
         objects: (prev.objects || []).map(o => o.id === objId ? { ...o, x: newTx, y: newTy } : o)
       };
     });
