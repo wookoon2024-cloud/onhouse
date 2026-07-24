@@ -1583,7 +1583,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
     const newBase = Array.from({ length: newH }, (_, y) =>
       Array.from({ length: newW }, (_, x) =>
-        y < localMap.height && x < localMap.width ? localMap.baseLayer[y][x] : (localMap.tileset === 'interior' ? 1199 : 2000)
+        y < localMap.height && x < localMap.width ? localMap.baseLayer[y][x] : -1
       )
     );
 
