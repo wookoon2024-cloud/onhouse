@@ -1854,15 +1854,16 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
       {mapContextMenu && (
         <div
           style={{
-            position: 'fixed',
+            position: "fixed",
             left: `${mapContextMenu.clientX}px`,
             top: `${mapContextMenu.clientY}px`,
             zIndex: 1200,
-            background: '#181825',
-            border: '1px solid var(--accent)',
-            borderRadius: '8px',
-            padding: '6px',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.8)'
+            background: "rgba(24, 24, 37, 0.95)",
+            backdropFilter: "blur(8px)",
+            border: "1px solid rgba(245, 194, 231, 0.4)",
+            borderRadius: "6px",
+            padding: "3px 4px",
+            boxShadow: "0 6px 18px rgba(0,0,0,0.6)"
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -1872,21 +1873,21 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
               setMapContextMenu(null);
             }}
             style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#fff',
-              fontSize: '12px',
-              fontWeight: 'bold',
-              padding: '6px 10px',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
+              background: "transparent",
+              border: "none",
+              color: "#fff",
+              fontSize: "11px",
+              fontWeight: "normal",
+              padding: "4px 8px",
+              borderRadius: "4px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "5px"
             }}
             className="hover-highlight"
           >
-            📝 이 위치에 메모 남기기
+            📝 메모 남기기
           </button>
         </div>
       )}
