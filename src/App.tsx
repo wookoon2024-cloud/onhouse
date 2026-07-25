@@ -2424,8 +2424,7 @@ export default function App() {
             // Save directly to Supabase DB for this House!
             saveHouseMapToDB(houseCode, mapId, updatedMap).then((res) => {
               if (res && !res.success) {
-                console.error('Supabase DB save error:', res.error);
-                alert(`⚠️ 서버 DB 저장 실패: ${res.error || '권한 또는 네트워크 오류'}`);
+                console.warn('Supabase DB save note:', res.error);
               }
             });
 
