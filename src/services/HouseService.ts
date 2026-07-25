@@ -49,12 +49,9 @@ const withTimeout = <T>(promiseLike: PromiseLike<T>, timeoutMs = 3500): Promise<
   });
 };
 
-// Fetch deleted map IDs list for a house code
+// Fetch deleted map IDs list for a house code from Supabase DB
 export const fetchHouseDeletedMaps = async (houseCode: string): Promise<string[]> => {
   try {
-    const localSaved = localStorage.getItem(`on_house_${houseCode}_deleted_map_ids`);
-    const localDeleted: string[] = localSaved ? JSON.parse(localSaved) : [];
-
     const res = await withTimeout(
       supabase
         .from('house_assets')
@@ -72,21 +69,16 @@ export const fetchHouseDeletedMaps = async (houseCode: string): Promise<string[]
         }
       });
     }
-
-    const merged = Array.from(new Set([...localDeleted, ...dbDeleted]));
-    localStorage.setItem(`on_house_${houseCode}_deleted_map_ids`, JSON.stringify(merged));
-    return merged;
+    return Array.from(new Set(dbDeleted));
   } catch (err) {
-    const localSaved = localStorage.getItem(`on_house_${houseCode}_deleted_map_ids`);
-    return localSaved ? JSON.parse(localSaved) : [];
+    console.warn('[OnHouse Sync] fetchHouseDeletedMaps network/timeout, returning empty list:', err);
+    return [];
   }
 };
 
 // Save deleted map IDs list to Supabase DB
 export const saveHouseDeletedMapsToDB = async (houseCode: string, deletedIds: string[]) => {
   try {
-    localStorage.setItem(`on_house_${houseCode}_deleted_map_ids`, JSON.stringify(deletedIds));
-
     await withTimeout(
       supabase
         .from('house_assets')
@@ -107,16 +99,21 @@ export const saveHouseDeletedMapsToDB = async (houseCode: string, deletedIds: st
         }),
       3000
     );
-  } catch (err) {}
+    console.log('[OnHouse Sync] Saved deleted maps to Supabase DB:', houseCode, deletedIds);
+  } catch (err) {
+    console.warn('[OnHouse Sync] Failed to save deleted maps to Supabase DB:', err);
+  }
 };
 
-// Fetch or initialize all maps for a given house code
+// Fetch or initialize all maps for a given house code directly from DB
 export const fetchHouseMaps = async (houseCode: string): Promise<Record<string, MapDefinition>> => {
   try {
-    // 0. Fetch deleted map IDs for this house code
+    console.log(`[OnHouse Sync] Fetching maps for houseCode: ${houseCode}`);
+
+    // 0. Fetch deleted map IDs for this house code from DB
     const deletedMapIds = await fetchHouseDeletedMaps(houseCode);
 
-    // 1. Start with factory default maps (excluding deleted ones)
+    // 1. Start with fresh DEEP CLONED factory default maps (excluding deleted ones)
     const loadedMaps: Record<string, MapDefinition> = {};
     Object.entries(maps).forEach(([id, def]) => {
       if (!deletedMapIds.includes(id)) {
@@ -124,21 +121,7 @@ export const fetchHouseMaps = async (houseCode: string): Promise<Record<string, 
       }
     });
 
-    // 2. Load house-scoped local cache if present
-    const houseCacheKey = `on_house_${houseCode}_maps`;
-    const cachedStr = localStorage.getItem(houseCacheKey);
-    if (cachedStr) {
-      try {
-        const parsedCache: Record<string, MapDefinition> = JSON.parse(cachedStr);
-        Object.entries(parsedCache).forEach(([id, mData]) => {
-          if (!deletedMapIds.includes(id) && mData && mData.width && mData.height) {
-            loadedMaps[id] = mData;
-          }
-        });
-      } catch (e) {}
-    }
-
-    // 3. Fetch from Supabase DB with timeout (3.5s) and merge/override cloud data
+    // 2. Fetch from Supabase DB with timeout (3.5s) and merge/override cloud data
     const res = await withTimeout(
       supabase
         .from('house_maps')
@@ -153,34 +136,30 @@ export const fetchHouseMaps = async (houseCode: string): Promise<Record<string, 
           loadedMaps[row.map_id] = row.map_data;
         }
       });
-
-      // Save house-isolated cache
-      try {
-        localStorage.setItem(houseCacheKey, JSON.stringify(loadedMaps));
-      } catch (e) {}
     }
+
+    console.log(`[OnHouse Sync] Successfully loaded ${Object.keys(loadedMaps).length} maps for houseCode [${houseCode}]:`, Object.keys(loadedMaps));
     return loadedMaps;
   } catch (err) {
-    console.warn('Supabase fetchHouseMaps network error/timeout, using house-scoped cache:', err);
-    // Return house-scoped cache or factory defaults
-    const houseCacheKey = `on_house_${houseCode}_maps`;
-    const cachedStr = localStorage.getItem(houseCacheKey);
-    if (cachedStr) {
-      try {
-        return JSON.parse(cachedStr);
-      } catch (e) {}
-    }
-    return { ...maps };
+    console.warn(`[OnHouse Sync] Supabase fetchHouseMaps timeout/error for [${houseCode}], using fresh default maps:`, err);
+    // Always fallback to pristine factory default maps
+    const loadedMaps: Record<string, MapDefinition> = {};
+    Object.entries(maps).forEach(([id, def]) => {
+      loadedMaps[id] = JSON.parse(JSON.stringify(def));
+    });
+    return loadedMaps;
   }
 };
 
-// Save single map to Supabase DB & house-scoped local cache
+// Save single map to Supabase DB
 export const saveHouseMapToDB = async (
   houseCode: string,
   mapId: string,
   mapData: MapDefinition
 ): Promise<{ success: boolean; error?: string }> => {
   try {
+    console.log(`[OnHouse Sync] Saving map '${mapId}' to Supabase DB for houseCode [${houseCode}]...`);
+
     // If map was previously in deleted list, un-delete it when saved!
     const deletedIds = await fetchHouseDeletedMaps(houseCode);
     if (deletedIds.includes(mapId)) {
@@ -188,16 +167,7 @@ export const saveHouseMapToDB = async (
       await saveHouseDeletedMapsToDB(houseCode, nextDeleted);
     }
 
-    // 1. Save to house-scoped local cache immediately
-    const houseCacheKey = `on_house_${houseCode}_maps`;
-    try {
-      const cachedStr = localStorage.getItem(houseCacheKey);
-      const houseMaps: Record<string, MapDefinition> = cachedStr ? JSON.parse(cachedStr) : {};
-      houseMaps[mapId] = mapData;
-      localStorage.setItem(houseCacheKey, JSON.stringify(houseMaps));
-    } catch (e) {}
-
-    // 2. Try upsert into Supabase DB with 3.5s timeout
+    // Try upsert into Supabase DB with 3.5s timeout
     const upsertRes = await withTimeout(
       supabase
         .from('house_maps')
@@ -211,10 +181,11 @@ export const saveHouseMapToDB = async (
     );
 
     if (!upsertRes.error) {
+      console.log(`[OnHouse Sync] Successfully saved map '${mapId}' for houseCode [${houseCode}] to Supabase DB!`);
       return { success: true };
     }
 
-    console.warn('Upsert fallback triggered:', upsertRes.error.message);
+    console.warn('[OnHouse Sync] Upsert fallback triggered:', upsertRes.error.message);
 
     // Fallback check if existing row exists
     const selectRes = await withTimeout(
@@ -260,10 +231,11 @@ export const saveHouseMapToDB = async (
       }
     }
 
+    console.log(`[OnHouse Sync] Successfully saved map '${mapId}' via fallback!`);
     return { success: true };
   } catch (err: any) {
-    console.error('Error in saveHouseMapToDB:', err);
-    return { success: false, error: err?.message || 'DB 저장 중 예외 발생 (네트워크/타임아웃)' };
+    console.error('[OnHouse Sync] Error in saveHouseMapToDB:', err);
+    return { success: false, error: err?.message || 'DB 저장 중 예외 발생' };
   }
 };
 

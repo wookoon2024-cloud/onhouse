@@ -941,19 +941,35 @@ export default function App() {
         case 'move':
           setOtherPlayers((prev) => {
             const existing = prev[msg.playerId];
-            if (!existing) return prev;
+            const updatedPlayer = existing
+              ? {
+                  ...existing,
+                  x: msg.x,
+                  y: msg.y,
+                  dir: msg.dir,
+                  isMoving: msg.isMoving,
+                  mapId: msg.mapId,
+                  isOnline: true,
+                  lastActive: Date.now()
+                }
+              : {
+                  id: msg.playerId,
+                  nickname: msg.nickname || '다른 플레이어',
+                  spriteType: msg.spriteType || 'char_a',
+                  x: msg.x,
+                  y: msg.y,
+                  dir: msg.dir || 'down',
+                  isMoving: msg.isMoving || false,
+                  statusMessage: '',
+                  hue: msg.hue || 0,
+                  charSize: msg.charSize || 1,
+                  mapId: msg.mapId || 'room',
+                  isOnline: true,
+                  lastActive: Date.now()
+                };
             return {
               ...prev,
-              [msg.playerId]: {
-                ...existing,
-                x: msg.x,
-                y: msg.y,
-                dir: msg.dir,
-                isMoving: msg.isMoving,
-                mapId: msg.mapId,
-                isOnline: true,
-                lastActive: Date.now()
-              }
+              [msg.playerId]: updatedPlayer
             };
           });
           break;
@@ -1207,6 +1223,10 @@ export default function App() {
     bcRef.current?.postMessage({
       type: 'move',
       playerId: deviceId.current,
+      nickname: localPlayer.nickname,
+      spriteType: localPlayer.spriteType,
+      hue: localPlayer.hue,
+      charSize: localPlayer.charSize,
       x,
       y,
       dir,
@@ -1235,6 +1255,10 @@ export default function App() {
     bcRef.current?.postMessage({
       type: 'move',
       playerId: deviceId.current,
+      nickname: localPlayer.nickname,
+      spriteType: localPlayer.spriteType,
+      hue: localPlayer.hue,
+      charSize: localPlayer.charSize,
       x: newX,
       y: newY,
       dir: 'down',
