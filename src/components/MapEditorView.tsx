@@ -1090,7 +1090,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         startRow = Math.floor(drawInfo.localIdx / tsInfo.cols);
       }
 
-      const isMultiTileObject = (tool === 'object' || ((cols > 1 || rows > 1) && editLayer === 'decor')) && selectedTile !== -1 && editLayer !== 'collision';
+      const isMultiTileObject = tool === 'object' && selectedTile !== -1 && editLayer !== 'collision';
 
       for (let dy = 0; dy < rows; dy++) {
         for (let dx = 0; dx < cols; dx++) {
@@ -2321,8 +2321,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                   const tsCols = tsInfo ? tsInfo.cols : tilesetCols;
                   const startCol = selInfo ? (selInfo.localIdx % tsCols) : 0;
                   const startRow = selInfo ? Math.floor(selInfo.localIdx / tsCols) : 0;
-                  const curCols = (paletteSelection && paletteSelection.tilesetKey === activeTileset && paletteSelection.cols > 1) ? paletteSelection.cols : (brushSize || 1);
-                  const curRows = (paletteSelection && paletteSelection.tilesetKey === activeTileset && paletteSelection.rows > 1) ? paletteSelection.rows : (brushSize || 1);
+                  const curCols = (paletteSelection && paletteSelection.tilesetKey === activeTileset) ? paletteSelection.cols : (brushSize || 1);
+                  const curRows = (paletteSelection && paletteSelection.tilesetKey === activeTileset) ? paletteSelection.rows : (brushSize || 1);
 
                   return (
                     <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "6px" }}>
@@ -2788,8 +2788,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                     const selDrawInfo = getTileDrawInfo(selectedTile, activeTileset);
                     const selCol = (selDrawInfo && selDrawInfo.tilesetKey === activeTileset) ? (selDrawInfo.localIdx % tilesetCols) : -1;
                     const selRow = (selDrawInfo && selDrawInfo.tilesetKey === activeTileset) ? Math.floor(selDrawInfo.localIdx / tilesetCols) : -1;
-                    const curCols = (paletteSelection && paletteSelection.tilesetKey === activeTileset && paletteSelection.cols > 1) ? paletteSelection.cols : 1;
-                    const curRows = (paletteSelection && paletteSelection.tilesetKey === activeTileset && paletteSelection.rows > 1) ? paletteSelection.rows : 1;
+                    const curCols = (paletteSelection && paletteSelection.tilesetKey === activeTileset) ? paletteSelection.cols : 1;
+                    const curRows = (paletteSelection && paletteSelection.tilesetKey === activeTileset) ? paletteSelection.rows : 1;
 
                     const isSelected = (selectedTile !== -1 && selCol !== -1) &&
                       (c >= selCol && c < selCol + curCols && r >= selRow && r < selRow + curRows);
