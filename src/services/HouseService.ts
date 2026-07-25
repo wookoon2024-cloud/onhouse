@@ -120,7 +120,7 @@ export const fetchHouseMaps = async (houseCode: string): Promise<Record<string, 
     const loadedMaps: Record<string, MapDefinition> = {};
     Object.entries(maps).forEach(([id, def]) => {
       if (!deletedMapIds.includes(id)) {
-        loadedMaps[id] = def;
+        loadedMaps[id] = JSON.parse(JSON.stringify(def));
       }
     });
 

@@ -48,44 +48,11 @@ export default function App() {
   const [houseCode, setHouseCodeState] = useState<string>(getSavedHouseCode);
   const [showHouseModal, setShowHouseModal] = useState<boolean>(false);
 
-  // 0. Active Maps (loads custom layouts from localStorage)
-  const [activeMaps, setActiveMaps] = useState<Record<string, MapDefinition>>(() => {
-    const loadedMaps: Record<string, MapDefinition> = { ...maps };
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('on_house_map_')) {
-        const mapId = key.replace('on_house_map_', '');
-        try {
-          const saved = localStorage.getItem(key);
-          if (saved) {
-            const parsed = JSON.parse(saved);
-            if (parsed && parsed.width && parsed.height && Array.isArray(parsed.baseLayer)) {
-              loadedMaps[mapId] = parsed;
-            }
-          }
-        } catch (e) {
-          console.error(`Failed to load custom map: ${mapId}`, e);
-        }
-      }
-    }
-    return loadedMaps;
-  });
+  // 0. Active Maps (loads house-isolated maps for current houseCode)
+  const [activeMaps, setActiveMaps] = useState<Record<string, MapDefinition>>(() => JSON.parse(JSON.stringify(maps)));
 
-  // 0.5. Available Map IDs displayed in top bar (1 to 4 maps)
-  const [availableMapIds, setAvailableMapIds] = useState<string[]>(() => {
-    const saved = localStorage.getItem('on_house_available_map_ids');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length >= 1 && parsed.length <= 4) {
-          return parsed;
-        }
-      } catch (e) {
-        console.error("Failed to parse availableMapIds", e);
-      }
-    }
-    return ['room', 'subway', 'park', 'apt'];
-  });
+  // 0.5. Available Map IDs displayed in top bar
+  const [availableMapIds, setAvailableMapIds] = useState<string[]>(['room', 'subway', 'park', 'apt']);
 
   const isMobileDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0 || window.innerWidth < 768;
 
@@ -873,6 +840,9 @@ export default function App() {
 
     // Reset other players list completely when joining a different house room!
     setOtherPlayers({});
+
+    // Reset activeMaps to fresh deep clones while fetching new house maps from DB
+    setActiveMaps(JSON.parse(JSON.stringify(maps)));
 
     // Reset house code state
     setHouseCodeState(formatted);
