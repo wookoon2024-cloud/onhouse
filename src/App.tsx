@@ -835,11 +835,6 @@ export default function App() {
         }
       });
 
-    // Periodic heartbeat to guarantee presence discovery across devices
-    const heartbeatTimer = setInterval(() => {
-      sendPlayerSync(localPlayerRef.current);
-    }, 3000);
-
     // Window unload / tab close listener to broadcast player_leave event
     const handleUnload = () => {
       try {
@@ -866,7 +861,6 @@ export default function App() {
     window.addEventListener('pagehide', handleUnload);
 
     return () => {
-      clearInterval(heartbeatTimer);
       handleUnload();
       window.removeEventListener('beforeunload', handleUnload);
       window.removeEventListener('pagehide', handleUnload);
