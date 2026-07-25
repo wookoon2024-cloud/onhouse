@@ -37,12 +37,12 @@ export function generateNickname(): string {
   return `${adj} ${noun} ${num}`;
 }
 
-// Get or create unique device ID
+// Get or create unique device ID for this tab/window session
 export function getOrCreateDeviceId(): string {
-  let id = localStorage.getItem('on_house_device_id');
+  let id = sessionStorage.getItem('on_house_device_id');
   if (!id) {
     id = 'dev_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now().toString(36);
-    localStorage.setItem('on_house_device_id', id);
+    sessionStorage.setItem('on_house_device_id', id);
   }
   return id;
 }

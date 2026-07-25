@@ -379,6 +379,22 @@ export default function App() {
           customCharData: customData
         }
       });
+
+      if (bcRef.current) {
+        bcRef.current.postMessage({
+          type: 'move',
+          playerId: playerData.id,
+          nickname: playerData.nickname,
+          spriteType: playerData.spriteType,
+          hue: playerData.hue,
+          charSize: playerData.charSize,
+          x: playerData.x,
+          y: playerData.y,
+          dir: playerData.dir,
+          isMoving: playerData.isMoving,
+          mapId: playerData.mapId
+        });
+      }
     } catch (e) {}
   };
 
