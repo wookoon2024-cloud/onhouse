@@ -2045,7 +2045,6 @@ export default function App() {
         availableMapIds={availableMapIds}
         activeMaps={activeMaps}
         onMapChange={handleMapChange}
-        onDeleteMap={handleDeleteMap}
       />
 
 
