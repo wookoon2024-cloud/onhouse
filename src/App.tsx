@@ -368,18 +368,34 @@ export default function App() {
     return null;
   };
 
+  const channelRef = useRef<RealtimeChannel | null>(null);
+
   const sendPlayerSync = (playerData: PlayerState) => {
     try {
       const customData = getCustomCharData(playerData.spriteType);
-      supabase.channel(`house:${houseCode}`).send({
-        type: 'broadcast',
-        event: 'player_sync',
-        payload: {
-          ...playerData,
-          customCharData: customData
-        }
-      });
 
+      // 1. Broadcast over active Supabase Realtime channel
+      if (channelRef.current) {
+        channelRef.current.send({
+          type: 'broadcast',
+          event: 'player_sync',
+          payload: {
+            ...playerData,
+            customCharData: customData
+          }
+        });
+      } else {
+        supabase.channel(`house:${houseCode}`).send({
+          type: 'broadcast',
+          event: 'player_sync',
+          payload: {
+            ...playerData,
+            customCharData: customData
+          }
+        });
+      }
+
+      // 2. Broadcast over BroadcastChannel for tabs on same device
       if (bcRef.current) {
         bcRef.current.postMessage({
           type: 'move',
@@ -457,6 +473,9 @@ export default function App() {
             [payload.id]: payload.player || { id: payload.id, nickname: joinName }
           };
         });
+
+        // Reply immediately so the joining player receives our presence state
+        sendPlayerSync(localPlayerRef.current);
       })
       .on('broadcast', { event: 'player_leave' }, ({ payload }) => {
         if (!payload || !payload.id || payload.id === deviceId.current) return;
@@ -794,6 +813,8 @@ export default function App() {
             }
           ]);
 
+          channelRef.current = channel;
+
           // Broadcast player_join to all clients
           channel.send({
             type: 'broadcast',
@@ -813,6 +834,11 @@ export default function App() {
           });
         }
       });
+
+    // Periodic heartbeat to guarantee presence discovery across devices
+    const heartbeatTimer = setInterval(() => {
+      sendPlayerSync(localPlayerRef.current);
+    }, 3000);
 
     // Window unload / tab close listener to broadcast player_leave event
     const handleUnload = () => {
@@ -840,9 +866,13 @@ export default function App() {
     window.addEventListener('pagehide', handleUnload);
 
     return () => {
+      clearInterval(heartbeatTimer);
       handleUnload();
       window.removeEventListener('beforeunload', handleUnload);
       window.removeEventListener('pagehide', handleUnload);
+      if (channelRef.current === channel) {
+        channelRef.current = null;
+      }
       supabase.removeChannel(channel);
     };
   }, [houseCode]);
