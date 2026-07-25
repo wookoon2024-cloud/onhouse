@@ -437,42 +437,15 @@ export default function App() {
       const fetchedMapIds = Object.keys(mapsData);
       if (fetchedMapIds.length > 0) {
         setAvailableMapIds(fetchedMapIds);
-        localStorage.setItem('on_house_available_map_ids', JSON.stringify(fetchedMapIds));
       }
     });
 
-    // 2. Load house custom assets from Supabase DB & merge with local cache
+    // 2. Load house custom assets from Supabase DB
     fetchHouseAssets(houseCode).then(({ mapTilesets, charSprites }) => {
-      let updated = false;
-      
-      // Merge map tilesets by ID
-      const savedMaps = localStorage.getItem('on_house_custom_map_tilesets');
-      const localMapsList: any[] = savedMaps ? JSON.parse(savedMaps) : [];
-      const mapMap = new Map();
-      localMapsList.forEach(m => mapMap.set(m.id, m));
-      mapTilesets.forEach(m => mapMap.set(m.id, m));
-      const mergedMaps = Array.from(mapMap.values());
-      if (mergedMaps.length > 0) {
-        localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(mergedMaps));
-        updated = true;
-      }
-
-      // Merge character sprites by ID
-      const savedChars = localStorage.getItem('on_house_custom_char_sprites');
-      const localCharsList: any[] = savedChars ? JSON.parse(savedChars) : [];
-      const charMap = new Map();
-      localCharsList.forEach(c => charMap.set(c.id, c));
-      charSprites.forEach(c => charMap.set(c.id, c));
-      const mergedChars = Array.from(charMap.values());
-      if (mergedChars.length > 0) {
-        localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(mergedChars));
-        updated = true;
-      }
-
-      if (updated) {
-        setAssetVersion((v) => v + 1);
-        window.dispatchEvent(new Event('on_house_sprites_updated'));
-      }
+      localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(mapTilesets));
+      localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(charSprites));
+      setAssetVersion((v) => v + 1);
+      window.dispatchEvent(new Event('on_house_sprites_updated'));
     });
 
     // 3. Connect Supabase Realtime channel for multi-device cross-pc sync
