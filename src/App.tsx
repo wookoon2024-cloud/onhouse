@@ -1361,6 +1361,16 @@ export default function App() {
     setActiveMaps((prev) => ({ ...prev, [newMapId]: newMapObj }));
     setAvailableMapIds((prev) => [...prev, newMapId]);
     saveHouseMapToDB(houseCode, newMapId, newMapObj);
+
+    // Broadcast new map to all players in H-1002!
+    try {
+      supabase.channel(`house:${houseCode}`).send({
+        type: 'broadcast',
+        event: 'map_update',
+        payload: { mapId: newMapId, mapData: newMapObj }
+      });
+    } catch (e) {}
+
     handleMapChange(newMapId);
   };
 
