@@ -36,9 +36,6 @@ export const setSavedHouseCode = (code: string) => {
 // Fetch deleted map IDs list for a house code
 export const fetchHouseDeletedMaps = async (houseCode: string): Promise<string[]> => {
   try {
-    const localSaved = localStorage.getItem('on_house_deleted_map_ids_' + houseCode);
-    const localDeleted: string[] = localSaved ? JSON.parse(localSaved) : [];
-
     const { data } = await supabase
       .from('house_assets')
       .select('asset_data')
@@ -54,19 +51,15 @@ export const fetchHouseDeletedMaps = async (houseCode: string): Promise<string[]
       });
     }
 
-    const merged = Array.from(new Set([...localDeleted, ...dbDeleted]));
-    localStorage.setItem('on_house_deleted_map_ids_' + houseCode, JSON.stringify(merged));
-    return merged;
+    return Array.from(new Set(dbDeleted));
   } catch (err) {
     return [];
   }
 };
 
-// Save deleted map IDs list to Supabase DB & localStorage
+// Save deleted map IDs list to Supabase DB
 export const saveHouseDeletedMapsToDB = async (houseCode: string, deletedIds: string[]) => {
   try {
-    localStorage.setItem('on_house_deleted_map_ids_' + houseCode, JSON.stringify(deletedIds));
-
     await supabase
       .from('house_assets')
       .delete()
@@ -84,7 +77,7 @@ export const saveHouseDeletedMapsToDB = async (houseCode: string, deletedIds: st
   } catch (err) {}
 };
 
-// Fetch or initialize all maps for a given house code
+// Fetch or initialize all maps for a given house code directly from Supabase DB
 export const fetchHouseMaps = async (houseCode: string): Promise<Record<string, MapDefinition>> => {
   try {
     // 0. Fetch deleted map IDs for this house code
@@ -98,26 +91,7 @@ export const fetchHouseMaps = async (houseCode: string): Promise<Record<string, 
       }
     });
 
-    // 2. Load all local map edits stored in localStorage (excluding deleted ones)
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('on_house_map_')) {
-        const mapId = key.replace('on_house_map_', '');
-        if (!deletedMapIds.includes(mapId)) {
-          try {
-            const val = localStorage.getItem(key);
-            if (val) {
-              const parsed = JSON.parse(val);
-              if (parsed && parsed.width && parsed.height && Array.isArray(parsed.baseLayer)) {
-                loadedMaps[mapId] = parsed;
-              }
-            }
-          } catch (e) {}
-        }
-      }
-    }
-
-    // 3. Fetch from Supabase DB and merge/override with cloud data (excluding deleted ones)
+    // 2. Fetch from Supabase DB and merge/override with cloud data (excluding deleted ones)
     const { data, error } = await supabase
       .from('house_maps')
       .select('map_id, map_data')
@@ -131,9 +105,6 @@ export const fetchHouseMaps = async (houseCode: string): Promise<Record<string, 
       data.forEach((row: { map_id: string; map_data: MapDefinition }) => {
         if (!deletedMapIds.includes(row.map_id) && row.map_data && row.map_data.width && row.map_data.height) {
           loadedMaps[row.map_id] = row.map_data;
-          try {
-            localStorage.setItem('on_house_map_' + row.map_id, JSON.stringify(row.map_data));
-          } catch (e) {}
         }
       });
     }
@@ -144,7 +115,7 @@ export const fetchHouseMaps = async (houseCode: string): Promise<Record<string, 
   }
 };
 
-// Save single map to Supabase
+// Save single map to Supabase DB
 export const saveHouseMapToDB = async (
   houseCode: string,
   mapId: string,
@@ -158,10 +129,7 @@ export const saveHouseMapToDB = async (
       await saveHouseDeletedMapsToDB(houseCode, nextDeleted);
     }
 
-    // 1. Also update localStorage cache immediately
-    localStorage.setItem('on_house_map_' + mapId, JSON.stringify(mapData));
-
-    // 2. Try upsert into Supabase
+    // Try upsert into Supabase DB
     const { error: upsertErr } = await supabase
       .from('house_maps')
       .upsert({
@@ -226,7 +194,7 @@ export const saveHouseMapToDB = async (
   }
 };
 
-// Delete map permanently from Supabase DB & localStorage
+// Delete map permanently from Supabase DB
 export const deleteHouseMapFromDB = async (
   houseCode: string,
   mapId: string
@@ -239,10 +207,7 @@ export const deleteHouseMapFromDB = async (
       await saveHouseDeletedMapsToDB(houseCode, deletedIds);
     }
 
-    // 2. Remove from localStorage cache
-    localStorage.removeItem('on_house_map_' + mapId);
-
-    // 3. Delete from Supabase house_maps table
+    // 2. Delete from Supabase house_maps table
     const { error } = await supabase
       .from('house_maps')
       .delete()

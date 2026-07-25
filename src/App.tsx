@@ -1346,13 +1346,8 @@ export default function App() {
 
     if (presetId && PRESET_MAP_TEMPLATES[presetId]) {
       newMapId = presetId;
-      const saved = localStorage.getItem('on_house_map_' + presetId);
-      if (saved) {
-        try {
-          newMapObj = JSON.parse(saved);
-        } catch {
-          newMapObj = PRESET_MAP_TEMPLATES[presetId].builder();
-        }
+      if (activeMaps[presetId]) {
+        newMapObj = activeMaps[presetId];
       } else {
         newMapObj = PRESET_MAP_TEMPLATES[presetId].builder();
       }
@@ -1365,7 +1360,7 @@ export default function App() {
 
     setActiveMaps((prev) => ({ ...prev, [newMapId]: newMapObj }));
     setAvailableMapIds((prev) => [...prev, newMapId]);
-    localStorage.setItem('on_house_map_' + newMapId, JSON.stringify(newMapObj));
+    saveHouseMapToDB(houseCode, newMapId, newMapObj);
     handleMapChange(newMapId);
   };
 
@@ -1380,7 +1375,6 @@ export default function App() {
 
     // Update local states
     setAvailableMapIds(nextAvailable);
-    localStorage.setItem('on_house_available_map_ids', JSON.stringify(nextAvailable));
 
     setActiveMaps((prev) => {
       const copy = { ...prev };
@@ -1388,13 +1382,10 @@ export default function App() {
       return copy;
     });
 
-    // 1. Delete from localStorage cache
-    localStorage.removeItem('on_house_map_' + mapId);
-
-    // 2. Delete permanently from Supabase Cloud DB!
+    // 1. Delete permanently from Supabase Cloud DB!
     await deleteHouseMapFromDB(houseCode, mapId);
 
-    // 3. Broadcast map_delete event to all connected players in the House
+    // 2. Broadcast map_delete event to all connected players in the House
     try {
       supabase.channel(`house:${houseCode}`).send({
         type: 'broadcast',
@@ -1418,10 +1409,7 @@ export default function App() {
       if (!target) return prev;
       const updatedMap = { ...target, name: newName.trim() };
 
-      // 1. Update localStorage
-      localStorage.setItem('on_house_map_' + mapId, JSON.stringify(updatedMap));
-
-      // 2. Save updated map name to Supabase Cloud DB
+      // Save updated map name to Supabase Cloud DB
       saveHouseMapToDB(houseCode, mapId, updatedMap);
 
       // 3. Broadcast map_update to all connected players
@@ -2445,18 +2433,16 @@ export default function App() {
 
             setAvailableMapIds((prev) => {
               if (!prev.includes(mapId)) {
-                const next = [...prev, mapId];
-                localStorage.setItem('on_house_available_map_ids', JSON.stringify(next));
-                return next;
+                return [...prev, mapId];
               }
               return prev;
             });
 
-            // Save to Supabase DB for this House!
+            // Save directly to Supabase DB for this House!
             saveHouseMapToDB(houseCode, mapId, updatedMap).then((res) => {
               if (res && !res.success) {
                 console.error('Supabase DB save error:', res.error);
-                alert(`⚠️ 클라우드 DB 저장 실패: ${res.error || '권한 또는 네트워크 오류'}\n(로컬 브라우저에만 저장되었습니다. 다른 사람에게 공유하려면 Supabase DB 저장이 성공해야 합니다.)`);
+                alert(`⚠️ 서버 DB 저장 실패: ${res.error || '권한 또는 네트워크 오류'}`);
               }
             });
 
