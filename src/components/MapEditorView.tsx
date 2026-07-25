@@ -114,8 +114,23 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   const lastPaintedCellRef = useRef<{ x: number; y: number } | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  const [customMapTilesets] = useState<TilesetOption[]>(getCustomMapTilesets);
+  const [customMapTilesets, setCustomMapTilesets] = useState<TilesetOption[]>(getCustomMapTilesets);
   const [activeTileset, setActiveTileset] = useState<string>(localMap.tileset);
+
+  useEffect(() => {
+    const syncCustomTilesets = () => {
+      setCustomMapTilesets(getCustomMapTilesets());
+    };
+
+    window.addEventListener('on_house_sprites_updated', syncCustomTilesets);
+    window.addEventListener('storage', syncCustomTilesets);
+    syncCustomTilesets();
+
+    return () => {
+      window.removeEventListener('on_house_sprites_updated', syncCustomTilesets);
+      window.removeEventListener('storage', syncCustomTilesets);
+    };
+  }, []);
 
   const getTilesetInfoLocal = (ts: string) => {
     const foundCustom = customMapTilesets.find(t => t.id === ts);

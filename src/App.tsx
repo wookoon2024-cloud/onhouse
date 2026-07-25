@@ -471,6 +471,7 @@ export default function App() {
 
       if (updated) {
         setAssetVersion((v) => v + 1);
+        window.dispatchEvent(new Event('on_house_sprites_updated'));
       }
     });
 
