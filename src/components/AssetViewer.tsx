@@ -137,8 +137,14 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     new Map([...DEFAULT_CHARACTER_SPRITES, ...customCharSprites].map((c) => [c.id, c])).values()
   ).map((opt) => {
     const override = charImageOverrides[opt.id];
-    if (override) {
-      return { ...opt, url: override.url, rows: override.rows, cols: override.cols, size: opt.size || 16 };
+    if (override && override.url && typeof override.url === 'string' && override.url.trim().length > 10) {
+      return {
+        ...opt,
+        url: override.url,
+        rows: override.rows || opt.rows,
+        cols: override.cols || opt.cols,
+        size: override.size || opt.size || 16
+      };
     }
     return opt;
   });
@@ -1955,13 +1961,33 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 position: 'relative',
                 width: `${currentOption.cols * visualCellSize}px`,
                 height: `${currentOption.rows * visualCellSize}px`,
-                backgroundImage: `url(${currentOption.url})`,
-                backgroundSize: '100% 100%',
-                imageRendering: 'pixelated',
                 cursor: 'pointer',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
+                boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+                overflow: 'hidden',
+                background: '#0a0a0f'
               }}
             >
+              {/* Background Sprite Image with onError fallback */}
+              <img
+                src={currentOption.url}
+                alt={currentOption.name}
+                onError={(e) => {
+                  const defaultOpt = DEFAULT_CHARACTER_SPRITES.find((c) => c.id === currentOption.id);
+                  if (defaultOpt && defaultOpt.url) {
+                    (e.currentTarget as HTMLImageElement).src = defaultOpt.url;
+                  }
+                }}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  imageRendering: 'pixelated',
+                  pointerEvents: 'none',
+                  objectFit: 'fill'
+                }}
+              />
               {/* Individual Interactive Tile Drag & Context Overlay Cells */}
               {Array.from({ length: currentOption.rows }).map((_, rIdx) =>
                 Array.from({ length: currentOption.cols }).map((_, cIdx) => (
