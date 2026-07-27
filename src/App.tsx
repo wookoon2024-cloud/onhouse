@@ -53,6 +53,7 @@ export default function App() {
 
   // 0.5. Available Map IDs displayed in top bar
   const [availableMapIds, setAvailableMapIds] = useState<string[]>(['room', 'subway', 'park', 'apt']);
+  const [dbCustomCharSprites, setDbCustomCharSprites] = useState<any[]>([]);
 
   const isMobileDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0 || window.innerWidth < 768;
 
@@ -441,6 +442,7 @@ export default function App() {
 
     // 2. Load house custom assets from Supabase DB
     fetchHouseAssets(houseCode).then(({ mapTilesets, charSprites, charOverrides, charRowActions }) => {
+      setDbCustomCharSprites(charSprites || []);
       localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(mapTilesets));
       localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(charSprites));
       if (charOverrides) {
@@ -2180,6 +2182,7 @@ export default function App() {
       {isCustomizing && (
         <Customizer
           player={localPlayer}
+          customCharSprites={dbCustomCharSprites}
           onChange={(updates) => {
             setLocalPlayer((prev) => {
               const nextSprite = updates.spriteType || prev.spriteType;

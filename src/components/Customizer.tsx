@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase';
 
 interface CustomizerProps {
   player: PlayerState;
+  customCharSprites?: Array<{ id: string; name: string }>;
   onChange: (updates: Partial<PlayerState>) => void;
   onClose: () => void;
 }
@@ -17,9 +18,10 @@ const DEFAULT_CHARACTERS = [
   { id: 'pig', name: '🐷 아기 돼지' },
 ];
 
-export const Customizer: React.FC<CustomizerProps> = ({ player, onChange, onClose }) => {
-  // Load custom created character sprites from localStorage
+export const Customizer: React.FC<CustomizerProps> = ({ player, customCharSprites, onChange, onClose }) => {
+  // Load custom created character sprites from DB props or localStorage
   const [customChars, setCustomChars] = useState<Array<{ id: string; name: string }>>(() => {
+    if (customCharSprites && Array.isArray(customCharSprites)) return customCharSprites;
     try {
       const saved = localStorage.getItem('on_house_custom_char_sprites');
       return saved ? JSON.parse(saved) : [];
@@ -27,6 +29,12 @@ export const Customizer: React.FC<CustomizerProps> = ({ player, onChange, onClos
       return [];
     }
   });
+
+  useEffect(() => {
+    if (customCharSprites && Array.isArray(customCharSprites)) {
+      setCustomChars(customCharSprites);
+    }
+  }, [customCharSprites]);
 
   // Re-sync character options dynamically whenever sprites are updated or loaded from DB
   useEffect(() => {
