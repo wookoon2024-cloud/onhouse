@@ -1543,6 +1543,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       } catch (e) {}
 
       setSaveProgressText('✅ 에셋 저장 완료!');
+      window.dispatchEvent(new Event('on_house_sprites_updated'));
 
       setTimeout(() => {
         setFileDataUrl(null);
