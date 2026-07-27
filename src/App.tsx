@@ -440,9 +440,17 @@ export default function App() {
     });
 
     // 2. Load house custom assets from Supabase DB
-    fetchHouseAssets(houseCode).then(({ mapTilesets, charSprites }) => {
+    fetchHouseAssets(houseCode).then(({ mapTilesets, charSprites, charOverrides, charRowActions }) => {
       localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(mapTilesets));
       localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(charSprites));
+      if (charOverrides) {
+        localStorage.setItem('on_house_char_image_overrides', JSON.stringify(charOverrides));
+      }
+      if (charRowActions) {
+        const existingActionsStr = localStorage.getItem('on_house_char_row_actions');
+        const existingActions = existingActionsStr ? JSON.parse(existingActionsStr) : {};
+        localStorage.setItem('on_house_char_row_actions', JSON.stringify({ ...existingActions, ...charRowActions }));
+      }
       setAssetVersion((v) => v + 1);
       window.dispatchEvent(new Event('on_house_sprites_updated'));
     });
@@ -693,8 +701,28 @@ export default function App() {
             } catch (e) {}
           }
 
-          window.dispatchEvent(new Event('on_house_sprites_updated'));
-          setAssetVersion((v) => v + 1);
+        } else if (assetType === 'char_image_override') {
+          if (assetData && assetData.id) {
+            try {
+              const overridesSaved = localStorage.getItem('on_house_char_image_overrides');
+              const overrides = overridesSaved ? JSON.parse(overridesSaved) : {};
+              overrides[assetData.id] = assetData;
+              localStorage.setItem('on_house_char_image_overrides', JSON.stringify(overrides));
+              window.dispatchEvent(new Event('on_house_sprites_updated'));
+              setAssetVersion((v) => v + 1);
+            } catch (e) {}
+          }
+        } else if (assetType === 'char_row_actions') {
+          if (assetData && assetData.id && assetData.actions) {
+            try {
+              const savedActions = localStorage.getItem('on_house_char_row_actions');
+              const actionsMap = savedActions ? JSON.parse(savedActions) : {};
+              actionsMap[assetData.id] = assetData.actions;
+              localStorage.setItem('on_house_char_row_actions', JSON.stringify(actionsMap));
+              window.dispatchEvent(new Event('on_house_sprites_updated'));
+              setAssetVersion((v) => v + 1);
+            } catch (e) {}
+          }
         }
       })
       .on('broadcast', { event: 'dm_request' }, ({ payload }) => {

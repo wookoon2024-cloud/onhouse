@@ -257,6 +257,13 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
 
           // Save to Supabase DB
           saveHouseAssetToDB(currentHouseCode, 'char_sprite', assetData);
+          saveHouseAssetToDB(currentHouseCode, 'char_image_override', {
+            id,
+            url: override.url,
+            cols: override.cols || foundOpt?.cols || 4,
+            rows: override.rows || foundOpt?.rows || 7,
+            size: override.size || 16
+          });
 
           // Broadcast to Realtime channel
           try {
@@ -266,6 +273,20 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
               payload: {
                 assetType: 'char_sprite',
                 assetData
+              }
+            });
+            supabase.channel(`house:${currentHouseCode}`).send({
+              type: 'broadcast',
+              event: 'asset_update',
+              payload: {
+                assetType: 'char_image_override',
+                assetData: {
+                  id,
+                  url: override.url,
+                  cols: override.cols || foundOpt?.cols || 4,
+                  rows: override.rows || foundOpt?.rows || 7,
+                  size: override.size || 16
+                }
               }
             });
           } catch (e) {}
@@ -278,6 +299,29 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       console.warn('Failed to save char image overrides', e);
     }
   }, [charImageOverrides]);
+
+  // Persist charRowActions to localStorage & Supabase Cloud DB
+  useEffect(() => {
+    try {
+      localStorage.setItem('on_house_char_row_actions', JSON.stringify(charRowActions));
+
+      const currentHouseCode = getSavedHouseCode();
+      Object.entries(charRowActions).forEach(([id, actions]) => {
+        const assetData = { id, actions };
+        saveHouseAssetToDB(currentHouseCode, 'char_row_actions', assetData);
+        try {
+          supabase.channel(`house:${currentHouseCode}`).send({
+            type: 'broadcast',
+            event: 'asset_update',
+            payload: {
+              assetType: 'char_row_actions',
+              assetData
+            }
+          });
+        } catch (e) {}
+      });
+    } catch (e) {}
+  }, [charRowActions]);
 
   // Keyboard Arrow Keys Nudging for Crop Modal
   useEffect(() => {

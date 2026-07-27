@@ -280,7 +280,7 @@ export const deleteHouseMapFromDB = async (
   }
 };
 
-// Fetch custom assets (map tilesets & character sprites) for house code
+// Fetch custom assets (map tilesets, character sprites, image overrides & action rows) for house code
 export const fetchHouseAssets = async (houseCode: string) => {
   try {
     const res = await withTimeout(
@@ -293,6 +293,8 @@ export const fetchHouseAssets = async (houseCode: string) => {
 
     const mapTilesets: any[] = [];
     const charSprites: any[] = [];
+    const charOverrides: Record<string, any> = {};
+    const charRowActions: Record<string, string[]> = {};
 
     if (res.data) {
       res.data.forEach((row: any) => {
@@ -300,6 +302,10 @@ export const fetchHouseAssets = async (houseCode: string) => {
           mapTilesets.push(row.asset_data);
         } else if (row.asset_type === 'char_sprite' && row.asset_data) {
           charSprites.push(row.asset_data);
+        } else if (row.asset_type === 'char_image_override' && row.asset_data && row.asset_data.id) {
+          charOverrides[row.asset_data.id] = row.asset_data;
+        } else if (row.asset_type === 'char_row_actions' && row.asset_data && row.asset_data.id && row.asset_data.actions) {
+          charRowActions[row.asset_data.id] = row.asset_data.actions;
         }
       });
     }
@@ -308,26 +314,53 @@ export const fetchHouseAssets = async (houseCode: string) => {
     try {
       localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(mapTilesets));
       localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(charSprites));
+      localStorage.setItem('on_house_char_image_overrides', JSON.stringify(charOverrides));
+      const existingActionsStr = localStorage.getItem('on_house_char_row_actions');
+      const existingActions = existingActionsStr ? JSON.parse(existingActionsStr) : {};
+      const mergedActions = { ...existingActions, ...charRowActions };
+      localStorage.setItem('on_house_char_row_actions', JSON.stringify(mergedActions));
     } catch (e) {}
 
-    return { mapTilesets, charSprites };
+    return { mapTilesets, charSprites, charOverrides, charRowActions };
   } catch (err) {
     console.warn('Supabase fetchHouseAssets warning/timeout:', err);
     let mapTilesets: any[] = [];
     let charSprites: any[] = [];
+    let charOverrides: Record<string, any> = {};
+    let charRowActions: Record<string, string[]> = {};
     try {
       const savedMaps = localStorage.getItem('on_house_custom_map_tilesets');
       if (savedMaps) mapTilesets = JSON.parse(savedMaps);
       const savedChars = localStorage.getItem('on_house_custom_char_sprites');
       if (savedChars) charSprites = JSON.parse(savedChars);
+      const savedOverrides = localStorage.getItem('on_house_char_image_overrides');
+      if (savedOverrides) charOverrides = JSON.parse(savedOverrides);
+      const savedActions = localStorage.getItem('on_house_char_row_actions');
+      if (savedActions) charRowActions = JSON.parse(savedActions);
     } catch (e) {}
-    return { mapTilesets, charSprites };
+    return { mapTilesets, charSprites, charOverrides, charRowActions };
   }
 };
 
 // Save custom asset to Supabase
-export const saveHouseAssetToDB = async (houseCode: string, assetType: 'map_tileset' | 'char_sprite', assetData: any) => {
+export const saveHouseAssetToDB = async (
+  houseCode: string,
+  assetType: 'map_tileset' | 'char_sprite' | 'char_image_override' | 'char_row_actions',
+  assetData: any
+) => {
   try {
+    if (assetData && assetData.id) {
+      await withTimeout(
+        supabase
+          .from('house_assets')
+          .delete()
+          .eq('house_code', houseCode)
+          .eq('asset_type', assetType)
+          .filter('asset_data->>id', 'eq', assetData.id),
+        3000
+      ).catch(() => {});
+    }
+
     const res = await withTimeout(
       supabase
         .from('house_assets')
@@ -352,7 +385,11 @@ export const saveHouseAssetToDB = async (houseCode: string, assetType: 'map_tile
 };
 
 // Delete custom asset from Supabase DB
-export const deleteHouseAssetFromDB = async (houseCode: string, assetType: 'map_tileset' | 'char_sprite', assetId: string) => {
+export const deleteHouseAssetFromDB = async (
+  houseCode: string,
+  assetType: 'map_tileset' | 'char_sprite' | 'char_image_override' | 'char_row_actions',
+  assetId: string
+) => {
   try {
     await withTimeout(
       supabase
