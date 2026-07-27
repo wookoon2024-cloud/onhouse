@@ -35,7 +35,7 @@ interface MapEditorViewProps {
   activeMaps: Record<string, MapDefinition>;
   availableMapIds: string[];
   onSaveMap: (mapId: string, updatedMap: MapDefinition) => void;
-  onAddMap: (presetId?: string, customName?: string) => void;
+  onAddMap: (presetId?: string, customName?: string) => string;
   onDeleteMap: (mapId: string) => void;
   onRenameMap?: (mapId: string, newName: string) => void;
   onClose: () => void;
@@ -2907,8 +2907,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                     key={key}
                     disabled={isAlreadyAdded}
                     onClick={() => {
-                      onAddMap(key);
-                      setSelectedMapId(key);
+                      const newId = onAddMap(key);
+                      if (newId) setSelectedMapId(newId);
                       setShowAddModal(false);
                     }}
                     style={{
@@ -2935,7 +2935,9 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               onSubmit={(e) => {
                 e.preventDefault();
                 const name = customNameInput.trim() || `🎨 커스텀 맵 ${availableMapIds.length + 1}`;
-                onAddMap(undefined, name);
+                const newId = onAddMap(undefined, name);
+                if (newId) setSelectedMapId(newId);
+                setCustomNameInput('');
                 setShowAddModal(false);
               }}
               style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '14px' }}

@@ -1425,10 +1425,10 @@ export default function App() {
   };
 
   // 2.5. Add Map and Delete Map Handlers
-  const handleAddMap = (presetId?: string, customName?: string) => {
+  const handleAddMap = (presetId?: string, customName?: string): string => {
     if (availableMapIds.length >= 4) {
       alert("맵은 최대 4개까지만 설정할 수 있습니다.");
-      return;
+      return '';
     }
 
     let newMapId = '';
@@ -1462,6 +1462,7 @@ export default function App() {
     } catch (e) {}
 
     handleMapChange(newMapId);
+    return newMapId;
   };
 
   const handleDeleteMap = async (mapId: string) => {
