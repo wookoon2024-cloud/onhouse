@@ -287,7 +287,9 @@ export const fetchHouseAssets = async (houseCode: string) => {
       supabase
         .from('house_assets')
         .select('asset_type, asset_data')
-        .eq('house_code', houseCode),
+        .eq('house_code', houseCode)
+        .order('id', { ascending: false })
+        .limit(100),
       3500
     );
 
@@ -295,17 +297,34 @@ export const fetchHouseAssets = async (houseCode: string) => {
     const charSprites: any[] = [];
     const charOverrides: Record<string, any> = {};
     const charRowActions: Record<string, string[]> = {};
+    const deletedAssetIds = new Set<string>();
+    const seenCharSpriteIds = new Set<string>();
+    const seenMapTilesetIds = new Set<string>();
 
     if (res.data) {
       res.data.forEach((row: any) => {
-        if (row.asset_type === 'map_tileset' && row.asset_data) {
-          mapTilesets.push(row.asset_data);
-        } else if (row.asset_type === 'char_sprite' && row.asset_data) {
-          charSprites.push(row.asset_data);
-        } else if (row.asset_type === 'char_image_override' && row.asset_data && row.asset_data.id) {
-          charOverrides[row.asset_data.id] = row.asset_data;
-        } else if (row.asset_type === 'char_row_actions' && row.asset_data && row.asset_data.id && row.asset_data.actions) {
-          charRowActions[row.asset_data.id] = row.asset_data.actions;
+        if (!row.asset_data) return;
+
+        if (row.asset_type === 'char_delete' && row.asset_data.id) {
+          deletedAssetIds.add(row.asset_data.id);
+        } else if (row.asset_type === 'map_tileset' && row.asset_data.id) {
+          if (!seenMapTilesetIds.has(row.asset_data.id) && !deletedAssetIds.has(row.asset_data.id)) {
+            seenMapTilesetIds.add(row.asset_data.id);
+            mapTilesets.push(row.asset_data);
+          }
+        } else if (row.asset_type === 'char_sprite' && row.asset_data.id) {
+          if (!seenCharSpriteIds.has(row.asset_data.id) && !deletedAssetIds.has(row.asset_data.id)) {
+            seenCharSpriteIds.add(row.asset_data.id);
+            charSprites.push(row.asset_data);
+          }
+        } else if (row.asset_type === 'char_image_override' && row.asset_data.id) {
+          if (!charOverrides[row.asset_data.id] && !deletedAssetIds.has(row.asset_data.id)) {
+            charOverrides[row.asset_data.id] = row.asset_data;
+          }
+        } else if (row.asset_type === 'char_row_actions' && row.asset_data.id && row.asset_data.actions) {
+          if (!charRowActions[row.asset_data.id] && !deletedAssetIds.has(row.asset_data.id)) {
+            charRowActions[row.asset_data.id] = row.asset_data.actions;
+          }
         }
       });
     }
@@ -342,25 +361,13 @@ export const fetchHouseAssets = async (houseCode: string) => {
   }
 };
 
-// Save custom asset to Supabase
+// Save custom asset to Supabase (Fast insert without slow unindexed JSON filter scan)
 export const saveHouseAssetToDB = async (
   houseCode: string,
   assetType: 'map_tileset' | 'char_sprite' | 'char_image_override' | 'char_row_actions',
   assetData: any
 ) => {
   try {
-    if (assetData && assetData.id) {
-      await withTimeout(
-        supabase
-          .from('house_assets')
-          .delete()
-          .eq('house_code', houseCode)
-          .eq('asset_type', assetType)
-          .filter('asset_data->>id', 'eq', assetData.id),
-        3000
-      ).catch(() => {});
-    }
-
     const res = await withTimeout(
       supabase
         .from('house_assets')
@@ -384,7 +391,7 @@ export const saveHouseAssetToDB = async (
   }
 };
 
-// Delete custom asset from Supabase DB
+// Delete custom asset from Supabase DB (Fast tombstone insert)
 export const deleteHouseAssetFromDB = async (
   houseCode: string,
   assetType: 'map_tileset' | 'char_sprite' | 'char_image_override' | 'char_row_actions',
@@ -394,10 +401,12 @@ export const deleteHouseAssetFromDB = async (
     await withTimeout(
       supabase
         .from('house_assets')
-        .delete()
-        .eq('house_code', houseCode)
-        .eq('asset_type', assetType)
-        .filter('asset_data->>id', 'eq', assetId),
+        .insert({
+          house_code: houseCode,
+          asset_type: 'char_delete',
+          asset_data: { id: assetId },
+          updated_at: new Date().toISOString()
+        }),
       3500
     );
 
