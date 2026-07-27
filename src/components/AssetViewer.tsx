@@ -177,6 +177,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   const [imgHeight, setImgHeight] = useState<number>(0);
   const [customColsInput, setCustomColsInput] = useState<number>(4);
   const [customRowsInput, setCustomRowsInput] = useState<number>(9);
+  const [customMarginInput, setCustomMarginInput] = useState<number>(0);
+  const [customSpacingInput, setCustomSpacingInput] = useState<number>(0);
   const [isNormalizing, setIsNormalizing] = useState<boolean>(false);
   const [previewZoom, setPreviewZoom] = useState<number>(1.0); // 1.0 (Fit), 1.5x, 2.0x, 3.0x, 4.0x
 
@@ -1219,10 +1221,12 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
         setImgWidth(img.width);
         setImgHeight(img.height);
 
+        setImgHeight(img.height);
+
         const currentTileSize = tileSizeInput || (uploadCategory === 'map' ? 16 : 16);
         if (uploadCategory === 'map') {
-          const autoCols = Math.max(1, Math.floor(img.width / currentTileSize));
-          const autoRows = Math.max(1, Math.floor(img.height / currentTileSize));
+          const autoCols = Math.max(1, Math.floor((img.width - customMarginInput * 2 + customSpacingInput) / (currentTileSize + customSpacingInput)));
+          const autoRows = Math.max(1, Math.floor((img.height - customMarginInput * 2 + customSpacingInput) / (currentTileSize + customSpacingInput)));
           setCustomColsInput(autoCols);
           setCustomRowsInput(autoRows);
         } else {
@@ -1238,20 +1242,82 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     reader.readAsDataURL(file);
   };
 
+  const recalculateDimensions = (
+    newSize: number = tileSizeInput,
+    margin: number = customMarginInput,
+    spacing: number = customSpacingInput,
+    w: number = imgWidth,
+    h: number = imgHeight,
+    cat: MainCategory = uploadCategory
+  ) => {
+    if (w <= 0 || h <= 0) return;
+    if (cat === 'map') {
+      const autoCols = Math.max(1, Math.floor((w - margin * 2 + spacing) / (newSize + spacing)));
+      const autoRows = Math.max(1, Math.floor((h - margin * 2 + spacing) / (newSize + spacing)));
+      setCustomColsInput(autoCols);
+      setCustomRowsInput(autoRows);
+    }
+  };
+
+  const handleMarginChange = (marginVal: number) => {
+    const m = Math.max(0, marginVal);
+    setCustomMarginInput(m);
+    recalculateDimensions(tileSizeInput, m, customSpacingInput);
+  };
+
+  const handleSpacingChange = (spacingVal: number) => {
+    const s = Math.max(0, spacingVal);
+    setCustomSpacingInput(s);
+    recalculateDimensions(tileSizeInput, customMarginInput, s);
+  };
+
   const handleTileSizeSelect = (newSize: number) => {
     setTileSizeInput(newSize);
-    if (imgWidth > 0 && imgHeight > 0) {
-      if (uploadCategory === 'map') {
-        const autoCols = Math.max(1, Math.floor(imgWidth / newSize));
-        const autoRows = Math.max(1, Math.floor(imgHeight / newSize));
-        setCustomColsInput(autoCols);
-        setCustomRowsInput(autoRows);
-      } else {
-        const autoCols = customColsInput || 4;
-        const autoRows = Math.max(1, Math.floor(imgHeight / (imgWidth / autoCols)));
-        setCustomRowsInput(autoRows);
+    recalculateDimensions(newSize, customMarginInput, customSpacingInput);
+  };
+
+  // Helper to slice tiles with margin & spacing into a 100% clean gapless tileset PNG
+  const extractCleanTilesetImage = (
+    sourceUrl: string,
+    cols: number,
+    rows: number,
+    tSize: number,
+    margin: number,
+    spacing: number
+  ): Promise<string> => {
+    return new Promise((resolve) => {
+      if (margin === 0 && spacing === 0) {
+        resolve(sourceUrl);
+        return;
       }
-    }
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = cols * tSize;
+        canvas.height = rows * tSize;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(sourceUrl);
+          return;
+        }
+        ctx.imageSmoothingEnabled = false;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const sx = margin + c * (tSize + spacing);
+            const sy = margin + r * (tSize + spacing);
+            const dx = c * tSize;
+            const dy = r * tSize;
+            ctx.drawImage(img, sx, sy, tSize, tSize, dx, dy, tSize, tSize);
+          }
+        }
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.onerror = () => resolve(sourceUrl);
+      img.src = sourceUrl;
+    });
   };
 
   // Smart Auto-Trim & Normalizer Algorithm for Custom Sprite Sheets
@@ -1504,6 +1570,19 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       } else if (fileDataUrl) {
         cols = customColsInput || Math.max(1, Math.floor(imgWidth / tSize));
         rows = customRowsInput || Math.max(1, Math.floor(imgHeight / tSize));
+
+        // Automatic Gap & Margin Extraction for Map Tilesets
+        if (uploadCategory === 'map' && (customSpacingInput > 0 || customMarginInput > 0)) {
+          setSaveProgressText('✂️ 타일 간격/검은줄 제거 및 픽셀 규격화 정제 중...');
+          finalUrl = await extractCleanTilesetImage(
+            fileDataUrl,
+            cols,
+            rows,
+            tSize,
+            customMarginInput,
+            customSpacingInput
+          );
+        }
       } else {
         alert("맵 타일셋의 경우 이미지 파일을 선택해 주세요!");
         setIsSavingAsset(false);
@@ -3142,6 +3221,43 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 </select>
               </div>
 
+              {/* Spacing & Margin Controls for Map Tilesets */}
+              {uploadCategory === 'map' && (
+                <div style={{ display: 'flex', gap: '8px', background: '#101018', padding: '8px 10px', border: '1px solid #3b3b54' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: '10px', color: '#a78bfa', display: 'block', marginBottom: '3px', fontWeight: 'normal' }}>
+                      ✏️ 타일 간격 (Spacing/검은줄 px):
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={16}
+                      value={customSpacingInput}
+                      disabled={isSavingAsset}
+                      onChange={(e) => handleSpacingChange(parseInt(e.target.value, 10) || 0)}
+                      placeholder="예: 1 (검은줄 1px)"
+                      style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '4px 8px', color: '#fff', fontSize: '11px', textAlign: 'center', fontWeight: 'normal' }}
+                    />
+                  </div>
+
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: '10px', color: '#aaa', display: 'block', marginBottom: '3px' }}>
+                      외곽 여백 (Margin px):
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={16}
+                      value={customMarginInput}
+                      disabled={isSavingAsset}
+                      onChange={(e) => handleMarginChange(parseInt(e.target.value, 10) || 0)}
+                      placeholder="예: 0"
+                      style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '4px 8px', color: '#fff', fontSize: '11px', textAlign: 'center', fontWeight: 'normal' }}
+                    />
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label style={{ fontSize: '11px', color: '#aaa', display: 'block', marginBottom: '6px' }}>
                   {uploadCategory === 'character' ? "이미지 파일 선택 (선택 사항):" : "이미지 파일 선택 (필수):"}
@@ -3219,22 +3335,33 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                         imageRendering: 'pixelated'
                       }}>
                         {/* Grid Lines Overlay */}
-                        <div style={{
-                          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-                          backgroundImage: `linear-gradient(rgba(255, 121, 198, 0.45) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 121, 198, 0.45) 1px, transparent 1px)`,
-                          backgroundSize: `${100 / Math.max(1, customColsInput)}% ${100 / Math.max(1, customRowsInput)}%`,
-                          pointerEvents: 'none'
-                        }} />
-                        {/* Top Left Sample Cell Highlight */}
-                        <div style={{
-                          position: 'absolute', top: 0, left: 0,
-                          width: `${100 / Math.max(1, customColsInput)}%`,
-                          height: `${100 / Math.max(1, customRowsInput)}%`,
-                          border: '2px solid #ff79c6',
-                          background: 'rgba(255, 121, 198, 0.3)',
-                          boxSizing: 'border-box',
-                          pointerEvents: 'none'
-                        }} />
+                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none' }}>
+                          {Array.from({ length: customColsInput }).map((_, c) =>
+                            Array.from({ length: customRowsInput }).map((_, r) => {
+                              const leftPct = ((customMarginInput + c * (tileSizeInput + customSpacingInput)) / imgWidth) * 100;
+                              const topPct = ((customMarginInput + r * (tileSizeInput + customSpacingInput)) / imgHeight) * 100;
+                              const widthPct = (tileSizeInput / imgWidth) * 100;
+                              const heightPct = (tileSizeInput / imgHeight) * 100;
+                              const isFirst = c === 0 && r === 0;
+
+                              return (
+                                <div
+                                  key={`${c}-${r}`}
+                                  style={{
+                                    position: 'absolute',
+                                    left: `${leftPct}%`,
+                                    top: `${topPct}%`,
+                                    width: `${widthPct}%`,
+                                    height: `${heightPct}%`,
+                                    border: isFirst ? '2px solid #ff79c6' : '1px solid rgba(255, 121, 198, 0.45)',
+                                    background: isFirst ? 'rgba(255, 121, 198, 0.3)' : 'transparent',
+                                    boxSizing: 'border-box'
+                                  }}
+                                />
+                              );
+                            })
+                          )}
+                        </div>
                       </div>
                     ) : (
                       /* Magnified Zoomed Mode (Exact Pixel Scrollable Canvas) */
@@ -3249,22 +3376,33 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                         imageRendering: 'pixelated'
                       }}>
                         {/* Grid Lines Overlay */}
-                        <div style={{
-                          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-                          backgroundImage: `linear-gradient(rgba(255, 121, 198, 0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 121, 198, 0.5) 1px, transparent 1px)`,
-                          backgroundSize: `${(imgWidth * previewZoom) / Math.max(1, customColsInput)}px ${(imgHeight * previewZoom) / Math.max(1, customRowsInput)}px`,
-                          pointerEvents: 'none'
-                        }} />
-                        {/* Top Left Sample Cell Highlight */}
-                        <div style={{
-                          position: 'absolute', top: 0, left: 0,
-                          width: `${(imgWidth * previewZoom) / Math.max(1, customColsInput)}px`,
-                          height: `${(imgHeight * previewZoom) / Math.max(1, customRowsInput)}px`,
-                          border: '2px solid #ff79c6',
-                          background: 'rgba(255, 121, 198, 0.3)',
-                          boxSizing: 'border-box',
-                          pointerEvents: 'none'
-                        }} />
+                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none' }}>
+                          {Array.from({ length: customColsInput }).map((_, c) =>
+                            Array.from({ length: customRowsInput }).map((_, r) => {
+                              const leftPx = (customMarginInput + c * (tileSizeInput + customSpacingInput)) * previewZoom;
+                              const topPx = (customMarginInput + r * (tileSizeInput + customSpacingInput)) * previewZoom;
+                              const widthPx = tileSizeInput * previewZoom;
+                              const heightPx = tileSizeInput * previewZoom;
+                              const isFirst = c === 0 && r === 0;
+
+                              return (
+                                <div
+                                  key={`${c}-${r}`}
+                                  style={{
+                                    position: 'absolute',
+                                    left: `${leftPx}px`,
+                                    top: `${topPx}px`,
+                                    width: `${widthPx}px`,
+                                    height: `${heightPx}px`,
+                                    border: isFirst ? '2px solid #ff79c6' : '1px solid rgba(255, 121, 198, 0.5)',
+                                    background: isFirst ? 'rgba(255, 121, 198, 0.3)' : 'transparent',
+                                    boxSizing: 'border-box'
+                                  }}
+                                />
+                              );
+                            })
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
