@@ -171,7 +171,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   const [showUploadModal, setShowUploadModal] = useState<boolean>(false);
   const [uploadCategory, setUploadCategory] = useState<MainCategory>('character');
   const [assetNameInput, setAssetNameInput] = useState<string>('');
-  const [tileSizeInput, setTileSizeInput] = useState<number>(32);
+  const [tileSizeInput, setTileSizeInput] = useState<number>(16);
   const [fileDataUrl, setFileDataUrl] = useState<string | null>(null);
   const [imgWidth, setImgWidth] = useState<number>(0);
   const [imgHeight, setImgHeight] = useState<number>(0);
@@ -1218,16 +1218,39 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
         setImgWidth(img.width);
         setImgHeight(img.height);
 
-        // Auto detect cols & rows (Default: 4 cols, auto rows based on aspect ratio)
-        const autoCols = 4;
-        const estRowH = img.width / autoCols;
-        const autoRows = estRowH > 0 ? Math.round(img.height / estRowH) : 9;
-        setCustomColsInput(autoCols);
-        setCustomRowsInput(autoRows > 0 ? autoRows : 9);
+        const currentTileSize = tileSizeInput || (uploadCategory === 'map' ? 16 : 16);
+        if (uploadCategory === 'map') {
+          const autoCols = Math.max(1, Math.floor(img.width / currentTileSize));
+          const autoRows = Math.max(1, Math.floor(img.height / currentTileSize));
+          setCustomColsInput(autoCols);
+          setCustomRowsInput(autoRows);
+        } else {
+          const autoCols = 4;
+          const estRowH = img.width / autoCols;
+          const autoRows = estRowH > 0 ? Math.round(img.height / estRowH) : 7;
+          setCustomColsInput(autoCols);
+          setCustomRowsInput(autoRows > 0 ? autoRows : 7);
+        }
       };
       img.src = result;
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleTileSizeSelect = (newSize: number) => {
+    setTileSizeInput(newSize);
+    if (imgWidth > 0 && imgHeight > 0) {
+      if (uploadCategory === 'map') {
+        const autoCols = Math.max(1, Math.floor(imgWidth / newSize));
+        const autoRows = Math.max(1, Math.floor(imgHeight / newSize));
+        setCustomColsInput(autoCols);
+        setCustomRowsInput(autoRows);
+      } else {
+        const autoCols = customColsInput || 4;
+        const autoRows = Math.max(1, Math.floor(imgHeight / (imgWidth / autoCols)));
+        setCustomRowsInput(autoRows);
+      }
+    }
   };
 
   // Smart Auto-Trim & Normalizer Algorithm for Custom Sprite Sheets
@@ -3057,7 +3080,20 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                   </button>
                   <button
                     type="button"
-                    onClick={() => setUploadCategory('map')}
+                    onClick={() => handleCategorySwitch('character')}
+                    disabled={isSavingAsset}
+                    style={{
+                      flex: 1, padding: '8px', fontSize: '11px', borderRadius: '6px',
+                      background: uploadCategory === 'character' ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
+                      color: '#fff', border: uploadCategory === 'character' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
+                      cursor: isSavingAsset ? 'not-allowed' : 'pointer', fontWeight: uploadCategory === 'character' ? 'bold' : 'normal'
+                    }}
+                  >
+                    👤 캐릭터 스프라이트
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCategorySwitch('map')}
                     disabled={isSavingAsset}
                     style={{
                       flex: 1, padding: '8px', fontSize: '11px', borderRadius: '6px',
@@ -3095,15 +3131,17 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 <select
                   value={tileSizeInput}
                   disabled={isSavingAsset}
-                  onChange={(e) => setTileSizeInput(parseInt(e.target.value, 10))}
+                  onChange={(e) => handleTileSizeSelect(parseInt(e.target.value, 10))}
                   style={{
-                    width: '100%', background: '#0d0d12', border: '1px solid rgba(255, 255, 255, 0.15)',
-                    borderRadius: '6px', padding: '8px 10px', color: '#fff', fontSize: '12px', outline: 'none'
+                    width: '100%', background: '#0d0d12', border: '1px solid var(--accent)',
+                    borderRadius: '6px', padding: '8px 10px', color: '#fff', fontSize: '12px', outline: 'none',
+                    fontWeight: 'bold'
                   }}
                 >
-                  <option value={16}>16 x 16 px (기본 픽셀 규격)</option>
-                  <option value={32}>32 x 32 px (고해상도 규격)</option>
-                  <option value={64}>64 x 64 px (HD 규격)</option>
+                  <option value={16}>16 x 16 px (레트로 / 도트 2D 타일 표준 - 추천)</option>
+                  <option value={32}>32 x 32 px (HD 픽셀 타일 규격)</option>
+                  <option value={48}>48 x 48 px (RPG Maker 규격)</option>
+                  <option value={64}>64 x 64 px (고해상도 HD 규격)</option>
                 </select>
               </div>
 
@@ -3130,12 +3168,87 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 </div>
               )}
 
+              {/* Interactive Live Grid Preview Overlay Box */}
               {fileDataUrl && (
-                <div style={{ background: 'rgba(255,255,255,0.04)', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-glass)', display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  <img src={fileDataUrl} alt="Preview" style={{ width: '48px', height: '48px', objectFit: 'contain', background: '#000', borderRadius: '4px', imageRendering: 'pixelated' }} />
-                  <div style={{ fontSize: '11px', color: '#ccc', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <div>현재 이미지 크기: <strong>{imgWidth} x {imgHeight} px</strong></div>
-                    <div>설정된 타일: <strong style={{ color: 'var(--accent)' }}>{customColsInput}열 x {customRowsInput}행 ({tileSizeInput}px 규격)</strong></div>
+                <div style={{ background: 'rgba(0,0,0,0.35)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-glass)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      👁️ 미리보기 격자 분할 확인 ({uploadCategory === 'map' ? '타일셋' : '스프라이트'})
+                    </span>
+                    <span style={{ fontSize: '10px', color: '#aaa' }}>
+                      해상도: {imgWidth}x{imgHeight}px
+                    </span>
+                  </div>
+
+                  {/* Grid Overlay Preview Canvas Container */}
+                  <div style={{
+                    position: 'relative', width: '100%', height: '160px', background: '#0a0a0f',
+                    borderRadius: '6px', border: '1px solid rgba(255,255,255,0.15)', overflow: 'hidden',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }}>
+                    <div style={{
+                      position: 'relative',
+                      width: '100%',
+                      height: '100%',
+                      backgroundImage: `url(${fileDataUrl})`,
+                      backgroundSize: 'contain',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'center',
+                      imageRendering: 'pixelated'
+                    }}>
+                      {/* Grid Lines Overlay */}
+                      <div style={{
+                        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                        backgroundImage: `linear-gradient(rgba(255, 121, 198, 0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 121, 198, 0.4) 1px, transparent 1px)`,
+                        backgroundSize: `${100 / Math.max(1, customColsInput)}% ${100 / Math.max(1, customRowsInput)}%`,
+                        pointerEvents: 'none'
+                      }} />
+                      {/* Top Left Sample Cell Highlight */}
+                      <div style={{
+                        position: 'absolute', top: 0, left: 0,
+                        width: `${100 / Math.max(1, customColsInput)}%`,
+                        height: `${100 / Math.max(1, customRowsInput)}%`,
+                        border: '2px solid #ff79c6',
+                        background: 'rgba(255, 121, 198, 0.25)',
+                        boxSizing: 'border-box',
+                        pointerEvents: 'none'
+                      }} />
+                    </div>
+                  </div>
+
+                  {/* Calculation summary badge */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#ccc', background: 'rgba(139, 92, 246, 0.12)', padding: '6px 10px', borderRadius: '4px', border: '1px solid var(--accent)' }}>
+                    <span>분할 결과: <strong style={{ color: '#fff' }}>{customColsInput}열 x {customRowsInput}행</strong></span>
+                    <span className="pixel-text" style={{ color: 'var(--accent)', fontWeight: 'bold' }}>총 {customColsInput * customRowsInput}개 타일</span>
+                  </div>
+
+                  {/* Editable Cols & Rows Controls */}
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '10px', color: '#aaa', display: 'block', marginBottom: '2px' }}>가로 열 수 (Cols)</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={64}
+                        value={customColsInput}
+                        disabled={isSavingAsset}
+                        onChange={(e) => setCustomColsInput(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                        style={{ width: '100%', background: '#0d0d12', border: '1px solid var(--border-glass)', borderRadius: '4px', padding: '4px 8px', color: '#fff', fontSize: '11px', textAlign: 'center' }}
+                      />
+                    </div>
+
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '10px', color: '#aaa', display: 'block', marginBottom: '2px' }}>세로 행 수 (Rows)</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={64}
+                        value={customRowsInput}
+                        disabled={isSavingAsset}
+                        onChange={(e) => setCustomRowsInput(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                        style={{ width: '100%', background: '#0d0d12', border: '1px solid var(--border-glass)', borderRadius: '4px', padding: '4px 8px', color: '#fff', fontSize: '11px', textAlign: 'center' }}
+                      />
+                    </div>
                   </div>
                 </div>
               )}
