@@ -463,7 +463,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     }
   }, [selectedMapId, activeMaps]);
 
-  // Image preloader for tilesets
+  // Image preloader for tilesets (Incremental real-time update per loaded image!)
   const [images, setImages] = useState<Record<string, HTMLImageElement>>({});
 
   useEffect(() => {
@@ -482,20 +482,17 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       assetUrls[ct.id] = ct.url;
     });
 
-    const loaded: Record<string, HTMLImageElement> = {};
-    let count = 0;
-    const total = Object.keys(assetUrls).length;
-
     Object.entries(assetUrls).forEach(([k, url]) => {
+      if (!url) return;
       const img = new Image();
-      img.src = url;
+      img.crossOrigin = 'anonymous';
       img.onload = () => {
-        loaded[k] = img;
-        count++;
-        if (count === total) {
-          setImages(loaded);
-        }
+        setImages((prev) => ({ ...prev, [k]: img }));
       };
+      img.src = url;
+      if (img.complete && img.naturalWidth > 0) {
+        setImages((prev) => ({ ...prev, [k]: img }));
+      }
     });
   }, [customMapTilesets]);
 
