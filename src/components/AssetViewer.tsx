@@ -1693,22 +1693,23 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   const cellSizePx = boardSize / editorGridRes;
 
   return (
-    <div className="glass-panel" style={{
-      position: 'absolute', left: '4%', top: '4%', width: '92%', height: '92%',
-      zIndex: 150, padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px',
-      border: '1px solid rgba(255,255,255,0.2)', background: 'var(--bg-panel-solid)',
-      boxShadow: '0 16px 48px rgba(0,0,0,0.7)', borderRadius: '12px'
+    <div style={{
+      position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
+      width: '1180px', maxWidth: '94vw', height: '86vh', maxHeight: '880px',
+      zIndex: 150, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px',
+      border: '1px solid #3b3b54', background: '#161622',
+      boxShadow: '0 20px 60px rgba(0,0,0,0.85)', borderRadius: 0
     }}>
       {/* Header Bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-glass)', paddingBottom: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #3b3b54', paddingBottom: '10px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
           {/* Renamed Title */}
-          <h3 className="pixel-text" style={{ fontSize: '16px', color: 'var(--accent)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Sparkles size={18} /> 픽셀 에디터
+          <h3 className="pixel-text" style={{ fontSize: '15px', color: '#a78bfa', margin: 0, display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'normal' }}>
+            <Sparkles size={16} /> 픽셀 에디터
           </h3>
 
-          {/* 1. Main Category Tabs: Character First, Map Second */}
-          <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', padding: '3px', borderRadius: '8px', border: '1px solid var(--border-glass)' }}>
+          {/* 1. Classic Sharp Main Category Tabs: 캐릭터 / 맵 */}
+          <div style={{ display: 'flex', gap: '2px', alignItems: 'flex-end', borderBottom: '1px solid #3b3b54' }}>
             <button
               onClick={() => {
                 setActiveTab('character');
@@ -1716,13 +1717,16 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 setSelectedTileState(null);
               }}
               style={{
-                padding: '6px 14px', fontSize: '11px', borderRadius: '6px', border: 'none',
-                background: activeTab === 'character' ? 'var(--primary)' : 'transparent',
-                color: '#fff', cursor: 'pointer', fontWeight: activeTab === 'character' ? 'bold' : 'normal',
-                display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.15s ease'
+                padding: '7px 16px', fontSize: '11px', borderRadius: 0,
+                background: activeTab === 'character' ? '#252538' : '#14141e',
+                color: activeTab === 'character' ? '#fff' : '#8a8a9e',
+                border: activeTab === 'character' ? '1px solid #4a4a6b' : '1px solid #28283a',
+                borderBottom: activeTab === 'character' ? '2px solid #a78bfa' : '1px solid #28283a',
+                cursor: 'pointer', fontWeight: 'normal',
+                display: 'flex', alignItems: 'center', gap: '5px', transition: 'all 0.1s ease'
               }}
             >
-              <User size={13} /> 👤 캐릭터 스프라이트 ({charOptions.length})
+              <User size={12} /> 캐릭터 ({charOptions.length})
             </button>
             <button
               onClick={() => {
@@ -1731,20 +1735,23 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 setSelectedTileState(null);
               }}
               style={{
-                padding: '6px 14px', fontSize: '11px', borderRadius: '6px', border: 'none',
-                background: activeTab === 'map' ? 'var(--primary)' : 'transparent',
-                color: '#fff', cursor: 'pointer', fontWeight: activeTab === 'map' ? 'bold' : 'normal',
-                display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.15s ease'
+                padding: '7px 16px', fontSize: '11px', borderRadius: 0,
+                background: activeTab === 'map' ? '#252538' : '#14141e',
+                color: activeTab === 'map' ? '#fff' : '#8a8a9e',
+                border: activeTab === 'map' ? '1px solid #4a4a6b' : '1px solid #28283a',
+                borderBottom: activeTab === 'map' ? '2px solid #a78bfa' : '1px solid #28283a',
+                cursor: 'pointer', fontWeight: 'normal',
+                display: 'flex', alignItems: 'center', gap: '5px', transition: 'all 0.1s ease'
               }}
             >
-              <Layers size={13} /> 🗺️ 맵 타일 에셋 ({mapOptions.length})
+              <Layers size={12} /> 맵 ({mapOptions.length})
             </button>
           </div>
 
           {/* 2. Sub-selection Select Box Dropdown & Delete Button */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-              {activeTab === 'character' ? '캐릭터 선택:' : '타일셋 선택:'}
+            <span style={{ fontSize: '11px', color: '#a0a0b8' }}>
+              {activeTab === 'character' ? '선택:' : '타일셋 선택:'}
             </span>
             <select
               value={currentSelectedId}
@@ -1755,9 +1762,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 setSelectedTileState(null);
               }}
               style={{
-                background: '#12121c', color: '#fff', border: '1px solid var(--accent)',
-                borderRadius: '6px', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold',
-                outline: 'none', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.4)'
+                background: '#1c1c2b', color: '#fff', border: '1px solid #4a4a6b',
+                borderRadius: 0, padding: '5px 10px', fontSize: '11px', fontWeight: 'normal',
+                outline: 'none', cursor: 'pointer'
               }}
             >
               {currentOptionList.map((opt) => (
@@ -1773,9 +1780,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 onClick={() => handleDeleteCustomAsset(currentOption.id)}
                 title="커스텀 에셋 삭제"
                 style={{
-                  background: 'rgba(239, 68, 68, 0.2)', border: '1px solid var(--danger)',
-                  color: '#ff6b6b', borderRadius: '6px', padding: '5px 8px', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px'
+                  background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444',
+                  color: '#ff6b6b', borderRadius: 0, padding: '5px 8px', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', fontWeight: 'normal'
                 }}
               >
                 <Trash2 size={12} /> 삭제
@@ -1786,10 +1793,10 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
             {activeTab === 'character' && (
               <div style={{
                 display: 'flex', alignItems: 'center', gap: '5px',
-                background: 'rgba(139, 92, 246, 0.15)', border: '1px solid var(--accent)',
-                padding: '3px 8px', borderRadius: '6px'
+                background: 'rgba(139, 92, 246, 0.12)', border: '1px solid #4a4a6b',
+                padding: '3px 8px', borderRadius: 0
               }}>
-                <span style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '11px', color: '#fff', fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   📏 맵 출력 크기:
                 </span>
 
@@ -1803,9 +1810,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                   }}
                   title="크기 줄이기 (-2px)"
                   style={{
-                    background: '#252538', border: '1px solid rgba(255,255,255,0.2)',
-                    color: '#fff', width: '22px', height: '22px', borderRadius: '4px',
-                    fontSize: '13px', fontWeight: 'bold', cursor: 'pointer',
+                    background: '#252538', border: '1px solid #4a4a6b',
+                    color: '#fff', width: '22px', height: '22px', borderRadius: 0,
+                    fontSize: '13px', fontWeight: 'normal', cursor: 'pointer',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     padding: 0
                   }}
@@ -1842,11 +1849,11 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                   style={{
                     width: '38px',
                     background: '#0d0d12',
-                    border: '1px solid var(--accent)',
-                    borderRadius: '4px',
+                    border: '1px solid #4a4a6b',
+                    borderRadius: 0,
                     color: '#fff',
                     fontSize: '11px',
-                    fontWeight: 'bold',
+                    fontWeight: 'normal',
                     textAlign: 'center',
                     padding: '2px 0',
                     outline: 'none'
@@ -1863,9 +1870,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                   }}
                   title="크기 키우기 (+2px)"
                   style={{
-                    background: '#252538', border: '1px solid rgba(255,255,255,0.2)',
-                    color: '#fff', width: '22px', height: '22px', borderRadius: '4px',
-                    fontSize: '13px', fontWeight: 'bold', cursor: 'pointer',
+                    background: '#252538', border: '1px solid #4a4a6b',
+                    color: '#fff', width: '22px', height: '22px', borderRadius: 0,
+                    fontSize: '13px', fontWeight: 'normal', cursor: 'pointer',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     padding: 0
                   }}
@@ -1886,10 +1893,10 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 setShowUploadModal(true);
               }}
               style={{
-                padding: '6px 12px', fontSize: '11px', borderRadius: '6px',
-                background: 'rgba(139, 92, 246, 0.2)', color: 'var(--accent)',
-                border: '1px dashed var(--accent)', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold'
+                padding: '5px 12px', fontSize: '11px', borderRadius: 0,
+                background: '#2a2a3e', color: '#a78bfa',
+                border: '1px solid #4a4a6b', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'normal'
               }}
             >
               <Plus size={13} /> 추가
@@ -1897,16 +1904,16 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
           </div>
 
           {/* 4. Grid Zoom Scale Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.03)', padding: '3px 6px', borderRadius: '6px', border: '1px solid var(--border-glass)' }}>
-            <ZoomIn size={12} style={{ color: 'var(--text-secondary)', marginRight: '2px' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#14141e', padding: '3px 6px', borderRadius: 0, border: '1px solid #3b3b54' }}>
+            <ZoomIn size={12} style={{ color: '#aaa', marginRight: '2px' }} />
             {([1.0, 1.5, 2.0, 3.0] as const).map((z) => (
               <button
                 key={z}
                 onClick={() => setGridZoom(z)}
                 style={{
-                  padding: '3px 6px', fontSize: '10px', borderRadius: '4px', border: 'none',
-                  background: gridZoom === z ? 'var(--accent)' : 'transparent',
-                  color: gridZoom === z ? '#000' : '#ccc', cursor: 'pointer', fontWeight: 'bold'
+                  padding: '3px 6px', fontSize: '10px', borderRadius: 0, border: 'none',
+                  background: gridZoom === z ? '#a78bfa' : 'transparent',
+                  color: gridZoom === z ? '#000' : '#ccc', cursor: 'pointer', fontWeight: 'normal'
                 }}
               >
                 {z}x
@@ -1918,9 +1925,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
         <button
           onClick={onClose}
           style={{
-            background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid var(--border-glass)',
-            padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: '4px'
+            background: '#252538', color: '#fff', border: '1px solid #4a4a6b',
+            padding: '5px 12px', borderRadius: 0, fontSize: '12px', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'normal'
           }}
         >
           <X size={14} /> 닫기
@@ -1928,11 +1935,11 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       </div>
 
       {/* Main Grid Viewport & Side Panel */}
-      <div style={{ flex: 1, display: 'flex', gap: '16px', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', gap: '14px', overflow: 'hidden' }}>
         {/* Left Grid Viewer Canvas Container */}
         <div style={{
-          flex: 1, overflow: 'auto', background: '#0a0a0f', borderRadius: '8px',
-          border: '1px solid var(--border-glass)', display: 'block', padding: '24px 36px', position: 'relative'
+          flex: 1, overflow: 'auto', background: '#0e0e16', borderRadius: 0,
+          border: '1px solid #3b3b54', display: 'block', padding: '24px 36px', position: 'relative'
         }}>
           {/* Outer Canvas Wrapper */}
           <div style={{
@@ -2162,11 +2169,11 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
         {/* Right Details Panel */}
         <div style={{
           width: '300px', display: 'flex', flexDirection: 'column', gap: '14px',
-          background: 'rgba(0,0,0,0.25)', padding: '16px', borderRadius: '8px',
-          border: '1px solid var(--border-glass)', flexShrink: 0, overflowY: 'auto'
+          background: '#1c1c2b', padding: '16px', borderRadius: 0,
+          border: '1px solid #3b3b54', flexShrink: 0, overflowY: 'auto'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-glass)', paddingBottom: '8px' }}>
-            <h4 className="pixel-text" style={{ fontSize: '13px', color: 'var(--accent)', margin: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #3b3b54', paddingBottom: '8px' }}>
+            <h4 className="pixel-text" style={{ fontSize: '13px', color: '#a78bfa', margin: 0, fontWeight: 'normal' }}>
               {activeTab === 'map' ? '🗺️ 선택된 타일 정보' : '👤 선택된 스프라이트 정보'}
             </h4>
             {selectedTileState && (
@@ -2174,9 +2181,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 onClick={() => setSelectedTileState(null)}
                 title="선택 고정 해제"
                 style={{
-                  background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border-glass)',
-                  color: '#ff79c6', borderRadius: '4px', padding: '3px 6px', fontSize: '10px',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px'
+                  background: 'rgba(255,255,255,0.06)', border: '1px solid #4a4a6b',
+                  color: '#ff79c6', borderRadius: 0, padding: '3px 6px', fontSize: '10px',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 'normal'
                 }}
               >
                 <Pin size={10} /> 📌 고정 해제
@@ -2187,51 +2194,51 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
           {activeDisplayTile ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>타일셋 분류:</span>
-                <span style={{ fontWeight: 'bold', color: '#fff', fontSize: '11px' }}>{currentOption.name}</span>
+                <span style={{ color: '#a0a0b8' }}>타일셋 분류:</span>
+                <span style={{ fontWeight: 'normal', color: '#fff', fontSize: '11px' }}>{currentOption.name}</span>
               </div>
 
               {activeDisplayTile.prefixedId !== undefined && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(139, 92, 246, 0.15)', padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--accent)' }}>
-                  <span style={{ color: 'var(--accent)', fontWeight: 'bold' }}>맵 타일 ID (Prefixed):</span>
-                  <span className="pixel-text" style={{ color: '#fff', fontWeight: 'bold', fontSize: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(139, 92, 246, 0.12)', padding: '6px 8px', borderRadius: 0, border: '1px solid #4a4a6b' }}>
+                  <span style={{ color: '#a78bfa', fontWeight: 'normal' }}>맵 타일 ID (Prefixed):</span>
+                  <span className="pixel-text" style={{ color: '#fff', fontWeight: 'normal', fontSize: '14px' }}>
                     {activeDisplayTile.prefixedId}
                   </span>
                 </div>
               )}
 
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>로컬 인덱스 ID:</span>
-                <span className="pixel-text" style={{ color: 'var(--accent)', fontWeight: 'bold', fontSize: '13px' }}>
+                <span style={{ color: '#a0a0b8' }}>로컬 인덱스 ID:</span>
+                <span className="pixel-text" style={{ color: '#a78bfa', fontWeight: 'normal', fontSize: '13px' }}>
                   {activeDisplayTile.index}
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>열 (Column X):</span>
+                <span style={{ color: '#a0a0b8' }}>열 (Column X):</span>
                 <span>{activeDisplayTile.col} / {currentOption.cols - 1}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>행 (Row Y):</span>
+                <span style={{ color: '#a0a0b8' }}>행 (Row Y):</span>
                 <span>{activeDisplayTile.row} / {currentOption.rows - 1}</span>
               </div>
 
               {/* Character sprite frame details & Action Name Editor & Pixel Art Editor Launcher */}
               {activeTab === 'character' && (
-                <div style={{ borderTop: '1px solid var(--border-glass)', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ borderTop: '1px solid #3b3b54', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <div style={{ fontSize: '11px', color: '#ccc' }}>
                     방향 (Direction):{' '}
-                    <strong style={{ color: 'var(--accent)' }}>
+                    <span style={{ color: '#a78bfa' }}>
                       {currentOption.id === 'pig'
                         ? (activeDisplayTile.col === 0 ? '왼쪽/기본 (Left)' : '걷기 프레임 2')
                         : (activeDisplayTile.col === 0 ? '아래 (Down 0)' : activeDisplayTile.col === 1 ? '위 (Up 1)' : activeDisplayTile.col === 2 ? '왼쪽 (Left 2)' : '오른쪽 (Right 3)')
                       }
-                    </strong>
+                    </span>
                   </div>
 
                   {/* Editable Action Motion Input for current Row */}
-                  <div style={{ background: 'rgba(139, 92, 246, 0.15)', padding: '10px', borderRadius: '6px', border: '1px solid var(--accent)' }}>
+                  <div style={{ background: 'rgba(139, 92, 246, 0.12)', padding: '10px', borderRadius: 0, border: '1px solid #4a4a6b' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 'bold' }}>
+                      <span style={{ fontSize: '11px', color: '#a78bfa', fontWeight: 'normal' }}>
                         ✏️ 행 {activeDisplayTile.row} 동작 이름:
                       </span>
                       <span style={{ fontSize: '10px', color: '#aaa' }}>
@@ -2254,13 +2261,13 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                       }}
                       placeholder="예: 대기, 걷기1, 환호, 공격..."
                       style={{
-                        width: '100%', background: '#0d0d12', border: '1px solid rgba(255,255,255,0.25)',
-                        borderRadius: '6px', padding: '6px 10px', color: '#fff', fontSize: '12px',
-                        fontWeight: 'bold', outline: 'none', boxSizing: 'border-box'
+                        width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b',
+                        borderRadius: 0, padding: '6px 10px', color: '#fff', fontSize: '12px',
+                        fontWeight: 'normal', outline: 'none', boxSizing: 'border-box'
                       }}
                     />
                     <div style={{ fontSize: '10px', color: '#aaa', marginTop: '6px', lineHeight: '1.4' }}>
-                      💬 채팅창에서 <strong style={{ color: '#89b4fa' }}>/{currentCharRowActions[activeDisplayTile.row] || '동작이름'}</strong> 입력 시 게임 내 캐릭터가 이 행의 모션을 실행합니다!
+                      💬 채팅창에서 <span style={{ color: '#89b4fa' }}>/{currentCharRowActions[activeDisplayTile.row] || '동작이름'}</span> 입력 시 게임 내 캐릭터가 이 행의 모션을 실행합니다!
                     </div>
                   </div>
 
@@ -2269,8 +2276,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                     onClick={() => handleOpenPixelEditor(activeDisplayTile.col, activeDisplayTile.row)}
                     style={{
                       padding: '10px', background: 'linear-gradient(135deg, #89b4fa 0%, #cba6f7 100%)',
-                      border: 'none', borderRadius: '6px', color: '#11111b', fontSize: '12px',
-                      fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center',
+                      border: 'none', borderRadius: 0, color: '#11111b', fontSize: '12px',
+                      fontWeight: 'normal', cursor: 'pointer', display: 'flex', alignItems: 'center',
                       justifyContent: 'center', gap: '6px', boxShadow: '0 4px 14px rgba(203, 166, 247, 0.4)'
                     }}
                   >
@@ -2280,8 +2287,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
               )}
 
               {/* Live Scaled Preview */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', marginTop: '8px', borderTop: '1px solid var(--border-glass)', paddingTop: '10px' }}>
-                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>타일 미리보기</span>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', marginTop: '8px', borderTop: '1px solid #3b3b54', paddingTop: '10px' }}>
+                <span style={{ fontSize: '11px', color: '#a0a0b8' }}>타일 미리보기</span>
                 <div style={{
                   width: '64px',
                   height: '64px',
@@ -2289,8 +2296,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                   backgroundPosition: `-${activeDisplayTile.col * 64}px -${activeDisplayTile.row * 64}px`,
                   backgroundSize: `${currentOption.cols * 64}px ${currentOption.rows * 64}px`,
                   imageRendering: 'pixelated',
-                  border: '2px solid var(--accent)',
-                  borderRadius: '4px',
+                  border: '2px solid #a78bfa',
+                  borderRadius: 0,
                   boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
                 }} />
               </div>
@@ -3019,9 +3026,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
             onClick={(e) => e.stopPropagation()}
             style={{
               position: 'relative',
-              background: '#181825', border: '1px solid rgba(255, 255, 255, 0.2)',
-              borderRadius: '12px', padding: '24px', width: '380px',
-              boxShadow: '0 16px 48px rgba(0, 0, 0, 0.9)', color: '#fff',
+              background: '#161622', border: '1px solid #3b3b54',
+              borderRadius: 0, padding: '20px', width: '380px',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.95)', color: '#fff',
               overflow: 'hidden'
             }}
           >
@@ -3029,14 +3036,14 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
             {isSavingAsset && (
               <div style={{
                 position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-                background: 'rgba(24, 24, 37, 0.94)', backdropFilter: 'blur(6px)',
+                background: 'rgba(22, 22, 34, 0.95)', backdropFilter: 'blur(6px)',
                 display: 'flex', flexDirection: 'column', alignItems: 'center',
                 justifyContent: 'center', gap: '14px', zIndex: 50, padding: '20px',
                 textAlign: 'center'
               }}>
-                <Loader2 size={42} style={{ color: 'var(--accent)' }} className="animate-spin" />
+                <Loader2 size={42} style={{ color: '#a78bfa' }} className="animate-spin" />
                 <div>
-                  <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '14px', fontWeight: 'normal', color: '#fff', marginBottom: '4px' }}>
                     {saveProgressText || '💾 에셋 처리 및 서버 저장 중...'}
                   </div>
                   <div style={{ fontSize: '11px', color: '#aaa' }}>
@@ -3048,7 +3055,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               {/* Renamed Modal Title to "➕ 추가" */}
-              <div style={{ fontSize: '15px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent)' }}>
+              <div style={{ fontSize: '15px', fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '6px', color: '#a78bfa' }}>
                 <Plus size={18} /> 추가
               </div>
               <button
@@ -3064,45 +3071,34 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
               <div>
                 <label style={{ fontSize: '11px', color: '#aaa', display: 'block', marginBottom: '6px' }}>에셋 분류:</label>
                 {/* Category order: Character First, Map Second */}
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setUploadCategory('character')}
-                    disabled={isSavingAsset}
-                    style={{
-                      flex: 1, padding: '8px', fontSize: '11px', borderRadius: '6px',
-                      background: uploadCategory === 'character' ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
-                      color: '#fff', border: uploadCategory === 'character' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
-                      cursor: isSavingAsset ? 'not-allowed' : 'pointer', fontWeight: uploadCategory === 'character' ? 'bold' : 'normal'
-                    }}
-                  >
-                    👤 캐릭터 스프라이트
-                  </button>
+                <div style={{ display: 'flex', gap: '6px' }}>
                   <button
                     type="button"
                     onClick={() => handleCategorySwitch('character')}
                     disabled={isSavingAsset}
                     style={{
-                      flex: 1, padding: '8px', fontSize: '11px', borderRadius: '6px',
-                      background: uploadCategory === 'character' ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
-                      color: '#fff', border: uploadCategory === 'character' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
-                      cursor: isSavingAsset ? 'not-allowed' : 'pointer', fontWeight: uploadCategory === 'character' ? 'bold' : 'normal'
+                      flex: 1, padding: '8px', fontSize: '11px', borderRadius: 0,
+                      background: uploadCategory === 'character' ? '#252538' : '#14141e',
+                      color: uploadCategory === 'character' ? '#fff' : '#8a8a9e',
+                      border: uploadCategory === 'character' ? '1px solid #a78bfa' : '1px solid #28283a',
+                      cursor: isSavingAsset ? 'not-allowed' : 'pointer', fontWeight: 'normal'
                     }}
                   >
-                    👤 캐릭터 스프라이트
+                    👤 캐릭터
                   </button>
                   <button
                     type="button"
                     onClick={() => handleCategorySwitch('map')}
                     disabled={isSavingAsset}
                     style={{
-                      flex: 1, padding: '8px', fontSize: '11px', borderRadius: '6px',
-                      background: uploadCategory === 'map' ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
-                      color: '#fff', border: uploadCategory === 'map' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
-                      cursor: isSavingAsset ? 'not-allowed' : 'pointer', fontWeight: uploadCategory === 'map' ? 'bold' : 'normal'
+                      flex: 1, padding: '8px', fontSize: '11px', borderRadius: 0,
+                      background: uploadCategory === 'map' ? '#252538' : '#14141e',
+                      color: uploadCategory === 'map' ? '#fff' : '#8a8a9e',
+                      border: uploadCategory === 'map' ? '1px solid #a78bfa' : '1px solid #28283a',
+                      cursor: isSavingAsset ? 'not-allowed' : 'pointer', fontWeight: 'normal'
                     }}
                   >
-                    🗺️ 맵 타일셋
+                    🗺️ 맵
                   </button>
                 </div>
               </div>
@@ -3117,9 +3113,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                   onChange={(e) => setAssetNameInput(e.target.value)}
                   autoFocus
                   style={{
-                    width: '100%', background: '#0d0d12', border: '1px solid rgba(255, 255, 255, 0.15)',
-                    borderRadius: '6px', padding: '8px 10px', color: '#fff', fontSize: '12px', outline: 'none',
-                    boxSizing: 'border-box'
+                    width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b',
+                    borderRadius: 0, padding: '8px 10px', color: '#fff', fontSize: '12px', outline: 'none',
+                    boxSizing: 'border-box', fontWeight: 'normal'
                   }}
                 />
               </div>
@@ -3133,9 +3129,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                   disabled={isSavingAsset}
                   onChange={(e) => handleTileSizeSelect(parseInt(e.target.value, 10))}
                   style={{
-                    width: '100%', background: '#0d0d12', border: '1px solid var(--accent)',
-                    borderRadius: '6px', padding: '8px 10px', color: '#fff', fontSize: '12px', outline: 'none',
-                    fontWeight: 'bold'
+                    width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b',
+                    borderRadius: 0, padding: '8px 10px', color: '#fff', fontSize: '12px', outline: 'none',
+                    fontWeight: 'normal'
                   }}
                 >
                   <option value={16}>16 x 16 px (레트로 / 도트 2D 타일 표준 - 추천)</option>
@@ -3155,24 +3151,24 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                   disabled={isSavingAsset}
                   onChange={handleFileChange}
                   style={{
-                    fontSize: '11px', color: '#ccc', background: 'rgba(255,255,255,0.05)',
-                    padding: '8px', borderRadius: '6px', width: '100%', boxSizing: 'border-box',
-                    border: '1px dashed rgba(255,255,255,0.2)'
+                    fontSize: '11px', color: '#ccc', background: '#101018',
+                    padding: '8px', borderRadius: 0, width: '100%', boxSizing: 'border-box',
+                    border: '1px dashed #4a4a6b'
                   }}
                 />
               </div>
 
               {uploadCategory === 'character' && !fileDataUrl && (
-                <div style={{ fontSize: '10px', color: '#888', background: 'rgba(255,255,255,0.03)', padding: '8px 10px', borderRadius: '6px' }}>
+                <div style={{ fontSize: '10px', color: '#888', background: '#101018', padding: '8px 10px', borderRadius: 0, border: '1px solid #28283a' }}>
                   💡 이미지 파일 없이 에셋 이름만 입력하셔도 <strong>새로운 픽셀 캐릭터 에셋</strong>이 즉시 등록되어 에디터로 그리실 수 있습니다!
                 </div>
               )}
 
               {/* Interactive Live Grid Preview Overlay Box */}
               {fileDataUrl && (
-                <div style={{ background: 'rgba(0,0,0,0.35)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-glass)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ background: '#101018', padding: '12px', borderRadius: 0, border: '1px solid #3b3b54', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ fontSize: '11px', color: '#a78bfa', fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       👁️ 미리보기 격자 분할 확인 ({uploadCategory === 'map' ? '타일셋' : '스프라이트'})
                     </span>
                     <span style={{ fontSize: '10px', color: '#aaa' }}>
@@ -3183,7 +3179,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                   {/* Grid Overlay Preview Canvas Container */}
                   <div style={{
                     position: 'relative', width: '100%', height: '160px', background: '#0a0a0f',
-                    borderRadius: '6px', border: '1px solid rgba(255,255,255,0.15)', overflow: 'hidden',
+                    borderRadius: 0, border: '1px solid #3b3b54', overflow: 'hidden',
                     display: 'flex', alignItems: 'center', justifyContent: 'center'
                   }}>
                     <div style={{
@@ -3217,9 +3213,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                   </div>
 
                   {/* Calculation summary badge */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#ccc', background: 'rgba(139, 92, 246, 0.12)', padding: '6px 10px', borderRadius: '4px', border: '1px solid var(--accent)' }}>
-                    <span>분할 결과: <strong style={{ color: '#fff' }}>{customColsInput}열 x {customRowsInput}행</strong></span>
-                    <span className="pixel-text" style={{ color: 'var(--accent)', fontWeight: 'bold' }}>총 {customColsInput * customRowsInput}개 타일</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#ccc', background: 'rgba(139, 92, 246, 0.12)', padding: '6px 10px', borderRadius: 0, border: '1px solid #4a4a6b' }}>
+                    <span>분할 결과: <span style={{ color: '#fff' }}>{customColsInput}열 x {customRowsInput}행</span></span>
+                    <span className="pixel-text" style={{ color: '#a78bfa', fontWeight: 'normal' }}>총 {customColsInput * customRowsInput}개 타일</span>
                   </div>
 
                   {/* Editable Cols & Rows Controls */}
@@ -3233,7 +3229,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                         value={customColsInput}
                         disabled={isSavingAsset}
                         onChange={(e) => setCustomColsInput(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                        style={{ width: '100%', background: '#0d0d12', border: '1px solid var(--border-glass)', borderRadius: '4px', padding: '4px 8px', color: '#fff', fontSize: '11px', textAlign: 'center' }}
+                        style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '4px 8px', color: '#fff', fontSize: '11px', textAlign: 'center', fontWeight: 'normal' }}
                       />
                     </div>
 
@@ -3246,59 +3242,10 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                         value={customRowsInput}
                         disabled={isSavingAsset}
                         onChange={(e) => setCustomRowsInput(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                        style={{ width: '100%', background: '#0d0d12', border: '1px solid var(--border-glass)', borderRadius: '4px', padding: '4px 8px', color: '#fff', fontSize: '11px', textAlign: 'center' }}
+                        style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '4px 8px', color: '#fff', fontSize: '11px', textAlign: 'center', fontWeight: 'normal' }}
                       />
                     </div>
                   </div>
-                </div>
-              )}
-
-              {fileDataUrl && uploadCategory === 'character' && (
-                <div style={{ background: 'rgba(139, 92, 246, 0.12)', border: '1px solid var(--accent)', padding: '12px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Sparkles size={14} /> ✨ 스마트 픽셀 자동 보정 (여백 제거 & 규격화)
-                  </div>
-                  
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: '10px', color: '#aaa', display: 'block', marginBottom: '2px' }}>가로 열 수 (Cols)</label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={16}
-                        value={customColsInput}
-                        disabled={isSavingAsset}
-                        onChange={(e) => setCustomColsInput(parseInt(e.target.value, 10) || 4)}
-                        style={{ width: '100%', background: '#0d0d12', border: '1px solid var(--border-glass)', borderRadius: '4px', padding: '4px 8px', color: '#fff', fontSize: '11px', textAlign: 'center' }}
-                      />
-                    </div>
-
-                    <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: '10px', color: '#aaa', display: 'block', marginBottom: '2px' }}>세로 행 수 (Rows)</label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={32}
-                        value={customRowsInput}
-                        disabled={isSavingAsset}
-                        onChange={(e) => setCustomRowsInput(parseInt(e.target.value, 10) || 9)}
-                        style={{ width: '100%', background: '#0d0d12', border: '1px solid var(--border-glass)', borderRadius: '4px', padding: '4px 8px', color: '#fff', fontSize: '11px', textAlign: 'center' }}
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleAutoNormalizeSpriteSheet}
-                    disabled={isNormalizing || isSavingAsset}
-                    style={{
-                      padding: '8px', background: 'var(--accent)', border: 'none', borderRadius: '6px',
-                      color: '#000', fontSize: '11px', fontWeight: 'bold', cursor: (isNormalizing || isSavingAsset) ? 'not-allowed' : 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
-                    }}
-                  >
-                    <Sparkles size={13} /> {isNormalizing ? '보정 처리 중...' : `✨ 여백 제거 & ${customColsInput}열 x ${customRowsInput}행 픽셀 규격화 자동 보정`}
-                  </button>
                 </div>
               )}
 
@@ -3308,9 +3255,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 disabled={isSavingAsset || (uploadCategory === 'character' ? !assetNameInput.trim() : !fileDataUrl)}
                 style={{
                   marginTop: '8px', padding: '10px',
-                  background: isSavingAsset ? '#e5c07b' : ((uploadCategory === 'character' ? assetNameInput.trim() : fileDataUrl) ? 'var(--primary)' : '#444'),
-                  border: 'none', borderRadius: '6px', color: isSavingAsset ? '#000' : '#fff', fontSize: '12px',
-                  fontWeight: 'bold', cursor: (isSavingAsset || (uploadCategory === 'character' ? !assetNameInput.trim() : !fileDataUrl)) ? 'not-allowed' : 'pointer',
+                  background: isSavingAsset ? '#e5c07b' : ((uploadCategory === 'character' ? assetNameInput.trim() : fileDataUrl) ? '#a78bfa' : '#333348'),
+                  border: 'none', borderRadius: 0, color: isSavingAsset ? '#000' : '#111', fontSize: '12px',
+                  fontWeight: 'normal', cursor: (isSavingAsset || (uploadCategory === 'character' ? !assetNameInput.trim() : !fileDataUrl)) ? 'not-allowed' : 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
                   transition: 'all 0.2s ease'
                 }}
