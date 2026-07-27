@@ -1584,6 +1584,16 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       });
       setSelectedCharId('samurai_blue');
       await deleteHouseAssetFromDB(currentHouse, 'char_sprite', id);
+      await deleteHouseAssetFromDB(currentHouse, 'char_image_override', id);
+      await deleteHouseAssetFromDB(currentHouse, 'char_row_actions', id);
+
+      try {
+        supabase.channel(`house:${currentHouse}`).send({
+          type: 'broadcast',
+          event: 'asset_delete',
+          payload: { assetType: 'char_sprite', assetId: id }
+        });
+      } catch (e) {}
     }
 
     // Broadcast sprite cache update event

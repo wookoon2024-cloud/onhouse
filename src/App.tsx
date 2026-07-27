@@ -55,6 +55,22 @@ export default function App() {
   const [availableMapIds, setAvailableMapIds] = useState<string[]>(['room', 'subway', 'park', 'apt']);
   const [dbCustomCharSprites, setDbCustomCharSprites] = useState<any[]>([]);
 
+  useEffect(() => {
+    const syncDbCharSprites = () => {
+      try {
+        const saved = localStorage.getItem('on_house_custom_char_sprites');
+        setDbCustomCharSprites(saved ? JSON.parse(saved) : []);
+      } catch (e) {}
+    };
+
+    window.addEventListener('on_house_sprites_updated', syncDbCharSprites);
+    window.addEventListener('storage', syncDbCharSprites);
+    return () => {
+      window.removeEventListener('on_house_sprites_updated', syncDbCharSprites);
+      window.removeEventListener('storage', syncDbCharSprites);
+    };
+  }, []);
+
   const isMobileDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0 || window.innerWidth < 768;
 
   // 1. Local Player State
@@ -689,6 +705,7 @@ export default function App() {
             next = [...current, assetData];
           }
           localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(next));
+          setDbCustomCharSprites(next);
 
           if (assetData.url) {
             try {
@@ -703,6 +720,8 @@ export default function App() {
             } catch (e) {}
           }
 
+          window.dispatchEvent(new Event('on_house_sprites_updated'));
+          setAssetVersion((v) => v + 1);
         } else if (assetType === 'char_image_override') {
           if (assetData && assetData.id) {
             try {
@@ -737,6 +756,7 @@ export default function App() {
               const current: any[] = JSON.parse(saved);
               const next = current.filter((item) => item.id !== assetId);
               localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(next));
+              setDbCustomCharSprites(next);
             }
             const overridesSaved = localStorage.getItem('on_house_char_image_overrides');
             if (overridesSaved) {
