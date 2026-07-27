@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { PlayerState } from '../game/syncManager';
 import { User, Palette, Trash2 } from 'lucide-react';
+import { deleteHouseAssetFromDB, getSavedHouseCode } from '../services/HouseService';
+import { supabase } from '../lib/supabase';
 
 interface CustomizerProps {
   player: PlayerState;
@@ -26,7 +28,24 @@ export const Customizer: React.FC<CustomizerProps> = ({ player, onChange, onClos
     }
   });
 
-  const handleDeleteCustomChar = (e: React.MouseEvent, charId: string, charName: string) => {
+  // Re-sync character options dynamically whenever sprites are updated or loaded from DB
+  useEffect(() => {
+    const syncCustomChars = () => {
+      try {
+        const saved = localStorage.getItem('on_house_custom_char_sprites');
+        setCustomChars(saved ? JSON.parse(saved) : []);
+      } catch (e) {}
+    };
+
+    window.addEventListener('on_house_sprites_updated', syncCustomChars);
+    window.addEventListener('storage', syncCustomChars);
+    return () => {
+      window.removeEventListener('on_house_sprites_updated', syncCustomChars);
+      window.removeEventListener('storage', syncCustomChars);
+    };
+  }, []);
+
+  const handleDeleteCustomChar = async (e: React.MouseEvent, charId: string, charName: string) => {
     e.stopPropagation();
     if (!window.confirm(`[${charName}] 커스텀 캐릭터를 삭제하시겠습니까?`)) return;
 
@@ -46,6 +65,19 @@ export const Customizer: React.FC<CustomizerProps> = ({ player, onChange, onClos
     if (player.spriteType === charId) {
       onChange({ spriteType: 'ninja_blue' });
     }
+
+    const currentHouseCode = getSavedHouseCode();
+    await deleteHouseAssetFromDB(currentHouseCode, 'char_sprite', charId);
+    await deleteHouseAssetFromDB(currentHouseCode, 'char_image_override', charId);
+    await deleteHouseAssetFromDB(currentHouseCode, 'char_row_actions', charId);
+
+    try {
+      supabase.channel(`house:${currentHouseCode}`).send({
+        type: 'broadcast',
+        event: 'asset_delete',
+        payload: { assetType: 'char_sprite', assetId: charId }
+      });
+    } catch (e) {}
 
     window.dispatchEvent(new Event('on_house_sprites_updated'));
   };

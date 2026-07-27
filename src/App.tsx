@@ -725,6 +725,28 @@ export default function App() {
           }
         }
       })
+      .on('broadcast', { event: 'asset_delete' }, ({ payload }) => {
+        if (!payload || !payload.assetId) return;
+        const { assetType, assetId } = payload;
+        if (assetType === 'char_sprite') {
+          try {
+            const saved = localStorage.getItem('on_house_custom_char_sprites');
+            if (saved) {
+              const current: any[] = JSON.parse(saved);
+              const next = current.filter((item) => item.id !== assetId);
+              localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(next));
+            }
+            const overridesSaved = localStorage.getItem('on_house_char_image_overrides');
+            if (overridesSaved) {
+              const overrides = JSON.parse(overridesSaved);
+              delete overrides[assetId];
+              localStorage.setItem('on_house_char_image_overrides', JSON.stringify(overrides));
+            }
+            window.dispatchEvent(new Event('on_house_sprites_updated'));
+            setAssetVersion((v) => v + 1);
+          } catch (e) {}
+        }
+      })
       .on('broadcast', { event: 'dm_request' }, ({ payload }) => {
         if (!payload || payload.toId !== deviceId.current) return;
         setIncomingDMRequest({
