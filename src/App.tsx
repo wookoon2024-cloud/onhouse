@@ -767,6 +767,17 @@ export default function App() {
             window.dispatchEvent(new Event('on_house_sprites_updated'));
             setAssetVersion((v) => v + 1);
           } catch (e) {}
+        } else if (assetType === 'map_tileset') {
+          try {
+            const saved = localStorage.getItem('on_house_custom_map_tilesets');
+            if (saved) {
+              const current: any[] = JSON.parse(saved);
+              const next = current.filter((item) => item.id !== assetId);
+              localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(next));
+            }
+            window.dispatchEvent(new Event('on_house_sprites_updated'));
+            setAssetVersion((v) => v + 1);
+          } catch (e) {}
         }
       })
       .on('broadcast', { event: 'dm_request' }, ({ payload }) => {

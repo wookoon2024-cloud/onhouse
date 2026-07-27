@@ -1577,6 +1577,13 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       });
       setSelectedMapId('interior');
       await deleteHouseAssetFromDB(currentHouse, 'map_tileset', id);
+      try {
+        supabase.channel(`house:${currentHouse}`).send({
+          type: 'broadcast',
+          event: 'asset_delete',
+          payload: { assetType: 'map_tileset', assetId: id }
+        });
+      } catch (e) {}
     } else {
       setCustomCharSprites((prev) => {
         const next = prev.filter((opt) => opt.id !== id);
