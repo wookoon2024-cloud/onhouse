@@ -178,6 +178,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   const [customColsInput, setCustomColsInput] = useState<number>(4);
   const [customRowsInput, setCustomRowsInput] = useState<number>(9);
   const [isNormalizing, setIsNormalizing] = useState<boolean>(false);
+  const [previewZoom, setPreviewZoom] = useState<number>(1.0); // 1.0 (Fit), 1.5x, 2.0x, 3.0x, 4.0x
 
   // Pixel Art Editor Modal State
   const [editingTile, setEditingTile] = useState<{ charId: string; col: number; row: number } | null>(null);
@@ -3027,9 +3028,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
             style={{
               position: 'relative',
               background: '#161622', border: '1px solid #3b3b54',
-              borderRadius: 0, padding: '20px', width: '380px',
-              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.95)', color: '#fff',
-              overflow: 'hidden'
+              borderRadius: 0, padding: '20px', width: fileDataUrl ? '520px' : '400px',
+              maxWidth: '94vw', maxHeight: '92vh', overflowY: 'auto',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.95)', color: '#fff'
             }}
           >
             {/* Loading Overlay during Supabase DB / Image processing */}
@@ -3164,58 +3165,114 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 </div>
               )}
 
-              {/* Interactive Live Grid Preview Overlay Box */}
+              {/* Interactive Live Grid Preview Overlay Box with Zoom Controls & Panning Viewport */}
               {fileDataUrl && (
                 <div style={{ background: '#101018', padding: '12px', borderRadius: 0, border: '1px solid #3b3b54', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                     <span style={{ fontSize: '11px', color: '#a78bfa', fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      👁️ 미리보기 격자 분할 확인 ({uploadCategory === 'map' ? '타일셋' : '스프라이트'})
+                      👁️ 미리보기 격자 분할 확인 ({imgWidth}x{imgHeight}px)
                     </span>
-                    <span style={{ fontSize: '10px', color: '#aaa' }}>
-                      해상도: {imgWidth}x{imgHeight}px
-                    </span>
+
+                    {/* Preview Zoom Controls */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px', background: '#1c1c2b', padding: '2px 4px', border: '1px solid #4a4a6b' }}>
+                      <span style={{ fontSize: '10px', color: '#aaa', marginRight: '3px' }}>🔎 확대:</span>
+                      {[
+                        { label: '맞춤', value: 1.0 },
+                        { label: '1.5x', value: 1.5 },
+                        { label: '2.0x', value: 2.0 },
+                        { label: '3.0x', value: 3.0 },
+                        { label: '4.0x', value: 4.0 }
+                      ].map((zOpt) => (
+                        <button
+                          key={zOpt.label}
+                          type="button"
+                          onClick={() => setPreviewZoom(zOpt.value)}
+                          style={{
+                            padding: '2px 6px', fontSize: '10px', borderRadius: 0, border: 'none',
+                            background: previewZoom === zOpt.value ? '#a78bfa' : 'transparent',
+                            color: previewZoom === zOpt.value ? '#000' : '#ccc', cursor: 'pointer',
+                            fontWeight: 'normal'
+                          }}
+                        >
+                          {zOpt.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   {/* Grid Overlay Preview Canvas Container */}
                   <div style={{
-                    position: 'relative', width: '100%', height: '160px', background: '#0a0a0f',
-                    borderRadius: 0, border: '1px solid #3b3b54', overflow: 'hidden',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    position: 'relative', width: '100%', height: '260px', background: '#0a0a0f',
+                    borderRadius: 0, border: '1px solid #3b3b54', overflow: 'auto',
+                    display: 'block', padding: previewZoom > 1.0 ? '12px' : 0
                   }}>
-                    <div style={{
-                      position: 'relative',
-                      width: '100%',
-                      height: '100%',
-                      backgroundImage: `url(${fileDataUrl})`,
-                      backgroundSize: 'contain',
-                      backgroundRepeat: 'no-repeat',
-                      backgroundPosition: 'center',
-                      imageRendering: 'pixelated'
-                    }}>
-                      {/* Grid Lines Overlay */}
+                    {previewZoom === 1.0 ? (
+                      /* Fit Mode */
                       <div style={{
-                        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-                        backgroundImage: `linear-gradient(rgba(255, 121, 198, 0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 121, 198, 0.4) 1px, transparent 1px)`,
-                        backgroundSize: `${100 / Math.max(1, customColsInput)}% ${100 / Math.max(1, customRowsInput)}%`,
-                        pointerEvents: 'none'
-                      }} />
-                      {/* Top Left Sample Cell Highlight */}
+                        position: 'relative',
+                        width: '100%',
+                        height: '100%',
+                        backgroundImage: `url(${fileDataUrl})`,
+                        backgroundSize: 'contain',
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'center',
+                        imageRendering: 'pixelated'
+                      }}>
+                        {/* Grid Lines Overlay */}
+                        <div style={{
+                          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                          backgroundImage: `linear-gradient(rgba(255, 121, 198, 0.45) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 121, 198, 0.45) 1px, transparent 1px)`,
+                          backgroundSize: `${100 / Math.max(1, customColsInput)}% ${100 / Math.max(1, customRowsInput)}%`,
+                          pointerEvents: 'none'
+                        }} />
+                        {/* Top Left Sample Cell Highlight */}
+                        <div style={{
+                          position: 'absolute', top: 0, left: 0,
+                          width: `${100 / Math.max(1, customColsInput)}%`,
+                          height: `${100 / Math.max(1, customRowsInput)}%`,
+                          border: '2px solid #ff79c6',
+                          background: 'rgba(255, 121, 198, 0.3)',
+                          boxSizing: 'border-box',
+                          pointerEvents: 'none'
+                        }} />
+                      </div>
+                    ) : (
+                      /* Magnified Zoomed Mode (Exact Pixel Scrollable Canvas) */
                       <div style={{
-                        position: 'absolute', top: 0, left: 0,
-                        width: `${100 / Math.max(1, customColsInput)}%`,
-                        height: `${100 / Math.max(1, customRowsInput)}%`,
-                        border: '2px solid #ff79c6',
-                        background: 'rgba(255, 121, 198, 0.25)',
-                        boxSizing: 'border-box',
-                        pointerEvents: 'none'
-                      }} />
-                    </div>
+                        position: 'relative',
+                        width: `${imgWidth * previewZoom}px`,
+                        height: `${imgHeight * previewZoom}px`,
+                        margin: 'auto',
+                        backgroundImage: `url(${fileDataUrl})`,
+                        backgroundSize: `${imgWidth * previewZoom}px ${imgHeight * previewZoom}px`,
+                        backgroundRepeat: 'no-repeat',
+                        imageRendering: 'pixelated'
+                      }}>
+                        {/* Grid Lines Overlay */}
+                        <div style={{
+                          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                          backgroundImage: `linear-gradient(rgba(255, 121, 198, 0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 121, 198, 0.5) 1px, transparent 1px)`,
+                          backgroundSize: `${(imgWidth * previewZoom) / Math.max(1, customColsInput)}px ${(imgHeight * previewZoom) / Math.max(1, customRowsInput)}px`,
+                          pointerEvents: 'none'
+                        }} />
+                        {/* Top Left Sample Cell Highlight */}
+                        <div style={{
+                          position: 'absolute', top: 0, left: 0,
+                          width: `${(imgWidth * previewZoom) / Math.max(1, customColsInput)}px`,
+                          height: `${(imgHeight * previewZoom) / Math.max(1, customRowsInput)}px`,
+                          border: '2px solid #ff79c6',
+                          background: 'rgba(255, 121, 198, 0.3)',
+                          boxSizing: 'border-box',
+                          pointerEvents: 'none'
+                        }} />
+                      </div>
+                    )}
                   </div>
 
                   {/* Calculation summary badge */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#ccc', background: 'rgba(139, 92, 246, 0.12)', padding: '6px 10px', borderRadius: 0, border: '1px solid #4a4a6b' }}>
                     <span>분할 결과: <span style={{ color: '#fff' }}>{customColsInput}열 x {customRowsInput}행</span></span>
-                    <span className="pixel-text" style={{ color: '#a78bfa', fontWeight: 'normal' }}>총 {customColsInput * customRowsInput}개 타일</span>
+                    <span className="pixel-text" style={{ color: '#a78bfa', fontWeight: 'normal' }}>총 {customColsInput * customRowsInput}개 타일 ({Math.round(imgWidth / Math.max(1, customColsInput))}x{Math.round(imgHeight / Math.max(1, customRowsInput))}px/타일)</span>
                   </div>
 
                   {/* Editable Cols & Rows Controls */}
