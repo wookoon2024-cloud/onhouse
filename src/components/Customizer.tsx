@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { PlayerState } from '../game/syncManager';
-import { User, Palette, Trash2 } from 'lucide-react';
+import { User, Trash2 } from 'lucide-react';
 import { deleteHouseAssetFromDB, getSavedHouseCode } from '../services/HouseService';
 import { supabase } from '../lib/supabase';
 
@@ -195,35 +195,6 @@ export const Customizer: React.FC<CustomizerProps> = ({ player, customCharSprite
               </button>
             )}
           </div>
-        </div>
-
-        {/* Color Dye (Hue Slider) */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <label style={{ fontSize: '11px', color: '#ccc', fontWeight: 'normal' }}>
-              🎨 의상/머리 염색 (Hue):
-            </label>
-            <span style={{ fontSize: '11px', color: '#a78bfa', fontWeight: 'normal' }}>
-              {player.hue}°
-            </span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Palette size={16} style={{ color: '#aaa' }} />
-            <input
-              type="range"
-              min="0"
-              max="360"
-              value={player.hue}
-              onChange={(e) => onChange({ hue: parseInt(e.target.value) })}
-              style={{
-                flex: 1, accentColor: '#a78bfa', cursor: 'pointer',
-                height: '6px', borderRadius: 0, background: 'linear-gradient(to right, red, yellow, green, cyan, blue, magenta, red)'
-              }}
-            />
-          </div>
-          <p style={{ margin: '4px 0 0 0', fontSize: '10px', color: '#888', lineHeight: '1.4' }}>
-            * 염색 원리: 피부톤을 보존하고 의상 및 장식 픽셀 색상(Hue)을 0°~360°로 실시간 전환합니다.
-          </p>
         </div>
       </div>
     </div>
