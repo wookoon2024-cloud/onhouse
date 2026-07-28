@@ -1469,9 +1469,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       lastPaintedCellRef.current = { x: tx, y: ty };
       handlePaint(tx, ty);
 
-      // Clean anchor: clear stamp & deselect only when placing a palette object!
-      if (paletteSelection) {
-        setPaletteSelection(null);
+      if (selectedObjectId) {
         setSelectedObjectId(null);
       }
     }
@@ -2240,13 +2238,14 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                   {/* Preset 1x1, 2x2, 3x3, 4x4 Row */}
                   <div style={{ display: 'flex', gap: '4px' }}>
                     {([1, 2, 3, 4] as const).map((sz) => {
-                      const isSelected = brushSize === sz;
+                      const isSelected = !paletteSelection && brushSize === sz;
                       return (
                         <button
                           key={sz}
                           onClick={() => {
                             setBrushSize(sz);
                             setCustomBrushInput(String(sz));
+                            setPaletteSelection(null);
                           }}
                           style={{
                             flex: 1, padding: '5px 2px', fontSize: '10px', borderRadius: '4px',
@@ -2307,6 +2306,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                             const val = parseInt(customBrushInput, 10);
                             if (!isNaN(val) && val >= 1 && val <= 20) {
                               setBrushSize(val);
+                              setPaletteSelection(null);
                               if (tool !== 'brush') setTool('brush');
                             } else {
                               alert('브러시 크기는 1에서 20 사이의 숫자로 지정해 주세요.');
@@ -2819,6 +2819,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                           e.preventDefault();
                           setPaletteDragStart({ col: c, row: r });
                           setPaletteSelection({ startCol: c, startRow: r, cols: 1, rows: 1, tilesetKey: activeTileset });
+                          setBrushSize(1);
                           setSelectedTile(prefixedIdx);
                           setSelectedObjectId(null);
                         }}
