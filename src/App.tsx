@@ -17,12 +17,13 @@ import { Messenger } from './components/Messenger';
 import { StatusPicker } from './components/StatusPicker';
 import { MapSelector } from './components/MapSelector';
 import { MapEditorView } from './components/MapEditorView';
-import { Mail, Settings, User, Eye, Hammer, Home, Share2 } from 'lucide-react';
+import { Mail, Settings, User, Eye, Hammer, Home, Share2, ShoppingCart } from 'lucide-react';
 import { AssetViewer } from './components/AssetViewer';
+import { MarketModal } from './components/MarketModal';
 import { HouseJoinModal } from './components/HouseJoinModal';
 import { PlayerInteractionModal } from './components/PlayerInteractionModal';
 import { DMRequestModal } from './components/DMRequestModal';
-import { getSavedHouseCode, setSavedHouseCode, fetchHouseMaps, saveHouseMapToDB, deleteHouseMapFromDB, fetchHouseAssets } from './services/HouseService';
+import { getSavedHouseCode, setSavedHouseCode, fetchHouseMaps, saveHouseMapToDB, deleteHouseMapFromDB, fetchHouseAssets, type MarketItem } from './services/HouseService';
 import { supabase } from './lib/supabase';
 import { APP_VERSION } from './config/version';
 import type { MapMemo, InventoryItem } from './types/memo';
@@ -138,10 +139,27 @@ export default function App() {
   const [isCustomizing, setIsCustomizing] = useState(false);
   const [activeDMTarget, setActiveDMTarget] = useState<PlayerState | null>(null);
   const [showAssetViewer, setShowAssetViewer] = useState(false);
+  const [isMarketOpen, setIsMarketOpen] = useState(false);
   const [interactionTargetPlayer, setInteractionTargetPlayer] = useState<PlayerState | null>(null);
   const [incomingDMRequest, setIncomingDMRequest] = useState<{ requesterId: string; requesterName: string; requesterPlayer: PlayerState } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isChatLogCollapsed, setIsChatLogCollapsed] = useState(false);
+
+  const handleMarketItemImported = (item: MarketItem, resultId?: string) => {
+    fetchHouseMaps(houseCode).then((mapsData) => {
+      setActiveMaps(mapsData);
+      const fetchedMapIds = Object.keys(mapsData);
+      if (fetchedMapIds.length > 0) {
+        setAvailableMapIds(fetchedMapIds);
+      }
+      if (item.type === 'map' && resultId) {
+        handleMapChange(resultId);
+      }
+    });
+    setAssetVersion((v) => v + 1);
+    window.dispatchEvent(new Event('on_house_sprites_updated'));
+    showToast(`🎉 [${item.title}]이(가) 내 하우스 DB로 복사되었습니다! 마음에 들게 자유롭게 편집해보세요.`);
+  };
 
   // Memos & Inventory State
   const [memos, setMemos] = useState<MapMemo[]>([]);
@@ -2268,6 +2286,13 @@ export default function App() {
         <AssetViewer onClose={() => setShowAssetViewer(false)} />
       )}
 
+      {/* 6.6. Open Marketplace Modal */}
+      <MarketModal
+        isOpen={isMarketOpen}
+        onClose={() => setIsMarketOpen(false)}
+        onItemImported={handleMarketItemImported}
+      />
+
       {/* 7. Classic Flat Translucent Integrated Chat Box */}
       <div style={{
         position: 'absolute',
@@ -2467,6 +2492,23 @@ export default function App() {
               title="픽셀 에디터"
             >
               <Eye size={14} />
+            </button>
+
+            {/* Open Marketplace Shop Button */}
+            <button
+              type="button"
+              onClick={() => setIsMarketOpen(true)}
+              style={{
+                background: isMarketOpen ? 'rgba(167,139,250,0.3)' : 'rgba(167,139,250,0.12)',
+                border: '1px solid #a78bfa',
+                color: '#a78bfa',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px',
+                padding: '2px 7px', borderRadius: '2px', fontSize: '11px', fontWeight: 'normal'
+              }}
+              title="오픈 마켓 상점 (에셋/맵 공유 및 내 하우스로 가져오기)"
+            >
+              <ShoppingCart size={13} />
+              <span>상점</span>
             </button>
 
             <button

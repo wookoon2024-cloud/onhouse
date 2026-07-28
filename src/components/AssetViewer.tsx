@@ -5,7 +5,7 @@ import {
   Copy, Clipboard, Trash, Crop, Check, Move, FlipHorizontal, Loader2, Scissors
 } from 'lucide-react';
 import { DEFAULT_CHAR_ROW_ACTIONS, getCharRowActions } from '../game/MapData';
-import { saveHouseAssetToDB, deleteHouseAssetFromDB, getSavedHouseCode } from '../services/HouseService';
+import { saveHouseAssetToDB, deleteHouseAssetFromDB, getSavedHouseCode, publishItemToMarket } from '../services/HouseService';
 import { supabase } from '../lib/supabase';
 
 import interiorTilesUrl from '../assets/interior_tiles.png';
@@ -181,6 +181,13 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   const [customSpacingInput, setCustomSpacingInput] = useState<number>(0);
   const [isNormalizing, setIsNormalizing] = useState<boolean>(false);
   const [previewZoom, setPreviewZoom] = useState<number>(1.0); // 1.0 (Fit), 1.5x, 2.0x, 3.0x, 4.0x
+
+  // Open Market Publish Modal State
+  const [showPublishModal, setShowPublishModal] = useState<boolean>(false);
+  const [publishTitle, setPublishTitle] = useState<string>('');
+  const [publishDesc, setPublishDesc] = useState<string>('');
+  const [publishCreator, setPublishCreator] = useState<string>('');
+  const [isPublishing, setIsPublishing] = useState<boolean>(false);
 
   // Pixel Art Editor Modal State
   const [editingTile, setEditingTile] = useState<{ charId: string; col: number; row: number } | null>(null);
@@ -1869,6 +1876,27 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
               </button>
             )}
 
+            {/* Open Market Share Button for Any Selected Asset */}
+            {currentOption && (
+              <button
+                type="button"
+                onClick={() => {
+                  setPublishTitle(currentOption.name || '');
+                  setPublishDesc('');
+                  setPublishCreator(localStorage.getItem('on_house_nickname') || '익명 크리에이터');
+                  setShowPublishModal(true);
+                }}
+                title="오픈 마켓 상점에 에셋 공유 게시"
+                style={{
+                  background: 'rgba(167, 139, 250, 0.15)', border: '1px solid #a78bfa',
+                  color: '#a78bfa', borderRadius: 0, padding: '5px 10px', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 'normal'
+                }}
+              >
+                🛒 마켓에 공유
+              </button>
+            )}
+
             {/* Per-Character Map Display Size Adjustment Control (Direct Typing & - / + Buttons!) */}
             {activeTab === 'character' && (
               <div style={{
@@ -3469,6 +3497,84 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
               </button>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* Open Market Share Modal */}
+      {showPublishModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(5px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 10000, padding: '16px'
+        }}>
+          <form
+            onSubmit={handlePublishAssetToMarket}
+            style={{
+              width: '420px', maxWidth: '90vw', background: '#12121e',
+              border: '1px solid #3b3b54', padding: '20px', display: 'flex',
+              flexDirection: 'column', gap: '14px', boxShadow: '0 10px 30px rgba(0,0,0,0.8)'
+            }}
+          >
+            <h3 style={{ margin: 0, color: '#fff', fontSize: '16px', fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              🛒 오픈 마켓 상점에 에셋 공유
+            </h3>
+
+            <div style={{ fontSize: '11px', color: '#aaa', background: '#191928', padding: '8px 10px', border: '1px solid #2d2d44' }}>
+              공유된 에셋은 온하우스의 모든 유저가 내 하우스로 자유롭게 가져가 소장하고 편집할 수 있습니다!
+            </div>
+
+            <div>
+              <label style={{ fontSize: '11px', color: '#ccc', display: 'block', marginBottom: '4px' }}>📌 에셋 제목:</label>
+              <input
+                type="text"
+                value={publishTitle}
+                onChange={(e) => setPublishTitle(e.target.value)}
+                placeholder="예: 레트로 닌자 캐릭터 32x32"
+                required
+                style={{ width: '100%', background: '#09090f', border: '1px solid #4a4a6b', padding: '6px 8px', color: '#fff', fontSize: '12px', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: '11px', color: '#ccc', display: 'block', marginBottom: '4px' }}>📝 간단한 소개 / 설명:</label>
+              <textarea
+                value={publishDesc}
+                onChange={(e) => setPublishDesc(e.target.value)}
+                placeholder="에셋에 대한 설명이나 크리에이터 한마디를 적어주세요."
+                rows={3}
+                style={{ width: '100%', background: '#09090f', border: '1px solid #4a4a6b', padding: '6px 8px', color: '#fff', fontSize: '12px', outline: 'none', resize: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: '11px', color: '#ccc', display: 'block', marginBottom: '4px' }}>👤 크리에이터 닉네임:</label>
+              <input
+                type="text"
+                value={publishCreator}
+                onChange={(e) => setPublishCreator(e.target.value)}
+                placeholder="닉네임"
+                style={{ width: '100%', background: '#09090f', border: '1px solid #4a4a6b', padding: '6px 8px', color: '#fff', fontSize: '12px', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '6px' }}>
+              <button
+                type="button"
+                onClick={() => setShowPublishModal(false)}
+                style={{ padding: '6px 12px', background: '#222233', border: '1px solid #4a4a6b', color: '#ccc', cursor: 'pointer', fontSize: '11px' }}
+              >
+                취소
+              </button>
+              <button
+                type="submit"
+                disabled={isPublishing}
+                style={{ padding: '6px 16px', background: '#a78bfa', border: 'none', color: '#000', cursor: 'pointer', fontSize: '11px', fontWeight: 'normal' }}
+              >
+                {isPublishing ? '⏳ 등록 중...' : '🚀 마켓에 공개 게시'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

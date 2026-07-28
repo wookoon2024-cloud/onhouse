@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { type MapDefinition, type MapObjectInstance, cleanDuplicateObjects, maps, PRESET_MAP_TEMPLATES } from '../game/MapData';
 import { Trash2, Save, X, Undo, Redo, Pipette, Paintbrush, PaintBucket, Eraser, Info, Sparkles, Plus, Download, Upload, Pencil, MousePointer, Copy, Layers, MoveUp, MoveDown } from 'lucide-react';
 import { getTileDrawInfo, getTilesetInfo } from '../game/CanvasGame';
+import { publishItemToMarket, getSavedHouseCode } from '../services/HouseService';
 
 import interiorTilesUrl from '../assets/interior_tiles.png';
 import outdoorTilesUrl from '../assets/outdoor_tiles.png';
@@ -80,6 +81,14 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   // Eyedropper Toast Notification
   const [pickedToast, setPickedToast] = useState<string | null>(null);
   const [isAltPressed, setIsAltPressed] = useState<boolean>(false);
+  
+  // Open Market Share Modal State for Maps
+  const [showPublishModal, setShowPublishModal] = useState<boolean>(false);
+  const [publishTitle, setPublishTitle] = useState<string>('');
+  const [publishDesc, setPublishDesc] = useState<string>('');
+  const [publishCreator, setPublishCreator] = useState<string>('');
+  const [includeCustomTilesets, setIncludeCustomTilesets] = useState<boolean>(true);
+  const [isPublishing, setIsPublishing] = useState<boolean>(false);
   
   // View Settings & Zoom (0.5x to 4.0x)
   const [zoom, setZoom] = useState<number>(1.5); 
@@ -1335,6 +1344,78 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     setTimeout(() => setPickedToast(null), 3000);
   };
 
+  const handlePublishMapToMarket = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const title = publishTitle.trim();
+    if (!title) {
+      alert('상점에 공개할 맵 이름을 입력해 주세요!');
+      return;
+    }
+
+    try {
+      setIsPublishing(true);
+      const currentHouse = getSavedHouseCode();
+      const creator = publishCreator.trim() || localStorage.getItem('on_house_nickname') || '익명 크리에이터';
+
+      // Capture map thumbnail from canvasRef if available
+      let previewDataUrl = '';
+      if (canvasRef.current) {
+        try {
+          previewDataUrl = canvasRef.current.toDataURL('image/png', 0.8);
+        } catch (e) {}
+      }
+
+      // Collect custom map tileset assets used in this map
+      const bundledTilesets: any[] = [];
+      if (includeCustomTilesets && customMapTilesets && customMapTilesets.length > 0) {
+        const usedPrefixes = new Set<number>();
+        const scanLayer = (layer: number[][]) => {
+          if (Array.isArray(layer)) {
+            layer.forEach(row => {
+              if (Array.isArray(row)) {
+                row.forEach(idx => {
+                  if (idx >= 9000) {
+                    const prefix = Math.floor(idx / 1000) * 1000;
+                    usedPrefixes.add(prefix);
+                  }
+                });
+              }
+            });
+          }
+        };
+        scanLayer(localMap.baseLayer);
+        scanLayer(localMap.decorLayer);
+
+        customMapTilesets.forEach(ts => {
+          if (ts.prefix && usedPrefixes.has(ts.prefix)) {
+            bundledTilesets.push(ts);
+          }
+        });
+      }
+
+      await publishItemToMarket({
+        type: 'map',
+        title,
+        description: publishDesc.trim() || '직접 제작한 완성형 온하우스 맵입니다.',
+        creatorName: creator,
+        originalHouseCode: currentHouse,
+        previewDataUrl,
+        payload: {
+          mapData: localMap,
+          bundledTilesets
+        }
+      });
+
+      setIsPublishing(false);
+      setShowPublishModal(false);
+      setPickedToast(`🎉 [${title}] 맵이 커스텀 타일셋과 함께 오픈 마켓 상점에 성공적으로 게시되었습니다!`);
+      setTimeout(() => setPickedToast(null), 3000);
+    } catch (err: any) {
+      alert('맵 마켓 게시 중 오류 발생: ' + (err?.message || err));
+      setIsPublishing(false);
+    }
+  };
+
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     // Right click cancels stamp preview and switches to select mode
     if (e.button === 2) {
@@ -1909,8 +1990,26 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           )}
         </div>
 
-        {/* Right Actions: Reset */}
+        {/* Right Actions: Reset & Market Share */}
         <div style={{ display: "flex", alignItems: "center", gap: "8px", paddingBottom: "4px" }}>
+          <button
+            type="button"
+            onClick={() => {
+              setPublishTitle(localMap.name || '');
+              setPublishDesc('');
+              setPublishCreator(localStorage.getItem('on_house_nickname') || '익명 크리에이터');
+              setIncludeCustomTilesets(true);
+              setShowPublishModal(true);
+            }}
+            style={{
+              padding: "4px 10px", background: "rgba(167, 139, 250, 0.15)", color: "#a78bfa",
+              border: "1px solid #a78bfa", borderRadius: "4px", fontSize: "11px",
+              display: "flex", alignItems: "center", gap: "4px", cursor: "pointer"
+            }}
+            title="이 맵과 사용 중인 커스텀 타일셋을 오픈 마켓 상점에 공유"
+          >
+            🛒 맵 마켓 공유
+          </button>
           <button
             onClick={handleResetToDefault}
             style={{
@@ -2994,6 +3093,97 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               </div>
             </form>
           </div>
+        </div>
+      )}
+      {/* Map Open Market Share Modal */}
+      {showPublishModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(5px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 10000, padding: '16px'
+        }}>
+          <form
+            onSubmit={handlePublishMapToMarket}
+            style={{
+              width: '440px', maxWidth: '90vw', background: '#12121e',
+              border: '1px solid #3b3b54', padding: '20px', display: 'flex',
+              flexDirection: 'column', gap: '14px', boxShadow: '0 10px 30px rgba(0,0,0,0.8)'
+            }}
+          >
+            <h3 style={{ margin: 0, color: '#fff', fontSize: '16px', fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              🛒 오픈 마켓 상점에 이 맵 공유
+            </h3>
+
+            <div style={{ fontSize: '11px', color: '#aaa', background: '#191928', padding: '8px 10px', border: '1px solid #2d2d44' }}>
+              공유된 맵은 다른 하우스의 모든 유저가 내 하우스로 가져가 100% 동일하게 렌더링하고 자유롭게 구조를 편집할 수 있습니다.
+            </div>
+
+            <div>
+              <label style={{ fontSize: '11px', color: '#ccc', display: 'block', marginBottom: '4px' }}>🏰 맵 이름:</label>
+              <input
+                type="text"
+                value={publishTitle}
+                onChange={(e) => setPublishTitle(e.target.value)}
+                placeholder="예: 닌자 템플 마을 맵 30x20"
+                required
+                style={{ width: '100%', background: '#09090f', border: '1px solid #4a4a6b', padding: '6px 8px', color: '#fff', fontSize: '12px', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: '11px', color: '#ccc', display: 'block', marginBottom: '4px' }}>📝 간단한 소개 / 설명:</label>
+              <textarea
+                value={publishDesc}
+                onChange={(e) => setPublishDesc(e.target.value)}
+                placeholder="맵 구성에 대한 설명이나 크리에이터 한마디를 적어주세요."
+                rows={3}
+                style={{ width: '100%', background: '#09090f', border: '1px solid #4a4a6b', padding: '6px 8px', color: '#fff', fontSize: '12px', outline: 'none', resize: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: '11px', color: '#ccc', display: 'block', marginBottom: '4px' }}>👤 크리에이터 닉네임:</label>
+              <input
+                type="text"
+                value={publishCreator}
+                onChange={(e) => setPublishCreator(e.target.value)}
+                placeholder="닉네임"
+                style={{ width: '100%', background: '#09090f', border: '1px solid #4a4a6b', padding: '6px 8px', color: '#fff', fontSize: '12px', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div style={{ background: '#161625', border: '1px solid #3b3b54', padding: '10px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: '#ffb86c', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={includeCustomTilesets}
+                  onChange={(e) => setIncludeCustomTilesets(e.target.checked)}
+                />
+                📦 이 맵에 사용된 커스텀 타일셋 에셋 함께 패키징하여 공유
+              </label>
+              <p style={{ margin: '4px 0 0 24px', fontSize: '10px', color: '#aaa' }}>
+                체크하면 타 유저가 맵을 다운로드할 때 커스텀 타일셋도 자동으로 소장하게 됩니다!
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '6px' }}>
+              <button
+                type="button"
+                onClick={() => setShowPublishModal(false)}
+                style={{ padding: '6px 12px', background: '#222233', border: '1px solid #4a4a6b', color: '#ccc', cursor: 'pointer', fontSize: '11px' }}
+              >
+                취소
+              </button>
+              <button
+                type="submit"
+                disabled={isPublishing}
+                style={{ padding: '6px 16px', background: '#a78bfa', border: 'none', color: '#000', cursor: 'pointer', fontSize: '11px', fontWeight: 'normal' }}
+              >
+                {isPublishing ? '⏳ 등록 중...' : '🚀 마켓에 공개 게시'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

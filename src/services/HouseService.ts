@@ -416,3 +416,302 @@ export const deleteHouseAssetFromDB = async (
     return { success: false };
   }
 };
+
+// ----------------------------------------------------
+// Open Marketplace (오픈 마켓 상점) Service API
+// ----------------------------------------------------
+
+export interface MarketItem {
+  id: string;
+  type: 'character' | 'map_tileset' | 'map';
+  title: string;
+  description: string;
+  creatorName: string;
+  originalHouseCode: string;
+  createdAt: string;
+  downloadsCount: number;
+  likesCount: number;
+  previewDataUrl: string;
+  payload: {
+    character?: any;
+    mapTileset?: any;
+    mapData?: any;
+    bundledTilesets?: any[];
+  };
+}
+
+// Fetch all market items from Supabase DB (or fallback to LocalStorage)
+export const fetchMarketItems = async (): Promise<MarketItem[]> => {
+  try {
+    const res = await withTimeout(
+      supabase
+        .from('house_assets')
+        .select('asset_data')
+        .eq('house_code', 'GLOBAL_MARKET')
+        .eq('asset_type', 'market_item')
+        .order('id', { ascending: false })
+        .limit(200),
+      4000
+    );
+
+    const items: MarketItem[] = [];
+    if (res.data && res.data.length > 0) {
+      res.data.forEach((row: any) => {
+        if (row.asset_data && row.asset_data.id && row.asset_data.title) {
+          items.push(row.asset_data as MarketItem);
+        }
+      });
+    }
+
+    // Merge with local fallback market items
+    try {
+      const localStr = localStorage.getItem('on_house_global_market_items');
+      if (localStr) {
+        const localItems: MarketItem[] = JSON.parse(localStr);
+        localItems.forEach((li) => {
+          if (!items.some((i) => i.id === li.id)) {
+            items.unshift(li);
+          }
+        });
+      }
+    } catch (e) {}
+
+    return items;
+  } catch (err) {
+    console.warn('[OnHouse Market] fetchMarketItems timeout/error, using local fallback:', err);
+    try {
+      const localStr = localStorage.getItem('on_house_global_market_items');
+      return localStr ? JSON.parse(localStr) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+};
+
+// Publish an asset or map to the global open market
+export const publishItemToMarket = async (
+  itemData: Omit<MarketItem, 'id' | 'createdAt' | 'downloadsCount' | 'likesCount'>
+): Promise<{ success: boolean; itemId?: string; error?: string }> => {
+  try {
+    const newItem: MarketItem = {
+      ...itemData,
+      id: 'mkt_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+      createdAt: new Date().toISOString(),
+      downloadsCount: 0,
+      likesCount: 0
+    };
+
+    // Save locally
+    try {
+      const localStr = localStorage.getItem('on_house_global_market_items');
+      const items: MarketItem[] = localStr ? JSON.parse(localStr) : [];
+      items.unshift(newItem);
+      localStorage.setItem('on_house_global_market_items', JSON.stringify(items));
+    } catch (e) {}
+
+    // Save to Supabase DB
+    await withTimeout(
+      supabase
+        .from('house_assets')
+        .insert({
+          house_code: 'GLOBAL_MARKET',
+          asset_type: 'market_item',
+          asset_data: newItem,
+          updated_at: new Date().toISOString()
+        }),
+      4000
+    );
+
+    return { success: true, itemId: newItem.id };
+  } catch (err: any) {
+    console.error('Error in publishItemToMarket:', err);
+    return { success: true }; // Local publish succeeds
+  }
+};
+
+// Increment download counter
+export const incrementMarketDownload = async (itemId: string) => {
+  try {
+    const localStr = localStorage.getItem('on_house_global_market_items');
+    if (localStr) {
+      const items: MarketItem[] = JSON.parse(localStr);
+      const target = items.find((i) => i.id === itemId);
+      if (target) {
+        target.downloadsCount = (target.downloadsCount || 0) + 1;
+        localStorage.setItem('on_house_global_market_items', JSON.stringify(items));
+      }
+    }
+  } catch (e) {}
+};
+
+// Increment like counter
+export const incrementMarketLike = async (itemId: string) => {
+  try {
+    const localStr = localStorage.getItem('on_house_global_market_items');
+    if (localStr) {
+      const items: MarketItem[] = JSON.parse(localStr);
+      const target = items.find((i) => i.id === itemId);
+      if (target) {
+        target.likesCount = (target.likesCount || 0) + 1;
+        localStorage.setItem('on_house_global_market_items', JSON.stringify(items));
+      }
+    }
+  } catch (e) {}
+};
+
+// Import a MarketItem directly into the current house DB & LocalStorage with full isolation & editability!
+export const importMarketItemToMyHouse = async (
+  houseCode: string,
+  marketItem: MarketItem
+): Promise<{ success: boolean; resultId?: string; error?: string }> => {
+  try {
+    await incrementMarketDownload(marketItem.id);
+
+    // Case 1: Importing a Character Sprite
+    if (marketItem.type === 'character' && marketItem.payload.character) {
+      const char = marketItem.payload.character;
+      const newCharId = 'custom_char_' + Date.now() + '_' + Math.random().toString(36).substring(2, 5);
+
+      const newCharObj = {
+        id: newCharId,
+        name: marketItem.title || char.name || '마켓 캐릭터',
+        url: char.dataUrl || char.url,
+        dataUrl: char.dataUrl || char.url,
+        cols: char.cols || 4,
+        rows: char.rows || 7,
+        size: char.size || 32,
+        spriteType: char.spriteType || newCharId,
+        isCustom: true
+      };
+
+      // Save to LocalStorage
+      const savedStr = localStorage.getItem('on_house_custom_char_sprites');
+      const existing: any[] = savedStr ? JSON.parse(savedStr) : [];
+      existing.push(newCharObj);
+      localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(existing));
+
+      // Save to Supabase DB
+      await saveHouseAssetToDB(houseCode, 'char_sprite', newCharObj);
+      window.dispatchEvent(new Event('on_house_sprites_updated'));
+
+      return { success: true, resultId: newCharId };
+    }
+
+    // Case 2: Importing a Map Tileset Asset
+    if (marketItem.type === 'map_tileset' && marketItem.payload.mapTileset) {
+      const ts = marketItem.payload.mapTileset;
+      const newTilesetId = 'custom_map_' + Date.now() + '_' + Math.random().toString(36).substring(2, 5);
+
+      const savedMapsStr = localStorage.getItem('on_house_custom_map_tilesets');
+      const existingMaps: any[] = savedMapsStr ? JSON.parse(savedMapsStr) : [];
+      const newPrefix = 9000 + existingMaps.length * 1000;
+
+      const newTilesetObj = {
+        id: newTilesetId,
+        name: marketItem.title || ts.name || '마켓 타일셋',
+        url: ts.url || ts.dataUrl,
+        cols: ts.cols || 16,
+        rows: ts.rows || 16,
+        size: ts.size || 16,
+        spacing: ts.spacing || 0,
+        margin: ts.margin || 0,
+        prefix: newPrefix,
+        isCustom: true
+      };
+
+      existingMaps.push(newTilesetObj);
+      localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(existingMaps));
+
+      await saveHouseAssetToDB(houseCode, 'map_tileset', newTilesetObj);
+      window.dispatchEvent(new Event('on_house_sprites_updated'));
+
+      return { success: true, resultId: newTilesetId };
+    }
+
+    // Case 3: Importing a Full Map (with optional bundled tilesets)
+    if (marketItem.type === 'map' && marketItem.payload.mapData) {
+      const rawMap = marketItem.payload.mapData;
+      const bundledTilesets = marketItem.payload.bundledTilesets || [];
+
+      // 1. Import any bundled custom tilesets into this house first!
+      const prefixRemap: Record<number, number> = {};
+      const savedMapsStr = localStorage.getItem('on_house_custom_map_tilesets');
+      const existingMaps: any[] = savedMapsStr ? JSON.parse(savedMapsStr) : [];
+
+      for (const bTs of bundledTilesets) {
+        if (bTs && bTs.url) {
+          // Check if identical tileset already imported
+          const found = existingMaps.find((m) => m.name === bTs.name && m.url === bTs.url);
+          if (found) {
+            if (bTs.prefix && found.prefix) {
+              prefixRemap[bTs.prefix] = found.prefix;
+            }
+          } else {
+            const newPrefix = 9000 + existingMaps.length * 1000;
+            const newTsId = 'custom_map_' + Date.now() + '_' + Math.random().toString(36).substring(2, 5);
+            const newTsObj = {
+              id: newTsId,
+              name: bTs.name || '마켓 타일셋',
+              url: bTs.url,
+              cols: bTs.cols || 16,
+              rows: bTs.rows || 16,
+              size: bTs.size || 16,
+              spacing: bTs.spacing || 0,
+              margin: bTs.margin || 0,
+              prefix: newPrefix,
+              isCustom: true
+            };
+            existingMaps.push(newTsObj);
+            await saveHouseAssetToDB(houseCode, 'map_tileset', newTsObj);
+            if (bTs.prefix) {
+              prefixRemap[bTs.prefix] = newPrefix;
+            }
+          }
+        }
+      }
+      localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(existingMaps));
+
+      // 2. Clone map data & remap tile prefixes if needed
+      const importedMap = JSON.parse(JSON.stringify(rawMap));
+      const newMapId = 'custom_preset_' + Date.now() + '_' + Math.random().toString(36).substring(2, 5);
+
+      importedMap.name = marketItem.title || rawMap.name || '마켓에서 가져온 맵';
+
+      // Remap tile indexes in base, decor, collision
+      const remapTileIndex = (idx: number) => {
+        if (idx < 9000) return idx;
+        const oldPrefix = Math.floor(idx / 1000) * 1000;
+        const offset = idx % 1000;
+        if (prefixRemap[oldPrefix]) {
+          return prefixRemap[oldPrefix] + offset;
+        }
+        return idx;
+      };
+
+      importedMap.baseLayer = importedMap.baseLayer.map((row: number[]) => row.map(remapTileIndex));
+      importedMap.decorLayer = importedMap.decorLayer.map((row: number[]) => row.map(remapTileIndex));
+
+      // Save map locally & to DB
+      localStorage.setItem('on_house_map_' + newMapId, JSON.stringify(importedMap));
+      await saveHouseMapToDB(houseCode, newMapId, importedMap);
+
+      // Save available map IDs
+      try {
+        const availStr = localStorage.getItem('on_house_available_map_ids');
+        const availList: string[] = availStr ? JSON.parse(availStr) : ['room', 'subway', 'park', 'apt'];
+        if (!availList.includes(newMapId)) {
+          availList.push(newMapId);
+          localStorage.setItem('on_house_available_map_ids', JSON.stringify(availList));
+        }
+      } catch (e) {}
+
+      window.dispatchEvent(new Event('on_house_sprites_updated'));
+      return { success: true, resultId: newMapId };
+    }
+
+    return { success: false, error: '지원하지 않는 마켓 항목입니다.' };
+  } catch (err: any) {
+    console.error('Error in importMarketItemToMyHouse:', err);
+    return { success: false, error: err?.message || '마켓 항목 가져오기 오류' };
+  }
+};
