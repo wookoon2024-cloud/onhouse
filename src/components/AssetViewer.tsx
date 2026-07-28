@@ -1673,6 +1673,72 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     }
   };
 
+  const handlePublishAssetToMarket = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentOption) return;
+    const title = publishTitle.trim();
+    if (!title) {
+      alert('상점에 공개할 에셋 이름을 입력해 주세요!');
+      return;
+    }
+
+    try {
+      setIsPublishing(true);
+      const currentHouse = getSavedHouseCode();
+      const creator = publishCreator.trim() || localStorage.getItem('on_house_nickname') || '익명 크리에이터';
+
+      const assetUrl = currentOption.url || currentOption.dataUrl || '';
+
+      if (activeTab === 'character') {
+        await publishItemToMarket({
+          type: 'character',
+          title,
+          description: publishDesc.trim() || '직접 디자인한 픽셀 캐릭터 에셋입니다.',
+          creatorName: creator,
+          originalHouseCode: currentHouse,
+          previewDataUrl: assetUrl,
+          payload: {
+            character: {
+              name: title,
+              size: currentOption.size || 32,
+              dataUrl: assetUrl,
+              cols: currentOption.cols || 4,
+              rows: currentOption.rows || 7,
+              spriteType: currentOption.id
+            }
+          }
+        });
+      } else {
+        await publishItemToMarket({
+          type: 'map_tileset',
+          title,
+          description: publishDesc.trim() || '직접 제작한 레트로 맵 타일셋 에셋입니다.',
+          creatorName: creator,
+          originalHouseCode: currentHouse,
+          previewDataUrl: assetUrl,
+          payload: {
+            mapTileset: {
+              name: title,
+              size: currentOption.size || 16,
+              url: assetUrl,
+              cols: currentOption.cols || 16,
+              rows: currentOption.rows || 16,
+              spacing: currentOption.spacing || 0,
+              margin: currentOption.margin || 0
+            }
+          }
+        });
+      }
+
+      setIsPublishing(false);
+      setShowPublishModal(false);
+      setToastMessage(`🎉 [${title}] 에셋이 오픈 마켓 상점에 성공적으로 게시되었습니다!`);
+    } catch (err: any) {
+      alert('마켓 게시 중 오류 발생: ' + (err?.message || err));
+      setIsPublishing(false);
+    }
+  };
+
   // Delete custom asset
   const handleDeleteCustomAsset = async (id: string) => {
     if (!window.confirm("정말로 이 커스텀 에셋을 영구 삭제하시겠습니까?")) return;
@@ -3503,17 +3569,18 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       {/* Open Market Share Modal */}
       {showPublishModal && (
         <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(5px)',
+          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(5, 5, 14, 0.95)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 10000, padding: '16px'
+          zIndex: 1000, padding: '16px', borderRadius: 0
         }}>
           <form
             onSubmit={handlePublishAssetToMarket}
             style={{
-              width: '420px', maxWidth: '90vw', background: '#12121e',
-              border: '1px solid #3b3b54', padding: '20px', display: 'flex',
-              flexDirection: 'column', gap: '14px', boxShadow: '0 10px 30px rgba(0,0,0,0.8)'
+              width: '440px', maxWidth: '92vw', background: '#12121c',
+              border: '1px solid #a78bfa', padding: '24px', display: 'flex',
+              flexDirection: 'column', gap: '14px', boxShadow: '0 20px 60px rgba(0,0,0,0.95)',
+              color: '#ffffff'
             }}
           >
             <h3 style={{ margin: 0, color: '#fff', fontSize: '16px', fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '6px' }}>
