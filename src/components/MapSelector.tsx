@@ -21,11 +21,12 @@ export const MapSelector: React.FC<MapSelectorProps> = ({
 }) => {
   return (
     <div className="glass-panel" style={{
-      position: 'absolute', left: '10px', top: '10px',
-      padding: '5px 8px', display: 'flex', alignItems: 'center', gap: '6px',
-      zIndex: 100, border: '1px solid rgba(255, 255, 255, 0.15)',
-      background: 'rgba(20, 20, 32, 0.85)', maxWidth: 'calc(100vw - 20px)',
-      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)', borderRadius: '6px'
+      position: 'absolute', left: '6px', top: '6px',
+      padding: '4px 6px', display: 'flex', alignItems: 'center', gap: '4px',
+      zIndex: 100, border: '1px solid rgba(255, 255, 255, 0.18)',
+      background: 'rgba(15, 15, 25, 0.88)', maxWidth: 'calc(100vw - 12px)',
+      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)', borderRadius: '6px',
+      boxSizing: 'border-box'
     }}>
       <Map size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
       <span className="pixel-text" style={{ fontSize: '11px', color: 'var(--text-secondary)', marginRight: '4px', flexShrink: 0 }}>

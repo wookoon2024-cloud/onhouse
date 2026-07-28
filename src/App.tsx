@@ -143,7 +143,7 @@ export default function App() {
   const [interactionTargetPlayer, setInteractionTargetPlayer] = useState<PlayerState | null>(null);
   const [incomingDMRequest, setIncomingDMRequest] = useState<{ requesterId: string; requesterName: string; requesterPlayer: PlayerState } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [isChatLogCollapsed, setIsChatLogCollapsed] = useState(false);
+  const [isChatLogCollapsed, setIsChatLogCollapsed] = useState<boolean>(() => typeof window !== 'undefined' && window.innerWidth < 768);
 
   const handleMarketItemImported = (item: MarketItem, resultId?: string) => {
     fetchHouseMaps(houseCode).then((mapsData) => {
@@ -2138,7 +2138,7 @@ export default function App() {
 
 
   return (
-    <div style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
+    <div style={{ position: 'relative', width: '100vw', height: '100dvh', overflow: 'hidden' }}>
       {/* App Version Badge (Bottom Left) */}
       <div style={{
         position: 'absolute', left: '10px', bottom: isMobile ? '4px' : '8px', zIndex: 99,
@@ -2296,18 +2296,19 @@ export default function App() {
       {/* 7. Classic Flat Translucent Integrated Chat Box */}
       <div style={{
         position: 'absolute',
-        bottom: isMobile ? '6px' : '14px',
+        bottom: isMobile ? 'calc(env(safe-area-inset-bottom, 0px) + 6px)' : '14px',
         left: '50%',
         transform: 'translateX(-50%)',
-        width: isMobile ? 'calc(100% - 12px)' : 'calc(100% - 32px)',
+        width: isMobile ? 'calc(100% - 10px)' : 'calc(100% - 32px)',
         maxWidth: isMobile ? '100%' : '880px',
         zIndex: 100,
-        background: 'rgba(15, 15, 25, 0.85)',
+        background: 'rgba(15, 15, 25, 0.88)',
         backdropFilter: 'blur(10px)',
         borderRadius: '6px',
         border: '1px solid rgba(255, 255, 255, 0.18)',
         boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
-        padding: isMobile ? '6px 8px' : '8px 12px',
+        padding: isMobile ? '4px 6px' : '8px 12px',
+        boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
         gap: '4px'

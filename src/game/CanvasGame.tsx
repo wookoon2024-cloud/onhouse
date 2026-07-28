@@ -163,7 +163,7 @@ export const getCameraCoords = (
   if (map.height * vSize > viewH) {
     cameraY = Math.max(0, Math.min(cameraY, maxCameraY));
   } else {
-    cameraY = (map.height * vSize - viewH) / 2;
+    cameraY = 0; // Top-flush: Eliminates black gap above map!
   }
 
   return {
@@ -939,7 +939,7 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
       if (map.height * vSize > dimensions.height) {
         editCameraY.current = Math.max(0, Math.min(editCameraY.current, maxCameraY));
       } else {
-        editCameraY.current = (map.height * vSize - dimensions.height) / 2;
+        editCameraY.current = 0;
       }
     };
 
@@ -1777,11 +1777,11 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
       {/* Mobile virtual directional key overlay */}
       {isMobile && (
         <div style={{
-          position: 'absolute', left: '12px', bottom: '125px', width: '115px', height: '115px',
+          position: 'absolute', left: '10px', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 75px)', width: '100px', height: '100px',
           display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gridTemplateRows: 'repeat(3, 1fr)',
-          gap: '3px', zIndex: 120, background: 'rgba(0,0,0,0.3)', padding: '5px', borderRadius: '50%',
-          backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.15)',
-          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.4)', touchAction: 'none'
+          gap: '3px', zIndex: 120, background: 'rgba(0,0,0,0.35)', padding: '4px', borderRadius: '50%',
+          backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.18)',
+          boxShadow: '0 8px 24px 0 rgba(0, 0, 0, 0.5)', touchAction: 'none'
         }}>
           <div />
           <button
