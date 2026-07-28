@@ -2359,114 +2359,127 @@ export default function App() {
           </div>
         )}
 
-        {/* Integrated Flat Tools & Input Controls Header Row */}
+        {/* Integrated Flat Tools & Input Controls Header Area */}
         <div style={{
           display: 'flex',
-          alignItems: 'center',
-          gap: isMobile ? '4px' : '8px',
+          flexDirection: isMobile ? 'column' : 'row',
+          alignItems: isMobile ? 'stretch' : 'center',
+          gap: isMobile ? '6px' : '8px',
           borderTop: isChatLogCollapsed ? 'none' : '1px solid rgba(255,255,255,0.1)',
           paddingTop: isChatLogCollapsed ? '0px' : '4px',
-          overflowX: isMobile ? 'auto' : 'visible',
+          overflowX: 'hidden',
           maxWidth: '100%'
         }}>
-          {/* Chat Channel Mode Selector ([전체] vs [맵]) */}
-          <button
-            type="button"
-            onClick={() => setChatChannel((mode) => mode === 'global' ? 'map' : 'global')}
-            style={{
-              fontSize: '10px',
-              color: chatChannel === 'global' ? '#fab387' : '#a6e3a1',
-              background: chatChannel === 'global' ? 'rgba(250, 179, 135, 0.15)' : 'rgba(166, 227, 161, 0.15)',
-              padding: '2px 6px',
-              borderRadius: '3px',
-              border: chatChannel === 'global' ? '1px solid rgba(250, 179, 135, 0.4)' : '1px solid rgba(166, 227, 161, 0.4)',
-              flexShrink: 0, whiteSpace: 'nowrap', cursor: 'pointer',
-              outline: 'none', transition: 'all 0.15s ease'
-            }}
-            title="채팅 범위 전환 (클릭 시 [전체] / [맵] 대화 전환)"
-          >
-            {chatChannel === 'global' ? '[전체]' : '[맵]'}
-          </button>
+          {/* ROW 1: Chat Channel Selector, Toggle History, Chat Input Form */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', width: isMobile ? '100%' : 'auto', flex: isMobile ? 'none' : 1 }}>
+            {/* Chat Channel Mode Selector ([전체] vs [맵]) */}
+            <button
+              type="button"
+              onClick={() => setChatChannel((mode) => mode === 'global' ? 'map' : 'global')}
+              style={{
+                fontSize: '10px',
+                color: chatChannel === 'global' ? '#fab387' : '#a6e3a1',
+                background: chatChannel === 'global' ? 'rgba(250, 179, 135, 0.15)' : 'rgba(166, 227, 161, 0.15)',
+                padding: '3px 6px',
+                borderRadius: '3px',
+                border: chatChannel === 'global' ? '1px solid rgba(250, 179, 135, 0.4)' : '1px solid rgba(166, 227, 161, 0.4)',
+                flexShrink: 0, whiteSpace: 'nowrap', cursor: 'pointer',
+                outline: 'none', transition: 'all 0.15s ease'
+              }}
+              title="채팅 범위 전환 (클릭 시 [전체] / [맵] 대화 전환)"
+            >
+              {chatChannel === 'global' ? '[전체]' : '[맵]'}
+            </button>
 
-          {/* Chat History Single Toggle Button ([▼ 축소] / [▲ 펼치기]) */}
-          <button
-            type="button"
-            onClick={() => setIsChatLogCollapsed((prev) => !prev)}
-            style={{
-              fontSize: '10px',
-              color: isChatLogCollapsed ? '#fab387' : '#a6adc8',
-              background: isChatLogCollapsed ? 'rgba(250, 179, 135, 0.15)' : 'rgba(255,255,255,0.06)',
-              padding: '2px 6px',
-              borderRadius: '3px',
-              border: isChatLogCollapsed ? '1px solid rgba(250, 179, 135, 0.4)' : '1px solid rgba(255,255,255,0.1)',
-              cursor: 'pointer',
-              outline: 'none',
-              whiteSpace: 'nowrap',
-              flexShrink: 0,
-              transition: 'all 0.15s ease'
-            }}
-            title="채팅 내역 축소 (숨기기) / 펼치기"
-          >
-            {isChatLogCollapsed ? '▲ 펼치기' : '▼ 축소'}
-          </button>
+            {/* Chat History Single Toggle Button ([▼ 축소] / [▲ 펼치기]) */}
+            <button
+              type="button"
+              onClick={() => setIsChatLogCollapsed((prev) => !prev)}
+              style={{
+                fontSize: '10px',
+                color: isChatLogCollapsed ? '#fab387' : '#a6adc8',
+                background: isChatLogCollapsed ? 'rgba(250, 179, 135, 0.15)' : 'rgba(255,255,255,0.06)',
+                padding: '3px 6px',
+                borderRadius: '3px',
+                border: isChatLogCollapsed ? '1px solid rgba(250, 179, 135, 0.4)' : '1px solid rgba(255,255,255,0.1)',
+                cursor: 'pointer',
+                outline: 'none',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                transition: 'all 0.15s ease'
+              }}
+              title="채팅 내역 축소 (숨기기) / 펼치기"
+            >
+              {isChatLogCollapsed ? '▲ 펼치기' : '▼ 축소'}
+            </button>
 
-          {/* Status Picker (😊) */}
-          <div style={{ flexShrink: 0 }}>
-            <StatusPicker
-              currentStatus={localPlayer.statusMessage}
-              onStatusChange={handleStatusChange}
-            />
+            {/* Flat Chat Input Form */}
+            <form onSubmit={handleChatSubmit} style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
+              <input
+                ref={chatInputRef}
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder={
+                  isMobile
+                    ? `[${chatChannel === 'global' ? '전체' : '맵'}] 입력...`
+                    : `[${chatChannel === 'global' ? '전체' : '맵'}] 메시지를 입력하세요 (Enter 키로 전송)...`
+                }
+                style={{
+                  width: '100%',
+                  background: 'rgba(0, 0, 0, 0.45)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: '3px',
+                  padding: isMobile ? '4px 6px' : '6px 10px',
+                  fontSize: isMobile ? '11px' : '12px',
+                  color: '#fff',
+                  outline: 'none',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </form>
           </div>
 
-          {/* Mailbox / DM Button */}
-          <button
-            onClick={handleOpenMailbox}
-            style={{
-              background: 'none', border: 'none', color: '#fff', cursor: 'pointer',
-              position: 'relative', display: 'flex', alignItems: 'center', padding: '3px', flexShrink: 0
-            }}
-            title="메일함 / DM"
-          >
-            <Mail size={14} />
-            {unreadCount > 0 && (
-              <span style={{
-                position: 'absolute', top: '-2px', right: '-4px', background: 'var(--danger)',
-                color: '#fff', fontSize: '8px', width: '13px', height: '13px', borderRadius: '50%',
-                display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold'
-              }}>
-                {unreadCount}
-              </span>
-            )}
-          </button>
+          {/* ROW 2: Status, Mail, Editors, Market, Settings, Bag, House Code */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: isMobile ? '4px' : '6px',
+            justifyContent: isMobile ? 'space-between' : 'flex-end',
+            width: isMobile ? '100%' : 'auto',
+            flexShrink: 0,
+            overflowX: 'hidden'
+          }}>
+            {/* Status Picker (😊) */}
+            <div style={{ flexShrink: 0 }}>
+              <StatusPicker
+                currentStatus={localPlayer.statusMessage}
+                onStatusChange={handleStatusChange}
+              />
+            </div>
 
-          {/* Flat Chat Input Form */}
-          <form onSubmit={handleChatSubmit} style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: isMobile ? '90px' : '140px' }}>
-            <input
-              ref={chatInputRef}
-              type="text"
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              placeholder={
-                isMobile
-                  ? `[${chatChannel === 'global' ? '전체' : '맵'}] 입력...`
-                  : `[${chatChannel === 'global' ? '전체' : '맵'}] 메시지를 입력하세요 (Enter 키로 전송)...`
-              }
+            {/* Mailbox / DM Button */}
+            <button
+              onClick={handleOpenMailbox}
               style={{
-                width: '100%',
-                background: 'rgba(0, 0, 0, 0.45)',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                borderRadius: '3px',
-                padding: isMobile ? '4px 6px' : '6px 10px',
-                fontSize: isMobile ? '11px' : '12px',
-                color: '#fff',
-                outline: 'none'
+                background: 'none', border: 'none', color: '#fff', cursor: 'pointer',
+                position: 'relative', display: 'flex', alignItems: 'center', padding: '3px', flexShrink: 0
               }}
-            />
-          </form>
+              title="메일함 / DM"
+            >
+              <Mail size={14} />
+              {unreadCount > 0 && (
+                <span style={{
+                  position: 'absolute', top: '-2px', right: '-4px', background: 'var(--danger)',
+                  color: '#fff', fontSize: '8px', width: '13px', height: '13px', borderRadius: '50%',
+                  display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold'
+                }}>
+                  {unreadCount}
+                </span>
+              )}
+            </button>
 
-          {/* Right Action Icons */}
-          <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
-            {/* 1. 픽셀 에디터 (Eye) - Swapped Order! */}
+            {/* 1. 픽셀 에디터 (Eye) */}
             <button
               onClick={() => setShowAssetViewer(!showAssetViewer)}
               style={{
@@ -2480,7 +2493,7 @@ export default function App() {
               <Eye size={14} />
             </button>
 
-            {/* 2. 전문 지도 편집기 (Hammer) - Swapped Order! */}
+            {/* 2. 전문 지도 편집기 (Hammer) */}
             <button
               onClick={() => {
                 setShowProfessionalEditor(!showProfessionalEditor);
@@ -2506,11 +2519,11 @@ export default function App() {
                 border: '1px solid #a78bfa',
                 color: '#a78bfa',
                 cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px',
-                padding: '2px 7px', borderRadius: '2px', fontSize: '11px', fontWeight: 'normal'
+                padding: '2px 5px', borderRadius: '2px', fontSize: '10px', fontWeight: 'normal'
               }}
-              title="오픈 마켓 상점 (에셋/맵 공유 및 내 하우스로 가져오기)"
+              title="오픈 마켓 상점"
             >
-              <ShoppingCart size={13} />
+              <ShoppingCart size={12} />
               <span>상점</span>
             </button>
 
@@ -2560,8 +2573,8 @@ export default function App() {
                 background: 'rgba(139, 92, 246, 0.2)',
                 border: '1px solid var(--accent)',
                 color: 'var(--accent)',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px',
-                padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px',
+                padding: '2px 5px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold',
                 whiteSpace: 'nowrap', flexShrink: 0
               }}
               title="하우스 번호 (클릭하여 변경 및 공유)"
@@ -2570,12 +2583,16 @@ export default function App() {
               <span>{houseCode}</span>
             </button>
 
-            <div style={{ width: '1px', height: '14px', background: 'rgba(255,255,255,0.15)' }} />
+            {!isMobile && (
+              <>
+                <div style={{ width: '1px', height: '14px', background: 'rgba(255,255,255,0.15)' }} />
 
-            <div style={{ fontSize: '11px', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <User size={12} />
-              <span>{localPlayer.nickname}</span>
-            </div>
+                <div style={{ fontSize: '11px', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <User size={12} />
+                  <span>{localPlayer.nickname}</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

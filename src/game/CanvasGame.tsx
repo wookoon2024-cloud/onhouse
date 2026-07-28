@@ -163,7 +163,7 @@ export const getCameraCoords = (
   if (map.height * vSize > viewH) {
     cameraY = Math.max(0, Math.min(cameraY, maxCameraY));
   } else {
-    cameraY = 0; // Top-flush: Eliminates black gap above map!
+    cameraY = (map.height * vSize - viewH) / 2;
   }
 
   return {
@@ -939,7 +939,7 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
       if (map.height * vSize > dimensions.height) {
         editCameraY.current = Math.max(0, Math.min(editCameraY.current, maxCameraY));
       } else {
-        editCameraY.current = 0;
+        editCameraY.current = (map.height * vSize - dimensions.height) / 2;
       }
     };
 
