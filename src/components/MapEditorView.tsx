@@ -1052,8 +1052,9 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
       const newBase = prev.baseLayer.map(r => [...r]);
       const newDecor = prev.decorLayer.map(r => [...r]);
+      const newCollision = prev.collision.map(r => [...r]);
 
-      // Erase ONLY original starting position (sTx, sTy) without altering map collision
+      // 1. Erase decor & collision at old starting position (sTx, sTy)
       for (let dy = 0; dy < obj.height; dy++) {
         for (let dx = 0; dx < obj.width; dx++) {
           const oldX = sTx + dx;
@@ -1061,6 +1062,26 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           if (oldX >= 0 && oldX < prev.width && oldY >= 0 && oldY < prev.height) {
             newDecor[oldY][oldX] = -1;
             if (obj.layer === "base" || editLayer === "base") { newBase[oldY][oldX] = -1; }
+            if (autoCollision) { newCollision[oldY][oldX] = false; }
+          }
+        }
+      }
+
+      // 2. Set new collision at destination position (newTx, newTy) if autoCollision is enabled
+      if (autoCollision) {
+        for (let dy = 0; dy < obj.height; dy++) {
+          for (let dx = 0; dx < obj.width; dx++) {
+            const nX = newTx + dx;
+            const nY = newTy + dy;
+            if (nX >= 0 && nX < prev.width && nY >= 0 && nY < prev.height) {
+              let hasTile = true;
+              if (obj.tiles && obj.tiles[dy] && obj.tiles[dy][dx] === -1) {
+                hasTile = false;
+              }
+              if (hasTile) {
+                newCollision[nY][nX] = true;
+              }
+            }
           }
         }
       }
@@ -1069,6 +1090,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         ...prev,
         baseLayer: newBase,
         decorLayer: newDecor,
+        collision: newCollision,
         objects: (prev.objects || []).map(o => o.id === objId ? { ...o, x: newTx, y: newTy } : o)
       };
     });
@@ -1252,9 +1274,9 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         objStartRow = Math.floor(drawInfo.localIdx / tsInfo.cols);
       }
 
-      // Capture exact tile grid for custom combined object & erase original map cells to 100% black empty
       const emptyBase = -1; // 100% Pure Black Canvas Ground (-1)!
       const newBase = prev.baseLayer.map(r => [...r]);
+      const newCollision = prev.collision.map(r => [...r]);
       const tilesGrid: number[][] = [];
       for (let r = 0; r < rows; r++) {
         const rowTiles: number[] = [];
@@ -1264,11 +1286,15 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           if (curTx >= 0 && curTx < prev.width && curTy >= 0 && curTy < prev.height) {
             const dIdx = prev.decorLayer[curTy][curTx];
             const bIdx = prev.baseLayer[curTy][curTx];
-            rowTiles.push(editLayer === "decor" ? dIdx : (dIdx !== -1 ? dIdx : bIdx));
+            const tileVal = editLayer === "decor" ? dIdx : (dIdx !== -1 ? dIdx : bIdx);
+            rowTiles.push(tileVal);
             
-            // 🎯 ERASE BOTH LAYERS AT VACATED CELLS TO BLACK EMPTY GROUND (1199 / -1)!
+            // 🎯 ERASE BOTH LAYERS AT VACATED CELLS TO BLACK EMPTY GROUND (-1)!
             newDecor[curTy][curTx] = -1;
             if (editLayer === "base") { newBase[curTy][curTx] = emptyBase; }
+            if (autoCollision) {
+              newCollision[curTy][curTx] = tileVal !== -1;
+            }
           } else {
             rowTiles.push(-1);
           }
@@ -1297,7 +1323,9 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
       return {
         ...prev,
+        baseLayer: newBase,
         decorLayer: newDecor,
+        collision: newCollision,
         objects: nextObjects
       };
     });
