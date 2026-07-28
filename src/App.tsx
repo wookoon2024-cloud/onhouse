@@ -49,7 +49,22 @@ export default function App() {
   const [showHouseModal, setShowHouseModal] = useState<boolean>(false);
 
   // 0. Active Maps (loads house-isolated maps for current houseCode)
-  const [activeMaps, setActiveMaps] = useState<Record<string, MapDefinition>>(() => JSON.parse(JSON.stringify(maps)));
+  const [activeMaps, setActiveMaps] = useState<Record<string, MapDefinition>>(() => {
+    const initial = JSON.parse(JSON.stringify(maps));
+    try {
+      Object.keys(initial).forEach((id) => {
+        const saved = localStorage.getItem('on_house_map_' + id);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && parsed.width && parsed.height) {
+            initial[id] = parsed;
+          }
+        }
+      });
+    } catch (e) {}
+    return initial;
+  });
+  const [isHouseLoaded, setIsHouseLoaded] = useState<boolean>(false);
 
   // 0.5. Available Map IDs displayed in top bar
   const [availableMapIds, setAvailableMapIds] = useState<string[]>(['room', 'subway', 'park', 'apt']);
@@ -447,30 +462,39 @@ export default function App() {
 
   // Supabase House DB fetch & Realtime WebSocket Channel
   useEffect(() => {
-    // 1. Load house maps from Supabase DB
-    fetchHouseMaps(houseCode).then((mapsData) => {
-      setActiveMaps(mapsData);
-      const fetchedMapIds = Object.keys(mapsData);
-      if (fetchedMapIds.length > 0) {
+    setIsHouseLoaded(false);
+
+    // 1. Load house maps & custom assets from Supabase DB
+    Promise.all([
+      fetchHouseMaps(houseCode),
+      fetchHouseAssets(houseCode)
+    ]).then(([mapsData, assetsData]) => {
+      if (mapsData && Object.keys(mapsData).length > 0) {
+        setActiveMaps(mapsData);
+        const fetchedMapIds = Object.keys(mapsData);
         setAvailableMapIds(fetchedMapIds);
       }
-    });
 
-    // 2. Load house custom assets from Supabase DB
-    fetchHouseAssets(houseCode).then(({ mapTilesets, charSprites, charOverrides, charRowActions }) => {
-      setDbCustomCharSprites(charSprites || []);
-      localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(mapTilesets));
-      localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(charSprites));
-      if (charOverrides) {
-        localStorage.setItem('on_house_char_image_overrides', JSON.stringify(charOverrides));
+      if (assetsData) {
+        const { mapTilesets, charSprites, charOverrides, charRowActions } = assetsData;
+        setDbCustomCharSprites(charSprites || []);
+        localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(mapTilesets));
+        localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(charSprites));
+        if (charOverrides) {
+          localStorage.setItem('on_house_char_image_overrides', JSON.stringify(charOverrides));
+        }
+        if (charRowActions) {
+          const existingActionsStr = localStorage.getItem('on_house_char_row_actions');
+          const existingActions = existingActionsStr ? JSON.parse(existingActionsStr) : {};
+          localStorage.setItem('on_house_char_row_actions', JSON.stringify({ ...existingActions, ...charRowActions }));
+        }
+        setAssetVersion((v) => v + 1);
+        window.dispatchEvent(new Event('on_house_sprites_updated'));
       }
-      if (charRowActions) {
-        const existingActionsStr = localStorage.getItem('on_house_char_row_actions');
-        const existingActions = existingActionsStr ? JSON.parse(existingActionsStr) : {};
-        localStorage.setItem('on_house_char_row_actions', JSON.stringify({ ...existingActions, ...charRowActions }));
-      }
-      setAssetVersion((v) => v + 1);
-      window.dispatchEvent(new Event('on_house_sprites_updated'));
+      setIsHouseLoaded(true);
+    }).catch((err) => {
+      console.warn('[OnHouse Sync] Error loading house data from DB:', err);
+      setIsHouseLoaded(true);
     });
 
     // 3. Connect Supabase Realtime channel for multi-device cross-pc sync
@@ -2126,6 +2150,7 @@ export default function App() {
         mapData={activeMaps[localPlayer.mapId] || activeMaps[availableMapIds[0]] || maps.room}
         brushSize={1}
         assetVersion={assetVersion}
+        isHouseLoaded={isHouseLoaded}
         reactionPrompt={reactionPrompt}
       />
 

@@ -41,6 +41,7 @@ interface CanvasGameProps {
   mapData: MapDefinition;
   brushSize: number; // 1 = 1x1, 2 = 2x2, 3 = 3x3, etc.
   assetVersion?: number;
+  isHouseLoaded?: boolean;
   reactionPrompt?: {
     fromId: string;
     fromName: string;
@@ -281,8 +282,8 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
   editLayer,
   onPaintTile,
   mapData,
-  brushSize,
   assetVersion = 0,
+  isHouseLoaded = true,
   reactionPrompt
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -1694,21 +1695,21 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
 
   return (
     <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
-      {!assetsLoaded && (
+      {(!assetsLoaded || isHouseLoaded === false) && (
         <div style={{
           position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
           background: '#12121e', display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center', zIndex: 10
         }}>
-          <div className="pixel-text" style={{ fontSize: '20px', marginBottom: '10px' }}>
-            픽셀 에셋 불러오는 중...
+          <div className="pixel-text" style={{ fontSize: '18px', marginBottom: '10px', color: '#a78bfa' }}>
+            픽셀 에셋 및 하우스 맵 불러오는 중...
           </div>
           <div style={{
-            width: '200px', height: '10px', background: '#1e1e2e',
-            borderRadius: '5px', overflow: 'hidden'
+            width: '220px', height: '10px', background: '#1e1e2e',
+            borderRadius: '5px', overflow: 'hidden', border: '1px solid #3b3b54'
           }}>
             <div style={{
-              width: '100%', height: '100%', background: '#8b5cf6',
+              width: '100%', height: '100%', background: '#a78bfa',
               animation: 'pulse-glow 1.5s infinite'
             }} />
           </div>
