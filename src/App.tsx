@@ -2479,36 +2479,39 @@ export default function App() {
               )}
             </button>
 
-            {/* 1. 픽셀 에디터 (Eye) */}
-            <button
-              onClick={() => setShowAssetViewer(!showAssetViewer)}
-              style={{
-                background: showAssetViewer ? 'rgba(139,92,246,0.3)' : 'none',
-                border: showAssetViewer ? '1px solid var(--accent)' : 'none',
-                color: showAssetViewer ? 'var(--accent)' : '#ccc',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '3px', borderRadius: '2px'
-              }}
-              title="픽셀 에디터"
-            >
-              <Eye size={14} />
-            </button>
+            {/* 1 & 2. 픽셀 에디터 (Eye) & 전문 지도 편집기 (Hammer) - Hidden on Mobile! */}
+            {!isMobile && (
+              <>
+                <button
+                  onClick={() => setShowAssetViewer(!showAssetViewer)}
+                  style={{
+                    background: showAssetViewer ? 'rgba(139,92,246,0.3)' : 'none',
+                    border: showAssetViewer ? '1px solid var(--accent)' : 'none',
+                    color: showAssetViewer ? 'var(--accent)' : '#ccc',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '3px', borderRadius: '2px'
+                  }}
+                  title="픽셀 에디터"
+                >
+                  <Eye size={14} />
+                </button>
 
-            {/* 2. 전문 지도 편집기 (Hammer) */}
-            <button
-              onClick={() => {
-                setShowProfessionalEditor(!showProfessionalEditor);
-                setIsCustomizing(false);
-              }}
-              style={{
-                background: showProfessionalEditor ? 'rgba(139,92,246,0.3)' : 'none',
-                border: showProfessionalEditor ? '1px solid var(--accent)' : 'none',
-                color: showProfessionalEditor ? 'var(--accent)' : '#ccc',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '3px', borderRadius: '2px'
-              }}
-              title="전문 지도 편집기"
-            >
-              <Hammer size={14} />
-            </button>
+                <button
+                  onClick={() => {
+                    setShowProfessionalEditor(!showProfessionalEditor);
+                    setIsCustomizing(false);
+                  }}
+                  style={{
+                    background: showProfessionalEditor ? 'rgba(139,92,246,0.3)' : 'none',
+                    border: showProfessionalEditor ? '1px solid var(--accent)' : 'none',
+                    color: showProfessionalEditor ? 'var(--accent)' : '#ccc',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '3px', borderRadius: '2px'
+                  }}
+                  title="전문 지도 편집기"
+                >
+                  <Hammer size={14} />
+                </button>
+              </>
+            )}
 
             {/* Open Marketplace Shop Button */}
             <button
