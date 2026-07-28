@@ -2299,13 +2299,13 @@ export default function App() {
         bottom: isMobile ? '6px' : '14px',
         left: '50%',
         transform: 'translateX(-50%)',
-        width: isMobile ? 'calc(100% - 12px)' : 'calc(100% - 40px)',
-        maxWidth: '680px',
+        width: isMobile ? 'calc(100% - 12px)' : 'calc(100% - 32px)',
+        maxWidth: isMobile ? '100%' : '880px',
         zIndex: 100,
-        background: 'rgba(15, 15, 25, 0.75)',
+        background: 'rgba(15, 15, 25, 0.85)',
         backdropFilter: 'blur(10px)',
         borderRadius: '6px',
-        border: '1px solid rgba(255, 255, 255, 0.15)',
+        border: '1px solid rgba(255, 255, 255, 0.18)',
         boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
         padding: isMobile ? '6px 8px' : '8px 12px',
         display: 'flex',
@@ -2365,7 +2365,7 @@ export default function App() {
           gap: isMobile ? '4px' : '8px',
           borderTop: isChatLogCollapsed ? 'none' : '1px solid rgba(255,255,255,0.1)',
           paddingTop: isChatLogCollapsed ? '0px' : '4px',
-          overflowX: 'auto',
+          overflowX: isMobile ? 'auto' : 'visible',
           maxWidth: '100%'
         }}>
           {/* Chat Channel Mode Selector ([전체] vs [맵]) */}
@@ -2465,6 +2465,21 @@ export default function App() {
 
           {/* Right Action Icons */}
           <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
+            {/* 1. 픽셀 에디터 (Eye) - Swapped Order! */}
+            <button
+              onClick={() => setShowAssetViewer(!showAssetViewer)}
+              style={{
+                background: showAssetViewer ? 'rgba(139,92,246,0.3)' : 'none',
+                border: showAssetViewer ? '1px solid var(--accent)' : 'none',
+                color: showAssetViewer ? 'var(--accent)' : '#ccc',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '3px', borderRadius: '2px'
+              }}
+              title="픽셀 에디터"
+            >
+              <Eye size={14} />
+            </button>
+
+            {/* 2. 전문 지도 편집기 (Hammer) - Swapped Order! */}
             <button
               onClick={() => {
                 setShowProfessionalEditor(!showProfessionalEditor);
@@ -2479,19 +2494,6 @@ export default function App() {
               title="전문 지도 편집기"
             >
               <Hammer size={14} />
-            </button>
-
-            <button
-              onClick={() => setShowAssetViewer(!showAssetViewer)}
-              style={{
-                background: showAssetViewer ? 'rgba(139,92,246,0.3)' : 'none',
-                border: showAssetViewer ? '1px solid var(--accent)' : 'none',
-                color: showAssetViewer ? 'var(--accent)' : '#ccc',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '3px', borderRadius: '2px'
-              }}
-              title="픽셀 에디터"
-            >
-              <Eye size={14} />
             </button>
 
             {/* Open Marketplace Shop Button */}
