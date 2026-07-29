@@ -31,6 +31,7 @@ import { fetchHouseMemos, saveMemoToDB, deleteMemoFromDB, getLocalInventory, sav
 import { CreateMemoModal } from './components/CreateMemoModal';
 import { ViewMemoModal } from './components/ViewMemoModal';
 import { InventoryModal } from './components/InventoryModal';
+import { CustomAlertModal } from './components/CustomAlertModal';
 import { Briefcase } from 'lucide-react';
 
 interface ChatLogMessage {
@@ -44,6 +45,17 @@ interface ChatLogMessage {
 
 export default function App() {
   const deviceId = useRef(getOrCreateDeviceId());
+
+  // Custom Global Alert Modal State
+  const [customAlertState, setCustomAlertState] = useState<{ message: string; title?: string; icon?: string } | null>(null);
+
+  // Global override for native browser window.alert
+  useEffect(() => {
+    window.alert = (message: any) => {
+      const msgStr = typeof message === 'object' ? JSON.stringify(message) : String(message);
+      setCustomAlertState({ message: msgStr, title: '안내', icon: '💡' });
+    };
+  }, []);
 
   // House Code (Multi-user sharing room ID)
   const [houseCode, setHouseCodeState] = useState<string>(getSavedHouseCode);
@@ -2819,6 +2831,15 @@ export default function App() {
           onClose={() => setShowInventoryModal(false)}
         />
       )}
+
+      {/* 13. Global Custom Alert Modal */}
+      <CustomAlertModal
+        isOpen={!!customAlertState}
+        message={customAlertState?.message || ''}
+        title={customAlertState?.title || '안내'}
+        icon={customAlertState?.icon || '💡'}
+        onClose={() => setCustomAlertState(null)}
+      />
     </div>
   );
 }

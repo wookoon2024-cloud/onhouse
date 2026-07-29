@@ -13,7 +13,9 @@ export const StatusPicker: React.FC<StatusPickerProps> = ({ currentStatus, onSta
   const [customText, setCustomText] = useState('');
   const [showTooltip, setShowTooltip] = useState(false);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const helpRef = useRef<HTMLDivElement | null>(null);
   const [coords, setCoords] = useState<{ bottom: number; left: number }>({ bottom: 50, left: 10 });
+  const [tooltipCoords, setTooltipCoords] = useState<{ bottom: number; left: number }>({ bottom: 50, left: 200 });
 
   const toggleOpen = () => {
     if (!isOpen && buttonRef.current) {
@@ -24,6 +26,17 @@ export const StatusPicker: React.FC<StatusPickerProps> = ({ currentStatus, onSta
       });
     }
     setIsOpen(!isOpen);
+  };
+
+  const handleHelpMouseEnter = () => {
+    if (helpRef.current) {
+      const rect = helpRef.current.getBoundingClientRect();
+      setTooltipCoords({
+        bottom: Math.max(10, window.innerHeight - rect.top + 8),
+        left: Math.max(10, Math.min(rect.left - 100, window.innerWidth - 230))
+      });
+    }
+    setShowTooltip(true);
   };
 
   // Close dropdown on outside click or ESC key
@@ -70,17 +83,18 @@ export const StatusPicker: React.FC<StatusPickerProps> = ({ currentStatus, onSta
 
         {/* Info button */}
         <div 
+          ref={helpRef}
           style={{ position: 'relative', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-          onMouseEnter={() => setShowTooltip(true)}
+          onMouseEnter={handleHelpMouseEnter}
           onMouseLeave={() => setShowTooltip(false)}
         >
           <HelpCircle size={14} style={{ color: 'rgba(255, 255, 255, 0.4)' }} />
           
           {showTooltip && (
             <div style={{
-              position: 'fixed', bottom: `${coords.bottom + 10}px`, left: `${coords.left + 50}px`,
-              width: '220px', padding: '10px', zIndex: 99999, fontSize: '11px', lineHeight: '1.4',
-              color: '#cdd6f4', background: 'rgba(15, 15, 25, 0.95)', border: '1px solid rgba(255,255,255,0.2)',
+              position: 'fixed', bottom: `${tooltipCoords.bottom}px`, left: `${tooltipCoords.left}px`,
+              width: '220px', padding: '10px 12px', zIndex: 99999, fontSize: '11px', lineHeight: '1.4',
+              color: '#cdd6f4', background: 'rgba(15, 15, 25, 0.96)', border: '1px solid rgba(255,255,255,0.22)',
               borderRadius: '6px', pointerEvents: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.6)'
             }}>
               💡 <strong>오프라인 상태 유지</strong>: 브라우저를 닫더라도 설정하신 상태가 캐릭터 머리 위에 계속 유지됩니다!
