@@ -551,8 +551,35 @@ export default function App() {
       if (assetsData) {
         const { mapTilesets, charSprites, charOverrides, charRowActions } = assetsData;
         setDbCustomCharSprites(charSprites || []);
-        localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(mapTilesets));
-        localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(charSprites));
+        
+        // Non-destructive merge for localStorage custom tilesets
+        try {
+          const existingMapsStr = localStorage.getItem('on_house_custom_map_tilesets');
+          let finalMaps = mapTilesets || [];
+          if (existingMapsStr) {
+            const existingMaps = JSON.parse(existingMapsStr);
+            const mapMap = new Map<string, any>();
+            existingMaps.forEach((m: any) => { if (m?.id) mapMap.set(m.id, m); });
+            (mapTilesets || []).forEach((m: any) => { if (m?.id) mapMap.set(m.id, m); });
+            finalMaps = Array.from(mapMap.values());
+          }
+          localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(finalMaps));
+        } catch (e) {}
+
+        // Non-destructive merge for localStorage char sprites
+        try {
+          const existingCharsStr = localStorage.getItem('on_house_custom_char_sprites');
+          let finalChars = charSprites || [];
+          if (existingCharsStr) {
+            const existingChars = JSON.parse(existingCharsStr);
+            const charMap = new Map<string, any>();
+            existingChars.forEach((c: any) => { if (c?.id) charMap.set(c.id, c); });
+            (charSprites || []).forEach((c: any) => { if (c?.id) charMap.set(c.id, c); });
+            finalChars = Array.from(charMap.values());
+          }
+          localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(finalChars));
+        } catch (e) {}
+
         if (charOverrides) {
           localStorage.setItem('on_house_char_image_overrides', JSON.stringify(charOverrides));
         }

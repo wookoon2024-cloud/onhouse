@@ -371,7 +371,7 @@ export const fetchHouseAssets = async (houseCode: string) => {
         .select('asset_type, asset_data')
         .eq('house_code', houseCode)
         .order('id', { ascending: false })
-        .limit(100),
+        .limit(200),
       3500
     );
 
@@ -384,45 +384,85 @@ export const fetchHouseAssets = async (houseCode: string) => {
     const seenMapTilesetIds = new Set<string>();
 
     if (res.data) {
+      // Pass 1: Collect all delete records first
       res.data.forEach((row: any) => {
-        if (!row.asset_data) return;
-
-        if (row.asset_type === 'char_delete' && row.asset_data.id) {
+        if (row.asset_data && row.asset_type === 'char_delete' && row.asset_data.id) {
           deletedAssetIds.add(row.asset_data.id);
-        } else if (row.asset_type === 'map_tileset' && row.asset_data.id) {
-          if (!seenMapTilesetIds.has(row.asset_data.id) && !deletedAssetIds.has(row.asset_data.id)) {
-            seenMapTilesetIds.add(row.asset_data.id);
+        }
+      });
+
+      // Pass 2: Filter active assets
+      res.data.forEach((row: any) => {
+        if (!row.asset_data || !row.asset_data.id) return;
+        const id = row.asset_data.id;
+        if (deletedAssetIds.has(id)) return;
+
+        if (row.asset_type === 'map_tileset') {
+          if (!seenMapTilesetIds.has(id)) {
+            seenMapTilesetIds.add(id);
             mapTilesets.push(row.asset_data);
           }
-        } else if (row.asset_type === 'char_sprite' && row.asset_data.id) {
-          if (!seenCharSpriteIds.has(row.asset_data.id) && !deletedAssetIds.has(row.asset_data.id)) {
-            seenCharSpriteIds.add(row.asset_data.id);
+        } else if (row.asset_type === 'char_sprite') {
+          if (!seenCharSpriteIds.has(id)) {
+            seenCharSpriteIds.add(id);
             charSprites.push(row.asset_data);
           }
-        } else if (row.asset_type === 'char_image_override' && row.asset_data.id) {
-          if (!charOverrides[row.asset_data.id] && !deletedAssetIds.has(row.asset_data.id)) {
-            charOverrides[row.asset_data.id] = row.asset_data;
+        } else if (row.asset_type === 'char_image_override') {
+          if (!charOverrides[id]) {
+            charOverrides[id] = row.asset_data;
           }
-        } else if (row.asset_type === 'char_row_actions' && row.asset_data.id && row.asset_data.actions) {
-          if (!charRowActions[row.asset_data.id] && !deletedAssetIds.has(row.asset_data.id)) {
-            charRowActions[row.asset_data.id] = row.asset_data.actions;
+        } else if (row.asset_type === 'char_row_actions' && row.asset_data.actions) {
+          if (!charRowActions[id]) {
+            charRowActions[id] = row.asset_data.actions;
           }
         }
       });
     }
 
-    // Save house-scoped custom asset caches
+    // Save house-scoped custom asset caches with non-destructive merge
+    let finalMapTilesets = mapTilesets;
+    let finalCharSprites = charSprites;
+    let mergedOverrides = charOverrides;
+    let mergedActions = charRowActions;
+
     try {
-      localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(mapTilesets));
-      localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(charSprites));
-      localStorage.setItem('on_house_char_image_overrides', JSON.stringify(charOverrides));
+      const existingMapsStr = localStorage.getItem('on_house_custom_map_tilesets');
+      if (existingMapsStr) {
+        const existingMaps: any[] = JSON.parse(existingMapsStr);
+        const mapMap = new Map<string, any>();
+        existingMaps.forEach((m: any) => { if (m && m.id && !deletedAssetIds.has(m.id)) mapMap.set(m.id, m); });
+        mapTilesets.forEach((m: any) => { if (m && m.id && !deletedAssetIds.has(m.id)) mapMap.set(m.id, m); });
+        finalMapTilesets = Array.from(mapMap.values());
+      }
+      localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(finalMapTilesets));
+
+      const existingCharsStr = localStorage.getItem('on_house_custom_char_sprites');
+      if (existingCharsStr) {
+        const existingChars: any[] = JSON.parse(existingCharsStr);
+        const charMap = new Map<string, any>();
+        existingChars.forEach((c: any) => { if (c && c.id && !deletedAssetIds.has(c.id)) charMap.set(c.id, c); });
+        charSprites.forEach((c: any) => { if (c && c.id && !deletedAssetIds.has(c.id)) charMap.set(c.id, c); });
+        finalCharSprites = Array.from(charMap.values());
+      }
+      localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(finalCharSprites));
+
+      const existingOverridesStr = localStorage.getItem('on_house_char_image_overrides');
+      const existingOverrides = existingOverridesStr ? JSON.parse(existingOverridesStr) : {};
+      mergedOverrides = { ...existingOverrides, ...charOverrides };
+      localStorage.setItem('on_house_char_image_overrides', JSON.stringify(mergedOverrides));
+
       const existingActionsStr = localStorage.getItem('on_house_char_row_actions');
       const existingActions = existingActionsStr ? JSON.parse(existingActionsStr) : {};
-      const mergedActions = { ...existingActions, ...charRowActions };
+      mergedActions = { ...existingActions, ...charRowActions };
       localStorage.setItem('on_house_char_row_actions', JSON.stringify(mergedActions));
     } catch (e) {}
 
-    return { mapTilesets, charSprites, charOverrides, charRowActions };
+    return {
+      mapTilesets: finalMapTilesets,
+      charSprites: finalCharSprites,
+      charOverrides: mergedOverrides,
+      charRowActions: mergedActions
+    };
   } catch (err) {
     console.warn('Supabase fetchHouseAssets warning/timeout:', err);
     let mapTilesets: any[] = [];
