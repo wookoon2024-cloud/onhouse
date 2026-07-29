@@ -2608,6 +2608,12 @@ export default function App() {
           onAddMap={handleAddMap}
           onDeleteMap={handleDeleteMap}
           onRenameMap={handleRenameMap}
+          onReorderMaps={(newOrder) => {
+            setAvailableMapIds(newOrder);
+            try {
+              localStorage.setItem('on_house_available_maps', JSON.stringify(newOrder));
+            } catch (e) {}
+          }}
           onSaveMap={(mapId, updatedMap) => {
             setActiveMaps((prev) => {
               const next = { ...prev, [mapId]: updatedMap };

@@ -39,6 +39,7 @@ interface MapEditorViewProps {
   onAddMap: (presetId?: string, customName?: string) => string;
   onDeleteMap: (mapId: string) => void;
   onRenameMap?: (mapId: string, newName: string) => void;
+  onReorderMaps?: (newOrder: string[]) => void;
   onClose: () => void;
 }
 
@@ -49,8 +50,55 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   onAddMap,
   onDeleteMap,
   onRenameMap,
+  onReorderMaps,
   onClose
 }) => {
+  const [tabMapIds, setTabMapIds] = useState<string[]>(availableMapIds);
+  const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
+  const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setTabMapIds(availableMapIds);
+  }, [availableMapIds]);
+
+  const handleTabDragStart = (e: React.DragEvent, mId: string) => {
+    setDraggedTabId(mId);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", mId);
+  };
+
+  const handleTabDragOver = (e: React.DragEvent, mId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverTabId !== mId) {
+      setDragOverTabId(mId);
+    }
+  };
+
+  const handleTabDrop = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    setDragOverTabId(null);
+    if (!draggedTabId || draggedTabId === targetId) return;
+
+    const currentOrder = [...tabMapIds];
+    const fromIndex = currentOrder.indexOf(draggedTabId);
+    const toIndex = currentOrder.indexOf(targetId);
+
+    if (fromIndex !== -1 && toIndex !== -1) {
+      currentOrder.splice(fromIndex, 1);
+      currentOrder.splice(toIndex, 0, draggedTabId);
+      setTabMapIds(currentOrder);
+      if (onReorderMaps) {
+        onReorderMaps(currentOrder);
+      }
+    }
+    setDraggedTabId(null);
+  };
+
+  const handleTabDragEnd = () => {
+    setDraggedTabId(null);
+    setDragOverTabId(null);
+  };
   const [selectedMapId, setSelectedMapId] = useState<string>(availableMapIds[0] || 'room');
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [customNameInput, setCustomNameInput] = useState<string>('');
@@ -2164,26 +2212,34 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
         {/* Center: Photoshop Document Tabs with Compact Add Button */}
         <div style={{ display: "flex", gap: "2px", alignItems: "flex-end" }}>
-          {availableMapIds.map((mId) => {
+          {tabMapIds.map((mId) => {
             const mapObj = activeMaps[mId];
             const name = mapObj ? mapObj.name : mId;
             const isSelected = selectedMapId === mId;
-            const canDelete = availableMapIds.length > 1;
+            const canDelete = tabMapIds.length > 1;
+            const isDragOver = dragOverTabId === mId;
+            const isBeingDragged = draggedTabId === mId;
 
             return (
               <div
                 key={mId}
+                draggable={true}
+                onDragStart={(e) => handleTabDragStart(e, mId)}
+                onDragOver={(e) => handleTabDragOver(e, mId)}
+                onDrop={(e) => handleTabDrop(e, mId)}
+                onDragEnd={handleTabDragEnd}
                 style={{
                   display: "flex", alignItems: "center", gap: "4px",
                   padding: "5px 10px", borderRadius: "6px 6px 0 0",
-                  background: isSelected ? "#1e1e2e" : "rgba(255, 255, 255, 0.03)",
+                  background: isSelected ? "#1e1e2e" : (isDragOver ? "rgba(137, 180, 250, 0.25)" : "rgba(255, 255, 255, 0.03)"),
                   color: isSelected ? "#fff" : "rgba(255, 255, 255, 0.65)",
-                  borderTop: isSelected ? "2px solid #89b4fa" : "2px solid transparent",
-                  borderLeft: isSelected ? "1px solid rgba(255,255,255,0.1)" : "1px solid rgba(255,255,255,0.03)",
+                  borderTop: isSelected ? "2px solid #89b4fa" : (isDragOver ? "2px solid #a6e3a1" : "2px solid transparent"),
+                  borderLeft: isSelected ? "1px solid rgba(255,255,255,0.1)" : (isDragOver ? "2px solid #89b4fa" : "1px solid rgba(255,255,255,0.03)"),
                   borderRight: isSelected ? "1px solid rgba(255,255,255,0.1)" : "1px solid rgba(255,255,255,0.03)",
                   borderBottom: "none",
+                  opacity: isBeingDragged ? 0.4 : 1,
                   transition: "all 0.15s ease",
-                  cursor: "pointer"
+                  cursor: "grab"
                 }}
                 onClick={() => {
                   if (!isSelected) {
