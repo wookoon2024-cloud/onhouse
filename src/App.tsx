@@ -67,9 +67,44 @@ export default function App() {
   });
   const [isHouseLoaded, setIsHouseLoaded] = useState<boolean>(false);
 
+  // Helper to load initial saved map tab order
+  const getInitialAvailableMapIds = (): string[] => {
+    try {
+      const savedOrder = localStorage.getItem('on_house_available_maps') || localStorage.getItem('on_house_available_map_ids');
+      if (savedOrder) {
+        const parsed = JSON.parse(savedOrder);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return ['room', 'subway', 'park', 'apt'];
+  };
+
   // 0.5. Available Map IDs displayed in top bar
-  const [availableMapIds, setAvailableMapIds] = useState<string[]>(['room', 'subway', 'park', 'apt']);
+  const [availableMapIds, setAvailableMapIds] = useState<string[]>(getInitialAvailableMapIds);
   const [dbCustomCharSprites, setDbCustomCharSprites] = useState<any[]>([]);
+
+  // Helper to update activeMaps while strictly preserving user's custom tab order!
+  const applyFetchedMapOrder = (mapsData: Record<string, MapDefinition>) => {
+    setActiveMaps(mapsData);
+    const fetchedMapIds = Object.keys(mapsData);
+    let savedOrder: string[] = [];
+    try {
+      const raw = localStorage.getItem('on_house_available_maps') || localStorage.getItem('on_house_available_map_ids');
+      if (raw) savedOrder = JSON.parse(raw);
+    } catch (e) {}
+
+    const orderedIds = [
+      ...savedOrder.filter(id => fetchedMapIds.includes(id)),
+      ...fetchedMapIds.filter(id => !savedOrder.includes(id))
+    ];
+
+    const finalOrder = orderedIds.length > 0 ? orderedIds : fetchedMapIds;
+    setAvailableMapIds(finalOrder);
+    try {
+      localStorage.setItem('on_house_available_maps', JSON.stringify(finalOrder));
+      localStorage.setItem('on_house_available_map_ids', JSON.stringify(finalOrder));
+    } catch (e) {}
+  };
 
   useEffect(() => {
     const syncDbCharSprites = () => {
@@ -121,6 +156,7 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('on_house_available_map_ids', JSON.stringify(availableMapIds));
+    localStorage.setItem('on_house_available_maps', JSON.stringify(availableMapIds));
     if (availableMapIds.length > 0 && !availableMapIds.includes(localPlayer.mapId)) {
       setLocalPlayer((prev) => ({ ...prev, mapId: availableMapIds[0] }));
     }
@@ -488,9 +524,7 @@ export default function App() {
       fetchHouseAssets(houseCode)
     ]).then(([mapsData, assetsData]) => {
       if (mapsData && Object.keys(mapsData).length > 0) {
-        setActiveMaps(mapsData);
-        const fetchedMapIds = Object.keys(mapsData);
-        setAvailableMapIds(fetchedMapIds);
+        applyFetchedMapOrder(mapsData);
       }
 
       if (assetsData) {
