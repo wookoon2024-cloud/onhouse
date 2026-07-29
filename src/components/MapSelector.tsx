@@ -40,7 +40,10 @@ export const MapSelector: React.FC<MapSelectorProps> = ({
       }}>
         {availableMapIds.map((mId) => {
           const mapObj = activeMaps[mId];
-          const mapName = mapObj ? mapObj.name : mId;
+          let mapName = mapObj ? mapObj.name : mId;
+          if (mapName && mapName.startsWith('custom_')) {
+            mapName = '🎨 커스텀 맵';
+          }
           const isCurrent = currentMapId === mId;
           const isCustom = !BUILTIN_MAPS.includes(mId);
 

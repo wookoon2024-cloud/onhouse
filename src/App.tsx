@@ -53,6 +53,11 @@ export default function App() {
   const [activeMaps, setActiveMaps] = useState<Record<string, MapDefinition>>(() => {
     const initial = JSON.parse(JSON.stringify(maps));
     try {
+      const cached = localStorage.getItem('on_house_custom_maps_cache');
+      if (cached) {
+        const parsedCached = JSON.parse(cached);
+        Object.assign(initial, parsedCached);
+      }
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key && key.startsWith('on_house_map_')) {
@@ -90,6 +95,9 @@ export default function App() {
   // Helper to update activeMaps while strictly preserving user's custom tab order!
   const applyFetchedMapOrder = (mapsData: Record<string, MapDefinition>, dbOrder?: string[]) => {
     setActiveMaps(mapsData);
+    try {
+      localStorage.setItem('on_house_custom_maps_cache', JSON.stringify(mapsData));
+    } catch (e) {}
     const fetchedMapIds = Object.keys(mapsData);
     let savedOrder: string[] = dbOrder && dbOrder.length > 0 ? dbOrder : [];
     if (savedOrder.length === 0) {
