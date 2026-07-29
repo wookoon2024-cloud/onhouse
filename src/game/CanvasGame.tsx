@@ -1460,6 +1460,60 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         renderPlayerIdx++;
       }
 
+      // 3.5. Render Memos on Map Canvas
+      if (memos && memos.length > 0) {
+        const currentMapMemos = memos.filter(m => !m.mapId || m.mapId === currentMapId);
+        const floatBounce = Math.sin(performance.now() / 250) * 3;
+
+        currentMapMemos.forEach((memo) => {
+          ctx.save();
+
+          const memoCanvasX = (memo.x / 16) * vSize + vSize / 2;
+          const memoCanvasY = (memo.y / 16) * vSize + vSize / 2 + (memo.memoType === 'notice' ? 0 : floatBounce);
+          const isNotice = memo.memoType === 'notice';
+
+          // 1. Glowing outer ring / shadow
+          ctx.beginPath();
+          ctx.arc(memoCanvasX, memoCanvasY, isNotice ? 12 : 10, 0, Math.PI * 2);
+          ctx.fillStyle = isNotice ? 'rgba(245, 194, 231, 0.35)' : 'rgba(167, 139, 250, 0.35)';
+          ctx.fill();
+
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = isNotice ? '#f5c2e7' : '#a78bfa';
+          ctx.stroke();
+
+          // 2. Icon Badge
+          ctx.font = '14px Arial, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(isNotice ? '📌' : '📜', memoCanvasX, memoCanvasY);
+
+          // 3. Text Tag above Memo Icon
+          const previewText = memo.content ? (memo.content.length > 10 ? memo.content.slice(0, 10) + '...' : memo.content) : '메모';
+          const tagText = `${memo.authorName || '익명'}: ${previewText}`;
+          
+          ctx.font = '10px "DungGeunMo", monospace, sans-serif';
+          const textW = ctx.measureText(tagText).width + 10;
+          const tagH = 16;
+          const tagX = memoCanvasX - textW / 2;
+          const tagY = memoCanvasY - 24;
+
+          ctx.fillStyle = 'rgba(15, 15, 25, 0.88)';
+          ctx.strokeStyle = isNotice ? '#f5c2e7' : '#a78bfa';
+          ctx.lineWidth = 1;
+
+          ctx.beginPath();
+          ctx.roundRect(tagX, tagY, textW, tagH, 4);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = isNotice ? '#f5c2e7' : '#ffffff';
+          ctx.fillText(tagText, memoCanvasX, tagY + tagH / 2);
+
+          ctx.restore();
+        });
+      }
+
       // 4. Render Animated Visual Particles (Flying Hearts & Cheering Claps)
       const nowTime = performance.now();
       particlesRef.current = particlesRef.current.filter((pt) => {
@@ -1586,10 +1640,10 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
     if (memos && memos.length > 0) {
       const clickedMemo = memos.find((m) => {
         if (m.mapId !== currentMapId) return false;
-        const mx = m.x * tileScale + vSize / 2;
-        const my = m.y * tileScale + vSize / 2;
+        const mx = (m.x / 16) * vSize + vSize / 2;
+        const my = (m.y / 16) * vSize + vSize / 2;
         const dist = Math.hypot(gameX - mx, gameY - my);
-        return dist < 24;
+        return dist < 32;
       });
 
       if (clickedMemo) {
