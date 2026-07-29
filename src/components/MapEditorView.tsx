@@ -1720,14 +1720,11 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         return;
       }
 
-      // If clicked on empty space without Ctrl
-      if (selectedObjectIds.length > 0) {
-        setIsDraggingObject(true);
-        setObjectDragStart({ originX: e.clientX, originY: e.clientY, startTx: tx, startTy: ty });
-      } else {
-        setIsDraggingObject(false);
-        setObjectDragStart(null);
-      }
+      // Clicking on empty space without Ctrl -> Deselect all selected objects!
+      setSelectedObjectIds([]);
+      setSelectedObjectId(null);
+      setIsDraggingObject(false);
+      setObjectDragStart(null);
       return;
     }
 
