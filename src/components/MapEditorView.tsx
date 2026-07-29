@@ -661,6 +661,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    const tileSize = 16 * zoom;
     const targetW = localMap.width * tileSize;
     const targetH = localMap.height * tileSize;
     if (canvas.width !== targetW) canvas.width = targetW;
