@@ -654,6 +654,16 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     });
   }, [customMapTilesets]);
 
+  const cleanedBaseObjects = React.useMemo(() => {
+    if (!localMap?.objects || localMap.objects.length === 0) return [];
+    return cleanDuplicateObjects(localMap.objects.filter(o => o.layer === 'base'));
+  }, [localMap?.objects]);
+
+  const cleanedDecorObjects = React.useMemo(() => {
+    if (!localMap?.objects || localMap.objects.length === 0) return [];
+    return cleanDuplicateObjects(localMap.objects.filter(o => o.layer !== 'base'));
+  }, [localMap?.objects]);
+
   // Main Canvas Render Loop
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -694,9 +704,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       }
   
       // 1.5 Base Layer Objects (obj.layer === 'base' - Ground Overlay Objects like Stepping Stones, Rugs)
-      if (localMap.objects && localMap.objects.length > 0) {
-        const baseObjects = cleanDuplicateObjects(localMap.objects.filter(o => o.layer === 'base'));
-        baseObjects.forEach(obj => {
+      if (cleanedBaseObjects.length > 0) {
+        cleanedBaseObjects.forEach(obj => {
           const img = images[obj.tilesetKey];
           const tsInfo = getTilesetInfoLocal(obj.tilesetKey);
           if (img && tsInfo) {
@@ -741,7 +750,6 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           }
         });
       }
-  
     }
 
     // 2. Decor Layer
@@ -767,9 +775,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       }
 
       // 2.5 Decor Objects Layer (MapObjectInstance[]) - Standing Decor Entity Rendering
-      if (localMap.objects && localMap.objects.length > 0) {
-        const cleaned = cleanDuplicateObjects(localMap.objects.filter(o => o.layer !== 'base'));
-        const sortedObjects = [...cleaned].sort((a, b) => {
+      if (cleanedDecorObjects.length > 0) {
+        const sortedObjects = [...cleanedDecorObjects].sort((a, b) => {
           const rootA = a.y + a.height - 1;
           const rootB = b.y + b.height - 1;
           if (rootA !== rootB) return rootA - rootB;
@@ -967,7 +974,43 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       }
       ctx.restore();
     }
-  }, [images, localMap, zoom, showGrid, showBase, showDecor, showCollision, hoverTile, isAltPressed, tool, brushSize, selectedTile, editLayer, activeTileset]);
+  }, [images, localMap, zoom, showGrid, showBase, showDecor, showCollision, hoverTile, isAltPressed, tool, brushSize, selectedTile, editLayer, activeTileset, selectedObjectIds, mapBoxSelection]);
+
+  // Keyboard Arrow Key Navigation for Moving Selected Objects
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (selectedObjectIds.length === 0) return;
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+
+      let deltaTx = 0;
+      let deltaTy = 0;
+      const step = e.shiftKey ? 5 : 1;
+
+      if (e.key === 'ArrowLeft') deltaTx = -step;
+      else if (e.key === 'ArrowRight') deltaTx = step;
+      else if (e.key === 'ArrowUp') deltaTy = -step;
+      else if (e.key === 'ArrowDown') deltaTy = step;
+
+      if (deltaTx !== 0 || deltaTy !== 0) {
+        e.preventDefault();
+        setLocalMap(prev => {
+          const nextObjects = (prev.objects || []).map(obj => {
+            if (selectedObjectIds.includes(obj.id)) {
+              const targetTx = Math.max(0, Math.min(prev.width - obj.width, obj.x + deltaTx));
+              const targetTy = Math.max(0, Math.min(prev.height - obj.height, obj.y + deltaTy));
+              return { ...obj, x: targetTx, y: targetTy };
+            }
+            return obj;
+          });
+          return { ...prev, objects: nextObjects };
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedObjectIds]);
 
   // Undo / Redo
   const handleUndo = () => {
@@ -1613,101 +1656,26 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         setMapBoxSelection(null);
         setMapBoxSelectStart(null);
 
+        const isAlreadySelected = selectedObjectIds.includes(clickedObj.id);
+
         if (isMultiSelectKey) {
           setSelectedObjectIds(prev =>
             prev.includes(clickedObj.id) ? prev.filter(id => id !== clickedObj.id) : [...prev, clickedObj.id]
           );
+          setIsDraggingObject(false);
+          setObjectDragStart(null);
         } else {
-          setSelectedObjectIds([clickedObj.id]);
-        }
-        setIsDraggingObject(true);
-        setObjectDragStart({ originX: e.clientX, originY: e.clientY, startTx: clickedObj.x, startTy: clickedObj.y });
-
-        // Update preview tile info
-        if (clickedObj.tiles && clickedObj.tiles[0] && clickedObj.tiles[0][0] !== undefined) {
-          const tIdx = clickedObj.tiles[0][0];
-          if (tIdx !== -1) {
-            setSelectedTile(tIdx);
-            const drawInfo = getTileDrawInfo(tIdx, clickedObj.tilesetKey || activeTileset);
-            if (drawInfo?.tilesetKey) setActiveTileset(drawInfo.tilesetKey);
+          if (!isAlreadySelected) {
+            setSelectedObjectIds([clickedObj.id]);
           }
-        } else {
-          const tsInfo = getTilesetInfoLocal(clickedObj.tilesetKey);
-          if (tsInfo) {
-            const lIdx = clickedObj.startRow * tsInfo.cols + clickedObj.startCol;
-            setSelectedTile(getPrefixedIndex(lIdx, clickedObj.tilesetKey));
-            setActiveTileset(clickedObj.tilesetKey);
-          }
+          // Only allow object dragging if clicking directly on an already selected object or single-click
+          setIsDraggingObject(true);
+          setObjectDragStart({ originX: e.clientX, originY: e.clientY, startTx: clickedObj.x, startTy: clickedObj.y });
         }
         return;
       }
 
-      // B. Check 1x1 tile at (tx, ty) strictly matching current editLayer!
-      const dTile = localMap.decorLayer[ty] ? localMap.decorLayer[ty][tx] : -1;
-      const bTile = localMap.baseLayer[ty] ? localMap.baseLayer[ty][tx] : -1;
-      const defaultBase = localMap.tileset === "interior" ? 1199 : 2000;
-
-      let isBasePick = false;
-      let targetTile = -1;
-
-      if (editLayer === "base") {
-        isBasePick = true;
-        targetTile = (bTile !== -1 && bTile !== defaultBase) ? bTile : -1;
-      } else if (editLayer === "decor") {
-        isBasePick = false;
-        targetTile = dTile;
-      }
-
-      if (targetTile !== -1 && targetTile !== 1199 && targetTile !== 2000) {
-        setHistory(prev => [...prev, localMap]);
-        setRedoHistory([]);
-
-        const drawInfo = getTileDrawInfo(targetTile, activeTileset);
-        const tsKey = drawInfo?.tilesetKey || activeTileset;
-        const tsInfo = getTilesetInfoLocal(tsKey);
-        const startCol = drawInfo && tsInfo ? (drawInfo.localIdx % tsInfo.cols) : 0;
-        const startRow = drawInfo && tsInfo ? Math.floor(drawInfo.localIdx / tsInfo.cols) : 0;
-
-        const newObj: MapObjectInstance = {
-          id: `obj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-          tilesetKey: tsKey,
-          startCol,
-          startRow,
-          width: 1,
-          height: 1,
-          x: tx,
-          y: ty,
-          layer: isBasePick ? 'base' : 'decor',
-          zIndex: Date.now(),
-          tiles: [[targetTile]]
-        };
-
-        setLocalMap(prev => {
-          const newDecor = prev.decorLayer.map(r => [...r]);
-          const newBase = prev.baseLayer.map(r => [...r]);
-          if (isBasePick) {
-            newBase[ty][tx] = -1;
-          } else {
-            newDecor[ty][tx] = -1;
-          }
-          return {
-            ...prev,
-            decorLayer: newDecor,
-            baseLayer: newBase,
-            objects: [...(prev.objects || []), newObj]
-          };
-        });
-
-        setSelectedObjectIds(prev => isMultiSelectKey ? [...prev, newObj.id] : [newObj.id]);
-        setIsDraggingObject(true);
-        setObjectDragStart({ originX: e.clientX, originY: e.clientY, startTx: tx, startTy: ty });
-
-        setSelectedTile(targetTile);
-        if (tsKey) setActiveTileset(tsKey);
-        return;
-      }
-
-      // C. Click on empty ground cell -> Start Map Box Selection!
+      // B. Click anywhere else (empty ground cell or non-object) -> ALWAYS Start Box Multi-Selection!
       if (!isMultiSelectKey) {
         setSelectedObjectIds([]);
       }
