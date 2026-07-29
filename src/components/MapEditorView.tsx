@@ -113,8 +113,13 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   const [heightInput, setHeightInput] = useState<string>('30');
 
   // Transactional Map States
-  const [localMap, setLocalMap] = useState<MapDefinition>(activeMaps.room);
-  const [originalMap, setOriginalMap] = useState<MapDefinition>(activeMaps.room);
+  const getInitialMap = (): MapDefinition => {
+    const targetId = availableMapIds[0] || 'room';
+    return activeMaps[targetId] || activeMaps.room || Object.values(activeMaps)[0] || maps.room;
+  };
+
+  const [localMap, setLocalMap] = useState<MapDefinition>(getInitialMap);
+  const [originalMap, setOriginalMap] = useState<MapDefinition>(getInitialMap);
 
   // Undo / Redo stacks
   const [history, setHistory] = useState<MapDefinition[]>([]);
@@ -126,7 +131,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const [customMapTilesets, setCustomMapTilesets] = useState<TilesetOption[]>(getCustomMapTilesets);
-  const [activeTileset, setActiveTileset] = useState<string>(localMap.tileset);
+  const [activeTileset, setActiveTileset] = useState<string>(localMap?.tileset || 'interior');
 
   useEffect(() => {
     const syncCustomTilesets = () => {
@@ -1979,6 +1984,14 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     const targetLocalIdx = targetRow * tsInfo.cols + targetCol;
     return getPrefixedIndex(targetLocalIdx, drawInfo.tilesetKey);
   };
+
+  if (!localMap) {
+    return (
+      <div style={{ position: 'fixed', inset: 0, background: '#111116', zIndex: 140, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '14px' }}>
+        지도 데이터를 로딩 중입니다...
+      </div>
+    );
+  }
 
   const tileDetails = getSelectedTileDetails();
 
