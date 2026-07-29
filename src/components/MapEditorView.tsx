@@ -243,6 +243,20 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     setSelectedObjectIds([]);
   };
 
+  // Helper function to extract exact tile value at (r, c) for any MapObjectInstance
+  const getTileValueForCell = (obj: MapObjectInstance, r: number, c: number): number => {
+    if (obj.tiles && obj.tiles[r] && obj.tiles[r][c] !== undefined && obj.tiles[r][c] !== -1) {
+      return obj.tiles[r][c];
+    }
+    const effTsKey = obj.tilesetKey || activeTileset;
+    const tsInfo = getTilesetInfoLocal(effTsKey) || getTilesetInfo(effTsKey);
+    if (tsInfo) {
+      const localIdx = (obj.startRow + r) * tsInfo.cols + (obj.startCol + c);
+      return getPrefixedIndex(localIdx, effTsKey);
+    }
+    return -1;
+  };
+
   // 🔗 Merge 2 or more selected objects into a single unified MapObjectInstance!
   const handleMergeSelectedObjects = () => {
     if (selectedObjectIds.length < 2) return;
@@ -270,19 +284,15 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       sortedTargets.forEach(obj => {
         const offsetX = obj.x - minX;
         const offsetY = obj.y - minY;
-        const tsInfo = getTilesetInfoLocal(obj.tilesetKey);
 
         for (let r = 0; r < obj.height; r++) {
           for (let c = 0; c < obj.width; c++) {
             const targetR = offsetY + r;
             const targetC = offsetX + c;
             if (targetR >= 0 && targetR < rows && targetC >= 0 && targetC < cols) {
-              if (obj.tiles && obj.tiles[r] && obj.tiles[r][c] !== undefined) {
-                const val = obj.tiles[r][c];
-                if (val !== -1) tilesGrid[targetR][targetC] = val;
-              } else if (tsInfo) {
-                const localIdx = (obj.startRow + r) * tsInfo.cols + (obj.startCol + c);
-                tilesGrid[targetR][targetC] = getPrefixedIndex(localIdx, obj.tilesetKey);
+              const val = getTileValueForCell(obj, r, c);
+              if (val !== -1) {
+                tilesGrid[targetR][targetC] = val;
               }
             }
           }
@@ -339,31 +349,25 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       if (targetObjs.length === 0) return prev;
 
       const new1x1Objects: MapObjectInstance[] = [];
+      let counter = 0;
 
       targetObjs.forEach(obj => {
-        const tsInfo = getTilesetInfoLocal(obj.tilesetKey);
         for (let r = 0; r < obj.height; r++) {
           for (let c = 0; c < obj.width; c++) {
             const tileX = obj.x + c;
             const tileY = obj.y + r;
-            let tileVal = -1;
-
-            if (obj.tiles && obj.tiles[r] && obj.tiles[r][c] !== undefined) {
-              tileVal = obj.tiles[r][c];
-            } else if (tsInfo) {
-              const localIdx = (obj.startRow + r) * tsInfo.cols + (obj.startCol + c);
-              tileVal = getPrefixedIndex(localIdx, obj.tilesetKey);
-            }
+            const tileVal = getTileValueForCell(obj, r, c);
 
             if (tileVal !== -1) {
+              counter++;
               const drawInfo = getTileDrawInfo(tileVal, obj.tilesetKey || activeTileset);
               const tsKey = drawInfo?.tilesetKey || obj.tilesetKey || activeTileset;
-              const singleTsInfo = getTilesetInfoLocal(tsKey);
+              const singleTsInfo = getTilesetInfoLocal(tsKey) || getTilesetInfo(tsKey);
               const startCol = drawInfo && singleTsInfo ? (drawInfo.localIdx % singleTsInfo.cols) : 0;
               const startRow = drawInfo && singleTsInfo ? Math.floor(drawInfo.localIdx / singleTsInfo.cols) : 0;
 
               new1x1Objects.push({
-                id: `obj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}_${r}_${c}`,
+                id: `obj_${Date.now()}_${counter}_${Math.random().toString(36).substring(2, 6)}`,
                 tilesetKey: tsKey,
                 startCol,
                 startRow,
