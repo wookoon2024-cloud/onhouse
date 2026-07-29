@@ -795,29 +795,54 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         const diffY = currentTarget.y - p.y;
         const dist = Math.sqrt(diffX * diffX + diffY * diffY);
 
-        if (dist > 6) {
+        if (dist > 4) {
           const moveSpeed = 120 * dt; // Smooth walk speed (120px/s)
-          const nx = diffX / dist;
-          const ny = diffY / dist;
+          let nx = 0;
+          let ny = 0;
+          let walkDir: 'up' | 'down' | 'left' | 'right' = p.dir;
 
-          let walkDir: 'up' | 'down' | 'left' | 'right' = 'right';
-          if (Math.abs(diffX) > Math.abs(diffY)) {
+          // Pure Right-Angle (Orthogonal) Movement: Move along X axis first, then Y axis!
+          if (Math.abs(diffX) > 2) {
+            nx = Math.sign(diffX);
+            ny = 0;
             walkDir = diffX > 0 ? 'right' : 'left';
-          } else {
+          } else if (Math.abs(diffY) > 2) {
+            nx = 0;
+            ny = Math.sign(diffY);
             walkDir = diffY > 0 ? 'down' : 'up';
           }
 
-          const nextX = p.x + nx * moveSpeed;
-          const nextY = p.y + ny * moveSpeed;
+          const stepDist = Math.min(moveSpeed, nx !== 0 ? Math.abs(diffX) : Math.abs(diffY));
+          const nextX = p.x + nx * stepDist;
+          const nextY = p.y + ny * stepDist;
 
           let finalX = p.x;
           let finalY = p.y;
 
-          if (!checkCollision(nextX, p.y, map)) {
+          if (nx !== 0 && !checkCollision(nextX, p.y, map)) {
             finalX = nextX;
           }
-          if (!checkCollision(p.x, nextY, map)) {
+          if (ny !== 0 && !checkCollision(p.x, nextY, map)) {
             finalY = nextY;
+          }
+
+          // If blocked along primary axis, attempt secondary axis detour
+          if (finalX === p.x && finalY === p.y) {
+            if (nx !== 0 && Math.abs(diffY) > 2) {
+              const altNy = Math.sign(diffY);
+              const altNextY = p.y + altNy * Math.min(moveSpeed, Math.abs(diffY));
+              if (!checkCollision(p.x, altNextY, map)) {
+                finalY = altNextY;
+                walkDir = diffY > 0 ? 'down' : 'up';
+              }
+            } else if (ny !== 0 && Math.abs(diffX) > 2) {
+              const altNx = Math.sign(diffX);
+              const altNextX = p.x + altNx * Math.min(moveSpeed, Math.abs(diffX));
+              if (!checkCollision(altNextX, p.y, map)) {
+                finalX = altNextX;
+                walkDir = diffX > 0 ? 'right' : 'left';
+              }
+            }
           }
 
           if (finalX === p.x && finalY === p.y) {
