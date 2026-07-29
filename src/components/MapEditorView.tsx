@@ -789,6 +789,10 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       // 2.5 Decor Objects Layer (MapObjectInstance[]) - Standing Decor Entity Rendering
       if (cleanedDecorObjects.length > 0) {
         const sortedObjects = [...cleanedDecorObjects].sort((a, b) => {
+          const overlaps = !(b.x + b.width <= a.x || b.x >= a.x + a.width || b.y + b.height <= a.y || b.y >= a.y + a.height);
+          if (overlaps && a.zIndex !== b.zIndex) {
+            return (a.zIndex || 0) - (b.zIndex || 0);
+          }
           const rootA = a.y + a.height - 1;
           const rootB = b.y + b.height - 1;
           if (rootA !== rootB) return rootA - rootB;
@@ -1378,6 +1382,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                   if (autoCollision) {
                     newCollision[pty][ptx] = tileToPaint !== -1;
                   }
+                  // Remove any older object at this tile position so newly painted decor tiles are drawn on top!
+                  nextObjects = nextObjects.filter(o => !(ptx >= o.x && ptx < o.x + o.width && pty >= o.y && pty < o.y + o.height));
                 }
               } else if (autoCollision) {
                 newCollision[pty][ptx] = true;
@@ -1401,8 +1407,19 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           zIndex: Date.now()
         };
 
-        // Remove any exact overlapping same-origin object if replacing
-        nextObjects = nextObjects.filter(o => !(o.x === tx && o.y === ty));
+        // Remove any overlapping older objects so the newly placed stamp object is drawn on top!
+        nextObjects = nextObjects.filter(o => {
+          const oMinX = o.x;
+          const oMinY = o.y;
+          const oMaxX = o.x + o.width;
+          const oMaxY = o.y + o.height;
+          const stampMinX = tx;
+          const stampMinY = ty;
+          const stampMaxX = tx + cols;
+          const stampMaxY = ty + rows;
+          const overlaps = !(oMaxX <= stampMinX || oMinX >= stampMaxX || oMaxY <= stampMinY || oMinY >= stampMaxY);
+          return !overlaps;
+        });
         nextObjects.push(newObj);
         setSelectedObjectId(newObj.id);
       }
