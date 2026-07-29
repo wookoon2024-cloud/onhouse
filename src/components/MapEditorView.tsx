@@ -1659,16 +1659,17 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         const isAlreadySelected = selectedObjectIds.includes(clickedObj.id);
 
         if (isMultiSelectKey) {
-          setSelectedObjectIds(prev =>
-            prev.includes(clickedObj.id) ? prev.filter(id => id !== clickedObj.id) : [...prev, clickedObj.id]
-          );
-          setIsDraggingObject(false);
-          setObjectDragStart(null);
+          const nextSelected = isAlreadySelected
+            ? selectedObjectIds.filter(id => id !== clickedObj.id)
+            : [...selectedObjectIds, clickedObj.id];
+
+          setSelectedObjectIds(nextSelected);
+          setIsDraggingObject(nextSelected.length > 0);
+          setObjectDragStart({ originX: e.clientX, originY: e.clientY, startTx: clickedObj.x, startTy: clickedObj.y });
         } else {
           if (!isAlreadySelected) {
             setSelectedObjectIds([clickedObj.id]);
           }
-          // Only allow object dragging if clicking directly on an already selected object or single-click
           setIsDraggingObject(true);
           setObjectDragStart({ originX: e.clientX, originY: e.clientY, startTx: clickedObj.x, startTy: clickedObj.y });
         }
