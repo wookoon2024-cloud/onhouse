@@ -101,32 +101,32 @@ export const CreateMemoModal: React.FC<CreateMemoModalProps> = ({
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {/* Memo Type Selector (1회성 vs 공지) */}
           <div>
-            <label style={{ fontSize: '10px', color: '#aaa', display: 'block', marginBottom: '4px' }}>메모 종류 선택 (기본: 1회성):</label>
+            <label style={{ fontSize: '10px', color: '#aaa', display: 'block', marginBottom: '4px' }}>메모 종류 선택:</label>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
               <button
                 type="button"
                 onClick={() => setMemoType('one_time')}
                 style={{
-                  padding: '6px 4px', borderRadius: '6px', fontSize: '10px', fontWeight: 'normal', cursor: 'pointer',
+                  padding: '8px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 'normal', cursor: 'pointer',
                   background: memoType === 'one_time' ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
                   color: '#fff', border: memoType === 'one_time' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
                 }}
               >
-                <Sparkles size={11} /> 1회성 메모 (주우면 가방 보관)
+                <Sparkles size={12} /> 1회성 메모
               </button>
               <button
                 type="button"
                 onClick={() => setMemoType('notice')}
                 style={{
-                  padding: '6px 4px', borderRadius: '6px', fontSize: '10px', fontWeight: 'normal', cursor: 'pointer',
+                  padding: '8px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 'normal', cursor: 'pointer',
                   background: memoType === 'notice' ? 'rgba(245, 194, 231, 0.25)' : 'rgba(255,255,255,0.05)',
                   color: memoType === 'notice' ? '#f5c2e7' : '#ccc',
                   border: memoType === 'notice' ? '1px solid #f5c2e7' : '1px solid var(--border-glass)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
                 }}
               >
-                <Bell size={11} /> 공지 메모 (맵에 영구 유지)
+                <Bell size={12} /> 공지 메모
               </button>
             </div>
           </div>
