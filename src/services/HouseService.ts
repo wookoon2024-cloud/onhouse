@@ -195,11 +195,29 @@ export const fetchHouseMaps = async (houseCode: string): Promise<Record<string, 
     );
 
     if (res.data && res.data.length > 0) {
-      res.data.forEach((row: { map_id: string; map_data: MapDefinition }) => {
+      // Sort rows by sortOrder property if defined
+      const sortedRows = [...res.data].sort((a, b) => {
+        const orderA = a.map_data?.sortOrder ?? 999;
+        const orderB = b.map_data?.sortOrder ?? 999;
+        return orderA - orderB;
+      });
+
+      const sortedMaps: Record<string, MapDefinition> = {};
+      sortedRows.forEach((row: { map_id: string; map_data: MapDefinition }) => {
         if (!deletedMapIds.includes(row.map_id) && row.map_data && row.map_data.width && row.map_data.height) {
-          loadedMaps[row.map_id] = row.map_data;
+          sortedMaps[row.map_id] = row.map_data;
         }
       });
+
+      // Append default maps that were not in DB
+      Object.keys(loadedMaps).forEach((id) => {
+        if (!sortedMaps[id] && !deletedMapIds.includes(id)) {
+          sortedMaps[id] = loadedMaps[id];
+        }
+      });
+
+      console.log(`[OnHouse Sync] Successfully loaded ${Object.keys(sortedMaps).length} maps for houseCode [${houseCode}] in sort order:`, Object.keys(sortedMaps));
+      return sortedMaps;
     }
 
     console.log(`[OnHouse Sync] Successfully loaded ${Object.keys(loadedMaps).length} maps for houseCode [${houseCode}]:`, Object.keys(loadedMaps));
