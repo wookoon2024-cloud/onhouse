@@ -304,7 +304,15 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         tiles: tilesGrid
       };
 
-      const remainingObjs = currentObjs.filter(o => !selectedObjectIds.includes(o.id));
+      const remainingObjs = currentObjs.filter(o => {
+        if (selectedObjectIds.includes(o.id)) return false;
+        const oMinX = o.x;
+        const oMinY = o.y;
+        const oMaxX = o.x + o.width;
+        const oMaxY = o.y + o.height;
+        const overlaps = !(oMaxX <= minX || oMinX >= maxX || oMaxY <= minY || oMinY >= maxY);
+        return !overlaps;
+      });
       remainingObjs.push(mergedObj);
 
       setSelectedObjectIds([mergedObj.id]);
@@ -1519,8 +1527,19 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         tiles: tilesGrid
       };
 
-      // Filter out any small sub-objects previously contained in this box
-      nextObjects = nextObjects.filter(o => !(o.x >= startCol && o.x + o.width <= startCol + cols && o.y >= startRow && o.y + o.height <= startRow + rows));
+      // Filter out any small sub-objects previously contained or overlapping in this box
+      nextObjects = nextObjects.filter(o => {
+        const oMinX = o.x;
+        const oMinY = o.y;
+        const oMaxX = o.x + o.width;
+        const oMaxY = o.y + o.height;
+        const boxMinX = startCol;
+        const boxMinY = startRow;
+        const boxMaxX = startCol + cols;
+        const boxMaxY = startRow + rows;
+        const overlaps = !(oMaxX <= boxMinX || oMinX >= boxMaxX || oMaxY <= boxMinY || oMinY >= boxMaxY);
+        return !overlaps;
+      });
       nextObjects.push(newObj);
       setSelectedObjectId(newObj.id);
 
@@ -1793,10 +1812,9 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       });
 
       if (overlapped.length > 0) {
-        const newIds = overlapped.map(o => o.id);
-        setSelectedObjectIds(prev => Array.from(new Set([...prev, ...newIds])));
+        setSelectedObjectIds(overlapped.map(o => o.id));
         setMapBoxSelection(null);
-        setPickedToast(`📦 ${overlapped.length}개 오브젝트가 다중 선택에 추가되었습니다!`);
+        setPickedToast(`📦 ${overlapped.length}개 오브젝트가 선택되었습니다!`);
         setTimeout(() => setPickedToast(null), 2000);
       } else {
         setMapBoxSelection(null);
