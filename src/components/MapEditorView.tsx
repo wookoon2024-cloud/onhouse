@@ -656,9 +656,10 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const tileSize = 16 * zoom;
-    canvas.width = localMap.width * tileSize;
-    canvas.height = localMap.height * tileSize;
+    const targetW = localMap.width * tileSize;
+    const targetH = localMap.height * tileSize;
+    if (canvas.width !== targetW) canvas.width = targetW;
+    if (canvas.height !== targetH) canvas.height = targetH;
 
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1795,6 +1796,33 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     lastPaintedCellRef.current = null;
     setIsDraggingObject(false);
     setObjectDragStart(null);
+
+    if (tool === 'select' && mapBoxSelection) {
+      const selectMinX = mapBoxSelection.startCol;
+      const selectMinY = mapBoxSelection.startRow;
+      const selectMaxX = mapBoxSelection.startCol + mapBoxSelection.cols;
+      const selectMaxY = mapBoxSelection.startRow + mapBoxSelection.rows;
+
+      const overlapped = (localMap.objects || []).filter(o => {
+        if (editLayer === "base" && o.layer !== "base") return false;
+        if (editLayer === "decor" && o.layer === "base") return false;
+        const oMinX = o.x;
+        const oMinY = o.y;
+        const oMaxX = o.x + o.width;
+        const oMaxY = o.y + o.height;
+        return !(oMaxX <= selectMinX || oMinX >= selectMaxX || oMaxY <= selectMinY || oMinY >= selectMaxY);
+      });
+
+      if (overlapped.length > 0) {
+        setSelectedObjectIds(overlapped.map(o => o.id));
+        setMapBoxSelection(null);
+        setPickedToast(`📦 ${overlapped.length}개 오브젝트가 선택되었습니다!`);
+        setTimeout(() => setPickedToast(null), 2000);
+      } else if (mapBoxSelection.cols === 1 && mapBoxSelection.rows === 1) {
+        setMapBoxSelection(null);
+      }
+    }
+
     setMapBoxSelectStart(null);
   };
 

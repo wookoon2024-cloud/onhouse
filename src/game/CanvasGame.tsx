@@ -50,24 +50,39 @@ interface CanvasGameProps {
   } | null;
 }
 
+let cachedCustoms: any[] | null = null;
+let lastCustomsRaw: string | null = null;
+
+const getCustomTilesetsCached = () => {
+  try {
+    const savedCustoms = localStorage.getItem('on_house_custom_map_tilesets');
+    if (savedCustoms !== lastCustomsRaw) {
+      lastCustomsRaw = savedCustoms;
+      if (savedCustoms) {
+        const customs: any[] = JSON.parse(savedCustoms);
+        cachedCustoms = [...customs].sort((a, b) => (b.prefix || 9000) - (a.prefix || 9000));
+      } else {
+        cachedCustoms = [];
+      }
+    }
+    return cachedCustoms || [];
+  } catch (e) {
+    return [];
+  }
+};
+
 export const getTileDrawInfo = (idx: number, defaultTileset: string) => {
   if (idx === -1 || idx === undefined || idx === null) return null;
   let tilesetKey = defaultTileset;
   let localIdx = idx;
 
-  try {
-    const savedCustoms = localStorage.getItem('on_house_custom_map_tilesets');
-    if (savedCustoms) {
-      const customs: any[] = JSON.parse(savedCustoms);
-      const sortedCustoms = [...customs].sort((a, b) => (b.prefix || 9000) - (a.prefix || 9000));
-      for (const ct of sortedCustoms) {
-        const p = ct.prefix || 9000;
-        if (idx >= p) {
-          return { tilesetKey: ct.id, localIdx: idx - p };
-        }
-      }
+  const sortedCustoms = getCustomTilesetsCached();
+  for (const ct of sortedCustoms) {
+    const p = ct.prefix || 9000;
+    if (idx >= p) {
+      return { tilesetKey: ct.id, localIdx: idx - p };
     }
-  } catch (e) {}
+  }
 
   if (idx >= 8000) {
     tilesetKey = 'field';
@@ -99,22 +114,17 @@ export const getTileDrawInfo = (idx: number, defaultTileset: string) => {
 };
 
 export const getTilesetInfo = (ts: string) => {
-  try {
-    const savedCustoms = localStorage.getItem('on_house_custom_map_tilesets');
-    if (savedCustoms) {
-      const customs: any[] = JSON.parse(savedCustoms);
-      const found = customs.find(c => c.id === ts);
-      if (found) {
-        return {
-          cols: found.cols || 16,
-          rows: found.rows || 16,
-          label: `🎨 ${found.name}`,
-          prefix: found.prefix || 9000,
-          url: found.url
-        };
-      }
-    }
-  } catch (e) {}
+  const customs = getCustomTilesetsCached();
+  const found = customs.find(c => c.id === ts);
+  if (found) {
+    return {
+      cols: found.cols || 16,
+      rows: found.rows || 16,
+      label: `🎨 ${found.name}`,
+      prefix: found.prefix || 9000,
+      url: found.url
+    };
+  }
 
   switch (ts) {
     case 'interior':
