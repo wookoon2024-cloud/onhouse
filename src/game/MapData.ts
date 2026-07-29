@@ -44,6 +44,7 @@ export interface MapDefinition {
   collision: boolean[][]; // 2D array of colliders (true = solid)
   spawnPoints: { x: number; y: number }[];
   objects?: MapObjectInstance[];
+  sortOrder?: number; // DB Tab display order
 }
 
 export const DEFAULT_CHAR_ROW_ACTIONS: Record<string, string[]> = {

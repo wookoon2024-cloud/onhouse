@@ -2671,6 +2671,18 @@ export default function App() {
               localStorage.setItem('on_house_available_map_ids', JSON.stringify(newOrder));
             } catch (e) {}
 
+            // Update sortOrder property on map objects and save to DB
+            setActiveMaps((prev) => {
+              const updated = { ...prev };
+              newOrder.forEach((id, idx) => {
+                if (updated[id]) {
+                  updated[id] = { ...updated[id], sortOrder: idx };
+                  saveHouseMapToDB(houseCode, id, updated[id]);
+                }
+              });
+              return updated;
+            });
+
             saveHouseMapOrderToDB(houseCode, newOrder);
 
             if (channelRef.current) {

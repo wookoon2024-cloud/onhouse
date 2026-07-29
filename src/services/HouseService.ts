@@ -129,26 +129,40 @@ export const fetchHouseMapOrder = async (houseCode: string): Promise<string[]> =
 // Save map order to Supabase DB
 export const saveHouseMapOrderToDB = async (houseCode: string, order: string[]) => {
   try {
-    await withTimeout(
-      supabase
-        .from('house_assets')
-        .delete()
-        .eq('house_code', houseCode)
-        .eq('asset_type', 'map_order'),
-      3000
-    );
+    try {
+      await withTimeout(
+        supabase
+          .from('house_assets')
+          .upsert({
+            house_code: houseCode,
+            asset_type: 'map_order',
+            asset_data: { order },
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'house_code,asset_type' }),
+        3000
+      );
+    } catch (e) {
+      await withTimeout(
+        supabase
+          .from('house_assets')
+          .delete()
+          .eq('house_code', houseCode)
+          .eq('asset_type', 'map_order'),
+        2000
+      );
 
-    await withTimeout(
-      supabase
-        .from('house_assets')
-        .insert({
-          house_code: houseCode,
-          asset_type: 'map_order',
-          asset_data: { order },
-          updated_at: new Date().toISOString()
-        }),
-      3000
-    );
+      await withTimeout(
+        supabase
+          .from('house_assets')
+          .insert({
+            house_code: houseCode,
+            asset_type: 'map_order',
+            asset_data: { order },
+            updated_at: new Date().toISOString()
+          }),
+        2000
+      );
+    }
     console.log('[OnHouse Sync] Saved map order to Supabase DB:', houseCode, order);
   } catch (err) {
     console.warn('[OnHouse Sync] Failed to save map order to Supabase DB:', err);
