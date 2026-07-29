@@ -2154,7 +2154,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     }}>
       {/* 1. Photoshop-Style Compact Header Toolbar */}
       <div style={{
-        padding: "4px 16px 0px 16px", borderBottom: "1px solid rgba(255,255,255,0.1)",
+        padding: "4px 16px 0px 16px", borderBottom: "1px solid rgba(255, 255, 255, 0.2)",
         background: "rgba(20, 20, 32, 0.98)", display: "flex", justifyContent: "space-between",
         alignItems: "flex-end", minHeight: "38px", zIndex: 10
       }}>
@@ -2163,7 +2163,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           <button
             onClick={handleCancel}
             style={{
-              padding: "4px 10px", background: "rgba(255,255,255,0.06)", border: "1px solid var(--border-glass)",
+              padding: "4px 10px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.2)",
               borderRadius: "4px", color: "#fff", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px",
               cursor: "pointer"
             }}
@@ -2187,7 +2187,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               onClick={handleUndo}
               disabled={history.length === 0}
               style={{
-                padding: "4px 8px", background: "rgba(255,255,255,0.06)", border: "1px solid var(--border-glass)",
+                padding: "4px 8px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.2)",
                 borderRadius: "4px 0 0 4px", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
                 cursor: history.length === 0 ? "not-allowed" : "pointer", opacity: history.length === 0 ? 0.3 : 1
               }}
@@ -2199,7 +2199,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               onClick={handleRedo}
               disabled={redoHistory.length === 0}
               style={{
-                padding: "4px 8px", background: "rgba(255,255,255,0.06)", border: "1px solid var(--border-glass)",
+                padding: "4px 8px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.2)",
                 borderLeft: "none", borderRadius: "0 4px 4px 0", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
                 cursor: redoHistory.length === 0 ? "not-allowed" : "pointer", opacity: redoHistory.length === 0 ? 0.3 : 1
               }}
@@ -2230,12 +2230,12 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                 onDragEnd={handleTabDragEnd}
                 style={{
                   display: "flex", alignItems: "center", gap: "4px",
-                  padding: "5px 10px", borderRadius: "6px 6px 0 0",
-                  background: isSelected ? "#1e1e2e" : (isDragOver ? "rgba(137, 180, 250, 0.25)" : "rgba(255, 255, 255, 0.03)"),
-                  color: isSelected ? "#fff" : "rgba(255, 255, 255, 0.65)",
-                  borderTop: isSelected ? "2px solid #89b4fa" : (isDragOver ? "2px solid #a6e3a1" : "2px solid transparent"),
-                  borderLeft: isSelected ? "1px solid rgba(255,255,255,0.1)" : (isDragOver ? "2px solid #89b4fa" : "1px solid rgba(255,255,255,0.03)"),
-                  borderRight: isSelected ? "1px solid rgba(255,255,255,0.1)" : "1px solid rgba(255,255,255,0.03)",
+                  padding: "6px 12px", borderRadius: "6px 6px 0 0",
+                  background: isSelected ? "#1e1e2e" : (isDragOver ? "rgba(137, 180, 250, 0.25)" : "rgba(255, 255, 255, 0.05)"),
+                  color: isSelected ? "#fff" : "rgba(255, 255, 255, 0.7)",
+                  borderTop: isSelected ? "2px solid #89b4fa" : (isDragOver ? "2px solid #a6e3a1" : "1px solid rgba(255,255,255,0.2)"),
+                  borderLeft: isSelected ? "1px solid rgba(255,255,255,0.25)" : (isDragOver ? "2px solid #89b4fa" : "1px solid rgba(255,255,255,0.18)"),
+                  borderRight: isSelected ? "1px solid rgba(255,255,255,0.25)" : "1px solid rgba(255,255,255,0.18)",
                   borderBottom: "none",
                   opacity: isBeingDragged ? 0.4 : 1,
                   transition: "all 0.15s ease",
@@ -2253,7 +2253,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                   }
                 }}
               >
-                <span style={{ fontSize: "11px", fontWeight: isSelected ? "bold" : "normal" }}>
+                <span style={{ fontSize: "12px", fontWeight: isSelected ? "bold" : "normal" }}>
                   {name}
                 </span>
 
@@ -2285,7 +2285,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                     (e.currentTarget as HTMLElement).style.color = "rgba(255, 255, 255, 0.4)";
                   }}
                 >
-                  <Pencil size={10} />
+                  <Pencil size={11} />
                 </button>
 
                 {/* Delete button (×) */}
@@ -2315,7 +2315,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                     padding: "1px", borderRadius: "3px", marginLeft: "1px"
                   }}
                 >
-                  <X size={11} />
+                  <X size={12} />
                 </button>
               </div>
             );
@@ -2326,24 +2326,24 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               title="새 맵 추가 (최대 4개)"
               style={{
                 display: "flex", alignItems: "center", gap: "3px",
-                padding: "5px 10px", borderRadius: "6px 6px 0 0",
-                background: "rgba(255, 255, 255, 0.03)",
+                padding: "6px 12px", borderRadius: "6px 6px 0 0",
+                background: "rgba(255, 255, 255, 0.05)",
                 color: "var(--accent)",
-                borderTop: "2px solid transparent",
-                borderLeft: "1px solid rgba(255,255,255,0.03)",
-                borderRight: "1px solid rgba(255,255,255,0.03)",
+                borderTop: "1px solid rgba(255,255,255,0.2)",
+                borderLeft: "1px solid rgba(255,255,255,0.18)",
+                borderRight: "1px solid rgba(255,255,255,0.18)",
                 borderBottom: "none",
                 cursor: "pointer", transition: "all 0.15s ease",
-                fontSize: "11px", fontWeight: "normal"
+                fontSize: "12px", fontWeight: "normal"
               }}
             >
-              <Plus size={12} />
+              <Plus size={13} />
               <span>추가</span>
             </button>
           )}
         </div>
 
-        {/* Right Actions: Reset & Market Share */}
+        {/* Right Actions: Market Share */}
         <div style={{ display: "flex", alignItems: "center", gap: "8px", paddingBottom: "4px" }}>
           <button
             type="button"
@@ -2355,23 +2355,13 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               setShowPublishModal(true);
             }}
             style={{
-              padding: "4px 10px", background: "rgba(167, 139, 250, 0.15)", color: "#a78bfa",
-              border: "1px solid #a78bfa", borderRadius: "4px", fontSize: "11px",
+              padding: "5px 12px", background: "rgba(167, 139, 250, 0.15)", color: "#a78bfa",
+              border: "1px solid #a78bfa", borderRadius: "4px", fontSize: "12px",
               display: "flex", alignItems: "center", gap: "4px", cursor: "pointer"
             }}
             title="이 맵과 사용 중인 커스텀 타일셋을 오픈 마켓 상점에 공유"
           >
             🛒 맵 마켓 공유
-          </button>
-          <button
-            onClick={handleResetToDefault}
-            style={{
-              padding: "4px 10px", background: "rgba(243, 139, 168, 0.1)", color: "var(--danger)",
-              border: "1px solid rgba(243, 139, 168, 0.25)", borderRadius: "4px", fontSize: "11px",
-              display: "flex", alignItems: "center", gap: "4px", cursor: "pointer"
-            }}
-          >
-            <Trash2 size={13} /> 리셋
           </button>
         </div>
       </div>
@@ -2380,13 +2370,13 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         
         {/* Left Side: Map Properties Panel with 3 Compact Tabs (기본, 크기, 옵션) */}
         <div style={{
-          width: '260px', borderRight: '1px solid var(--border-glass)',
+          width: '260px', borderRight: '1px solid rgba(255, 255, 255, 0.2)',
           background: 'rgba(20, 20, 30, 0.5)', display: 'flex',
           flexDirection: 'column', overflow: 'hidden'
         }}>
           {/* Tab Header Row */}
           <div style={{
-            display: 'flex', borderBottom: '1px solid var(--border-glass)',
+            display: 'flex', borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
             background: 'rgba(15, 15, 24, 0.8)', padding: '4px 4px 0 4px', gap: '2px'
           }}>
             {(['basic', 'size', 'option'] as const).map((tabKey) => {
@@ -2398,11 +2388,11 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                   onClick={() => setLeftSidebarTab(tabKey)}
                   style={{
                     flex: 1, padding: '7px 2px', fontSize: '12px', fontWeight: 'normal',
-                    color: isActive ? '#fff' : 'rgba(255, 255, 255, 0.6)',
-                    background: isActive ? '#1e1e2e' : 'rgba(255, 255, 255, 0.02)',
-                    borderTop: isActive ? '2px solid #89b4fa' : '2px solid transparent',
-                    borderLeft: isActive ? '1px solid rgba(255,255,255,0.08)' : 'none',
-                    borderRight: isActive ? '1px solid rgba(255,255,255,0.08)' : 'none',
+                    color: isActive ? '#fff' : 'rgba(255, 255, 255, 0.65)',
+                    background: isActive ? '#1e1e2e' : 'rgba(255, 255, 255, 0.03)',
+                    borderTop: isActive ? '2px solid #89b4fa' : '1px solid rgba(255,255,255,0.18)',
+                    borderLeft: isActive ? '1px solid rgba(255,255,255,0.22)' : '1px solid rgba(255,255,255,0.18)',
+                    borderRight: isActive ? '1px solid rgba(255,255,255,0.22)' : '1px solid rgba(255,255,255,0.18)',
                     borderBottom: 'none', borderRadius: '4px 4px 0 0',
                     cursor: 'pointer', transition: 'all 0.15s ease'
                   }}
@@ -3229,22 +3219,22 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         <div
           onMouseDown={handlePaletteResizeStart}
           style={{
-            width: '6px', background: 'rgba(255, 255, 255, 0.05)', cursor: 'col-resize',
-            borderLeft: '1px solid var(--border-glass)', borderRight: '1px solid var(--border-glass)',
+            width: '6px', background: 'rgba(255, 255, 255, 0.08)', cursor: 'col-resize',
+            borderLeft: '1px solid rgba(255, 255, 255, 0.2)', borderRight: '1px solid rgba(255, 255, 255, 0.2)',
             display: 'flex', justifyContent: 'center', alignItems: 'center', transition: 'background 0.2s'
           }}
           title="좌우 드래그로 크기 조절">
-          <div style={{ width: '2px', height: '24px', background: 'rgba(255, 255, 255, 0.3)', borderRadius: '1px' }} />
+          <div style={{ width: '2px', height: '24px', background: 'rgba(255, 255, 255, 0.4)', borderRadius: '1px' }} />
         </div>
 
         {/* Right Side: Tileset Palette & Selector Panel */}
         <div style={{
-          width: `${paletteWidth}px`, borderLeft: '1px solid var(--border-glass)',
+          width: `${paletteWidth}px`, borderLeft: '1px solid rgba(255, 255, 255, 0.2)',
           background: 'rgba(20, 20, 30, 0.65)', display: 'flex', flexDirection: 'column', overflow: 'hidden'
         }}>
           {/* Palette Control Header */}
           <div style={{
-            padding: '12px 16px', borderBottom: '1px solid var(--border-glass)',
+            padding: '12px 16px', borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
             background: 'rgba(30, 30, 46, 0.9)', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
           }}>
             <div style={{ fontSize: '12px', fontWeight: 'normal', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '6px' }}>
