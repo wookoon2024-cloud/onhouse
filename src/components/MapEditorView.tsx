@@ -69,7 +69,9 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   const [paletteSelection, setPaletteSelection] = useState<{ startCol: number; startRow: number; cols: number; rows: number; tilesetKey: string } | null>(null);
 
   // Object Selection & Smart Editing State (Step 3 & 4)
-  const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
+  const [selectedObjectIds, setSelectedObjectIds] = useState<string[]>([]);
+  const selectedObjectId = selectedObjectIds[0] || null;
+  const setSelectedObjectId = (id: string | null) => setSelectedObjectIds(id ? [id] : []);
   const [copiedObject, setCopiedObject] = useState<MapObjectInstance | null>(null);
   const [isDraggingObject, setIsDraggingObject] = useState<boolean>(false);
   const [objectDragStart, setObjectDragStart] = useState<{ originX: number; originY: number; startTx: number; startTy: number } | null>(null);
@@ -190,51 +192,193 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   const handleUndoRef = useRef<() => void>(() => {});
   const handleRedoRef = useRef<() => void>(() => {});
 
-  // Helper handlers for Smart Object Management (Steps 3 & 4) - Non-destructive Layer Overlay
+  // Helper handlers for Smart Object Management - Non-destructive Layer Overlay
   const handleDeleteSelectedObject = (targetId?: string) => {
-    const objId = targetId || selectedObjectId;
-    if (!objId) return;
+    const idsToDelete = targetId ? [targetId] : selectedObjectIds;
+    if (idsToDelete.length === 0) return;
 
     setHistory(prev => [...prev, localMap]);
     setRedoHistory([]);
 
     setLocalMap(prev => {
-      const obj = prev.objects?.find(o => o.id === objId);
-      if (!obj) return prev;
+      const targetObjs = (prev.objects || []).filter(o => idsToDelete.includes(o.id));
+      if (targetObjs.length === 0) return prev;
 
       const newCollision = prev.collision.map(r => [...r]);
       const newDecor = prev.decorLayer.map(r => [...r]);
 
-      const tsInfo = getTilesetInfoLocal(obj.tilesetKey);
-
-      for (let ody = 0; ody < obj.height; ody++) {
-        for (let odx = 0; odx < obj.width; odx++) {
-          const ptx = obj.x + odx;
-          const pty = obj.y + ody;
-          if (ptx >= 0 && ptx < prev.width && pty >= 0 && pty < prev.height) {
-            if (autoCollision) newCollision[pty][ptx] = false;
-
-            // Clean up any duplicate baked-in decor tiles left from previous versions
-            if (tsInfo) {
-              const localIdx = (obj.startRow + ody) * tsInfo.cols + (obj.startCol + odx);
-              const expectedTile = getPrefixedIndex(localIdx, obj.tilesetKey);
-              if (newDecor[pty][ptx] === expectedTile) {
-                newDecor[pty][ptx] = -1;
+      targetObjs.forEach(obj => {
+        const tsInfo = getTilesetInfoLocal(obj.tilesetKey);
+        for (let ody = 0; ody < obj.height; ody++) {
+          for (let odx = 0; odx < obj.width; odx++) {
+            const ptx = obj.x + odx;
+            const pty = obj.y + ody;
+            if (ptx >= 0 && ptx < prev.width && pty >= 0 && pty < prev.height) {
+              if (autoCollision) newCollision[pty][ptx] = false;
+              if (tsInfo) {
+                const localIdx = (obj.startRow + ody) * tsInfo.cols + (obj.startCol + odx);
+                const expectedTile = getPrefixedIndex(localIdx, obj.tilesetKey);
+                if (newDecor[pty][ptx] === expectedTile) {
+                  newDecor[pty][ptx] = -1;
+                }
               }
             }
           }
         }
-      }
+      });
 
       return {
         ...prev,
         decorLayer: newDecor,
         collision: newCollision,
-        objects: (prev.objects || []).filter(o => o.id !== objId)
+        objects: (prev.objects || []).filter(o => !idsToDelete.includes(o.id))
       };
     });
 
-    setSelectedObjectId(null);
+    setSelectedObjectIds([]);
+  };
+
+  // 🔗 Merge 2 or more selected objects into a single unified MapObjectInstance!
+  const handleMergeSelectedObjects = () => {
+    if (selectedObjectIds.length < 2) return;
+
+    setHistory(prev => [...prev, localMap]);
+    setRedoHistory([]);
+
+    setLocalMap(prev => {
+      const currentObjs = prev.objects || [];
+      const targetObjs = currentObjs.filter(o => selectedObjectIds.includes(o.id));
+      if (targetObjs.length < 2) return prev;
+
+      const minX = Math.min(...targetObjs.map(o => o.x));
+      const minY = Math.min(...targetObjs.map(o => o.y));
+      const maxX = Math.max(...targetObjs.map(o => o.x + o.width));
+      const maxY = Math.max(...targetObjs.map(o => o.y + o.height));
+
+      const cols = maxX - minX;
+      const rows = maxY - minY;
+
+      const tilesGrid: number[][] = Array.from({ length: rows }, () => Array(cols).fill(-1));
+
+      const sortedTargets = [...targetObjs].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+
+      sortedTargets.forEach(obj => {
+        const offsetX = obj.x - minX;
+        const offsetY = obj.y - minY;
+        const tsInfo = getTilesetInfoLocal(obj.tilesetKey);
+
+        for (let r = 0; r < obj.height; r++) {
+          for (let c = 0; c < obj.width; c++) {
+            const targetR = offsetY + r;
+            const targetC = offsetX + c;
+            if (targetR >= 0 && targetR < rows && targetC >= 0 && targetC < cols) {
+              if (obj.tiles && obj.tiles[r] && obj.tiles[r][c] !== undefined) {
+                const val = obj.tiles[r][c];
+                if (val !== -1) tilesGrid[targetR][targetC] = val;
+              } else if (tsInfo) {
+                const localIdx = (obj.startRow + r) * tsInfo.cols + (obj.startCol + c);
+                tilesGrid[targetR][targetC] = getPrefixedIndex(localIdx, obj.tilesetKey);
+              }
+            }
+          }
+        }
+      });
+
+      const primaryTsKey = targetObjs[0].tilesetKey || activeTileset;
+      const mergedObj: MapObjectInstance = {
+        id: `obj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        tilesetKey: primaryTsKey,
+        startCol: 0,
+        startRow: 0,
+        width: cols,
+        height: rows,
+        x: minX,
+        y: minY,
+        layer: editLayer === "base" ? "base" : "decor",
+        zIndex: Date.now(),
+        tiles: tilesGrid
+      };
+
+      const remainingObjs = currentObjs.filter(o => !selectedObjectIds.includes(o.id));
+      remainingObjs.push(mergedObj);
+
+      setSelectedObjectIds([mergedObj.id]);
+      setPickedToast(`✨ ${targetObjs.length}개 오브젝트가 1개의 통합 오브젝트로 병합되었습니다!`);
+      setTimeout(() => setPickedToast(null), 2500);
+
+      return {
+        ...prev,
+        objects: remainingObjs
+      };
+    });
+  };
+
+  // 💥 Explode / Un-group selected object(s) into individual 1x1 objects!
+  const handleExplodeSelectedObjects = () => {
+    if (selectedObjectIds.length === 0) return;
+
+    setHistory(prev => [...prev, localMap]);
+    setRedoHistory([]);
+
+    setLocalMap(prev => {
+      const currentObjs = prev.objects || [];
+      const targetObjs = currentObjs.filter(o => selectedObjectIds.includes(o.id));
+      if (targetObjs.length === 0) return prev;
+
+      const new1x1Objects: MapObjectInstance[] = [];
+
+      targetObjs.forEach(obj => {
+        const tsInfo = getTilesetInfoLocal(obj.tilesetKey);
+        for (let r = 0; r < obj.height; r++) {
+          for (let c = 0; c < obj.width; c++) {
+            const tileX = obj.x + c;
+            const tileY = obj.y + r;
+            let tileVal = -1;
+
+            if (obj.tiles && obj.tiles[r] && obj.tiles[r][c] !== undefined) {
+              tileVal = obj.tiles[r][c];
+            } else if (tsInfo) {
+              const localIdx = (obj.startRow + r) * tsInfo.cols + (obj.startCol + c);
+              tileVal = getPrefixedIndex(localIdx, obj.tilesetKey);
+            }
+
+            if (tileVal !== -1) {
+              const drawInfo = getTileDrawInfo(tileVal, obj.tilesetKey || activeTileset);
+              const tsKey = drawInfo?.tilesetKey || obj.tilesetKey || activeTileset;
+              const singleTsInfo = getTilesetInfoLocal(tsKey);
+              const startCol = drawInfo && singleTsInfo ? (drawInfo.localIdx % singleTsInfo.cols) : 0;
+              const startRow = drawInfo && singleTsInfo ? Math.floor(drawInfo.localIdx / singleTsInfo.cols) : 0;
+
+              new1x1Objects.push({
+                id: `obj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}_${r}_${c}`,
+                tilesetKey: tsKey,
+                startCol,
+                startRow,
+                width: 1,
+                height: 1,
+                x: tileX,
+                y: tileY,
+                layer: obj.layer || (editLayer === "base" ? "base" : "decor"),
+                zIndex: (obj.zIndex || Date.now()) + r * 10 + c,
+                tiles: [[tileVal]]
+              });
+            }
+          }
+        }
+      });
+
+      const remainingObjs = currentObjs.filter(o => !selectedObjectIds.includes(o.id));
+      const finalObjs = [...remainingObjs, ...new1x1Objects];
+
+      setSelectedObjectIds(new1x1Objects.map(o => o.id));
+      setPickedToast(`💥 ${targetObjs.length}개 오브젝트가 ${new1x1Objects.length}개의 1x1 개별 오브젝트로 해체 분리되었습니다!`);
+      setTimeout(() => setPickedToast(null), 2500);
+
+      return {
+        ...prev,
+        objects: finalObjs
+      };
+    });
   };
 
   const handleCopySelectedObject = () => {
@@ -708,7 +852,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     // 5. Objects Bounding Boxes Overlay (Selected: Gold/Yellow, Unselected: Neon Cyan!)
     if (localMap.objects && localMap.objects.length > 0) {
       localMap.objects.forEach(obj => {
-        const isSelected = obj.id === selectedObjectId;
+        const isSelected = selectedObjectIds.includes(obj.id);
         const ox = obj.x * tileSize;
         const oy = obj.y * tileSize;
         const ow = obj.width * tileSize;
@@ -1295,7 +1439,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           if (curTx >= 0 && curTx < prev.width && curTy >= 0 && curTy < prev.height) {
             const dIdx = prev.decorLayer[curTy][curTx];
             const bIdx = prev.baseLayer[curTy][curTx];
-            const tileVal = editLayer === "decor" ? dIdx : (dIdx !== -1 ? dIdx : bIdx);
+            const tileVal = dIdx !== -1 ? dIdx : bIdx;
             rowTiles.push(tileVal);
             
             // 🎯 ERASE BOTH LAYERS AT VACATED CELLS TO BLACK EMPTY GROUND (-1)!
@@ -1447,20 +1591,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     }
 
     if (tool === "select") {
-      const isAltHeld = e.altKey || isAltPressed;
-      if (isAltHeld) {
-        // Alt + Drag in select mode -> ONLY WAY to start Map Box Multi-Tile Drag Selection!
-        setSelectedObjectId(null);
-        setIsDraggingObject(false);
-        setObjectDragStart(null);
-        setMapBoxSelectStart({ tx, ty });
-        setMapBoxSelection({ startCol: tx, startRow: ty, cols: 1, rows: 1 });
-        return;
-      }
-
-      // NO Alt held -> Pure 1x1 Tile / Object Select & Drag-to-Move Mode!
-      setMapBoxSelectStart(null);
-      setMapBoxSelection(null);
+      const isMultiSelectKey = e.ctrlKey || e.metaKey || e.shiftKey;
 
       // A. Check existing MapObjectInstance at (tx, ty) strictly matching current editLayer!
       const clickedObj = (localMap.objects || []).slice().reverse().find(o => {
@@ -1472,11 +1603,17 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       });
 
       if (clickedObj) {
-        setSelectedObjectId(clickedObj.id);
+        if (isMultiSelectKey) {
+          setSelectedObjectIds(prev =>
+            prev.includes(clickedObj.id) ? prev.filter(id => id !== clickedObj.id) : [...prev, clickedObj.id]
+          );
+        } else {
+          setSelectedObjectIds([clickedObj.id]);
+        }
         setIsDraggingObject(true);
         setObjectDragStart({ originX: e.clientX, originY: e.clientY, startTx: clickedObj.x, startTy: clickedObj.y });
 
-        // 🎯 Update "현재 선택된 브러시" preview box in palette panel!
+        // Update preview tile info
         if (clickedObj.tiles && clickedObj.tiles[0] && clickedObj.tiles[0][0] !== undefined) {
           const tIdx = clickedObj.tiles[0][0];
           if (tIdx !== -1) {
@@ -1539,9 +1676,9 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           const newDecor = prev.decorLayer.map(r => [...r]);
           const newBase = prev.baseLayer.map(r => [...r]);
           if (isBasePick) {
-            newBase[ty][tx] = -1; // 🎯 ERASE OLD BASE TILE FROM MAP TO BLACK (-1)!
+            newBase[ty][tx] = -1;
           } else {
-            newDecor[ty][tx] = -1; // 🎯 ERASE OLD DECOR TILE FROM MAP!
+            newDecor[ty][tx] = -1;
           }
           return {
             ...prev,
@@ -1551,20 +1688,23 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           };
         });
 
-        setSelectedObjectId(newObj.id);
+        setSelectedObjectIds(prev => isMultiSelectKey ? [...prev, newObj.id] : [newObj.id]);
         setIsDraggingObject(true);
         setObjectDragStart({ originX: e.clientX, originY: e.clientY, startTx: tx, startTy: ty });
 
-        // 🎯 Update "현재 선택된 브러시" preview box in palette panel!
         setSelectedTile(targetTile);
         if (tsKey) setActiveTileset(tsKey);
         return;
       }
 
-      // C. Click on empty ground cell without Alt -> Clear object selection
-      setSelectedObjectId(null);
+      // C. Click on empty ground cell -> Start Map Box Selection!
+      if (!isMultiSelectKey) {
+        setSelectedObjectIds([]);
+      }
       setIsDraggingObject(false);
       setObjectDragStart(null);
+      setMapBoxSelectStart({ tx, ty });
+      setMapBoxSelection({ startCol: tx, startRow: ty, cols: 1, rows: 1 });
       return;
     }
 
@@ -1601,21 +1741,29 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       return { x: tx, y: ty };
     });
 
-    if (isDraggingObject && selectedObjectId && objectDragStart && e.buttons === 1) {
+    if (isDraggingObject && selectedObjectIds.length > 0 && objectDragStart && e.buttons === 1) {
       const deltaTx = Math.round((e.clientX - objectDragStart.originX) / tileSize);
       const deltaTy = Math.round((e.clientY - objectDragStart.originY) / tileSize);
-      const targetTx = Math.max(0, Math.min(localMap.width - 1, objectDragStart.startTx + deltaTx));
-      const targetTy = Math.max(0, Math.min(localMap.height - 1, objectDragStart.startTy + deltaTy));
 
-      const curObj = localMap.objects?.find(o => o.id === selectedObjectId);
-      if (curObj && (curObj.x !== targetTx || curObj.y !== targetTy)) {
-        handleMoveObjectTiles(selectedObjectId, targetTx, targetTy, objectDragStart.startTx, objectDragStart.startTy);
+      if (deltaTx !== 0 || deltaTy !== 0) {
+        setLocalMap(prev => {
+          const nextObjects = (prev.objects || []).map(obj => {
+            if (selectedObjectIds.includes(obj.id)) {
+              const targetTx = Math.max(0, Math.min(prev.width - obj.width, obj.x + deltaTx));
+              const targetTy = Math.max(0, Math.min(prev.height - obj.height, obj.y + deltaTy));
+              return { ...obj, x: targetTx, y: targetTy };
+            }
+            return obj;
+          });
+          return { ...prev, objects: nextObjects };
+        });
+        setObjectDragStart({ originX: e.clientX, originY: e.clientY, startTx: objectDragStart.startTx + deltaTx, startTy: objectDragStart.startTy + deltaTy });
       }
       return;
     }
 
-    // Drag to select box area on map ONLY when Alt is held in select mode
-    if (tool === 'select' && mapBoxSelectStart && (e.altKey || isAltPressed) && e.buttons === 1) {
+    // Drag to select box area on map in select mode
+    if (tool === 'select' && mapBoxSelectStart && e.buttons === 1) {
       const sCol = Math.min(mapBoxSelectStart.tx, tx);
       const sRow = Math.min(mapBoxSelectStart.ty, ty);
       const eCol = Math.max(mapBoxSelectStart.tx, tx);
@@ -2670,7 +2818,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           </div>
 
           {/* Floating Object Smart Edit Action Bar (Fixed on bottom center) */}
-          {selectedObjectId && (
+          {selectedObjectIds.length > 0 && (
             <div style={{
               position: "absolute", bottom: "24px", left: "50%", transform: "translateX(-50%)", zIndex: 100,
               background: "rgba(20, 20, 32, 0.95)", border: "1px solid #ffd700",
@@ -2679,9 +2827,40 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               pointerEvents: "auto", animation: "fadeIn 0.15s ease-out", whiteSpace: "nowrap"
             }}>
               <span style={{ fontSize: "11px", color: "#ffd700", fontWeight: "normal", whiteSpace: "nowrap" }}>
-                📦 오브젝트
+                📦 오브젝트 {selectedObjectIds.length > 1 ? `(${selectedObjectIds.length}개 선택됨)` : ''}
               </span>
               <div style={{ width: "1px", height: "14px", background: "rgba(255,255,255,0.2)" }} />
+
+              {/* Merge button (2+ objects selected) */}
+              {selectedObjectIds.length >= 2 && (
+                <button
+                  onClick={() => handleMergeSelectedObjects()}
+                  style={{
+                    padding: "5px 12px", fontSize: "11px", borderRadius: "4px",
+                    background: "linear-gradient(135deg, rgba(167,139,250,0.3), rgba(139,92,246,0.3))",
+                    color: "#a78bfa", border: "1px solid #a78bfa", cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap"
+                  }}
+                  title="선택된 2개 이상의 오브젝트를 1개의 오브젝트로 통합 병합"
+                >
+                  <Layers size={12} /> 🔗 오브젝트 병합
+                </button>
+              )}
+
+              {/* Explode / Un-group button */}
+              <button
+                onClick={() => handleExplodeSelectedObjects()}
+                style={{
+                  padding: "5px 12px", fontSize: "11px", borderRadius: "4px",
+                  background: "rgba(250, 179, 135, 0.2)",
+                  color: "#fab387", border: "1px solid #fab387", cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap"
+                }}
+                title="선택된 오브젝트를 각각 1x1 개별 오브젝트로 해체 분리"
+              >
+                <Sparkles size={12} /> 💥 오브젝트 해체
+              </button>
+
               <button
                 onClick={() => handleBringToFront()}
                 style={{
@@ -2727,7 +2906,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                 <Trash2 size={12} /> 삭제
               </button>
               <button
-                onClick={() => setSelectedObjectId(null)}
+                onClick={() => setSelectedObjectIds([])}
                 style={{ padding: "4px 6px", fontSize: "10px", borderRadius: "4px", background: "transparent", color: "#aaa", border: "none", cursor: "pointer", whiteSpace: "nowrap" }}
               >
                 <X size={12} />
