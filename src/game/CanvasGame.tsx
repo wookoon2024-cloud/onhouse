@@ -1287,52 +1287,53 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
       };
 
       // 2.5 Render Base Layer Objects (obj.layer === 'base' - Ground Overlay Objects like Stepping Stones, Rugs)
+      // 2.5 Render Base Layer Objects (obj.layer === 'base' - Ground Overlay Objects like Stepping Stones, Rugs)
       if (map.objects && map.objects.length > 0) {
         const baseObjs = cleanDuplicateObjects(map.objects.filter(o => o.layer === 'base'));
         baseObjs.forEach(obj => {
-          const tsInfo = getTilesetInfo(obj.tilesetKey);
-          const img = images[obj.tilesetKey];
-          if (img && tsInfo) {
-            const tileW = Math.max(1, Math.floor(img.width / tsInfo.cols));
-            const tileH = Math.max(1, Math.floor(img.height / tsInfo.rows));
-              for (let ody = 0; ody < obj.height; ody++) {
-                for (let odx = 0; odx < obj.width; odx++) {
-                  const targetTx = obj.x + odx;
-                  const targetTy = obj.y + ody;
-                  if (targetTx >= 0 && targetTx < map.width && targetTy >= 0 && targetTy < map.height) {
-                    if (obj.tiles && obj.tiles[ody] && obj.tiles[ody][odx] !== undefined) {
-                      const tileIdx = obj.tiles[ody][odx];
-                      if (tileIdx !== -1) {
-                        const drawInfo = getTileDrawInfo(tileIdx, obj.tilesetKey || map.tileset);
-                        if (drawInfo) {
-                          const tImg = images[drawInfo.tilesetKey];
-                          if (tImg) {
-                            const tTsInfo = getTilesetInfo(drawInfo.tilesetKey);
-                            const tTileW = Math.max(1, Math.floor(tImg.width / tTsInfo.cols));
-                            const tTileH = Math.max(1, Math.floor(tImg.height / tTsInfo.rows));
-                            const srcX = (drawInfo.localIdx % tTsInfo.cols) * tTileW;
-                            const srcY = Math.floor(drawInfo.localIdx / tTsInfo.cols) * tTileH;
-                            ctx.drawImage(
-                              tImg,
-                              srcX, srcY, tTileW, tTileH,
-                              targetTx * vSize, targetTy * vSize, vSize, vSize
-                            );
-                          }
-                        }
+          const tsKey = obj.tilesetKey || map.tileset;
+          const tsInfo = getTilesetInfo(tsKey);
+          const img = images[tsKey];
+
+          for (let ody = 0; ody < obj.height; ody++) {
+            for (let odx = 0; odx < obj.width; odx++) {
+              const targetTx = obj.x + odx;
+              const targetTy = obj.y + ody;
+              if (targetTx >= 0 && targetTx < map.width && targetTy >= 0 && targetTy < map.height) {
+                if (obj.tiles && obj.tiles[ody] && obj.tiles[ody][odx] !== undefined) {
+                  const tileIdx = obj.tiles[ody][odx];
+                  if (tileIdx !== -1) {
+                    const drawInfo = getTileDrawInfo(tileIdx, tsKey);
+                    if (drawInfo) {
+                      const tImg = images[drawInfo.tilesetKey];
+                      if (tImg) {
+                        const tTsInfo = getTilesetInfo(drawInfo.tilesetKey);
+                        const tTileW = Math.max(1, Math.floor(tImg.width / tTsInfo.cols));
+                        const tTileH = Math.max(1, Math.floor(tImg.height / tTsInfo.rows));
+                        const srcX = (drawInfo.localIdx % tTsInfo.cols) * tTileW;
+                        const srcY = Math.floor(drawInfo.localIdx / tTsInfo.cols) * tTileH;
+                        ctx.drawImage(
+                          tImg,
+                          srcX, srcY, tTileW, tTileH,
+                          targetTx * vSize, targetTy * vSize, vSize, vSize
+                        );
                       }
-                    } else {
-                      const localIdx = (obj.startRow + ody) * tsInfo.cols + (obj.startCol + odx);
-                      const srcX = (localIdx % tsInfo.cols) * tileW;
-                      const srcY = Math.floor(localIdx / tsInfo.cols) * tileH;
-                      ctx.drawImage(
-                        img,
-                        srcX, srcY, tileW, tileH,
-                        targetTx * vSize, targetTy * vSize, vSize, vSize
-                      );
                     }
                   }
+                } else if (img && tsInfo) {
+                  const tileW = Math.max(1, Math.floor(img.width / tsInfo.cols));
+                  const tileH = Math.max(1, Math.floor(img.height / tsInfo.rows));
+                  const localIdx = (obj.startRow + ody) * tsInfo.cols + (obj.startCol + odx);
+                  const srcX = (localIdx % tsInfo.cols) * tileW;
+                  const srcY = Math.floor(localIdx / tsInfo.cols) * tileH;
+                  ctx.drawImage(
+                    img,
+                    srcX, srcY, tileW, tileH,
+                    targetTx * vSize, targetTy * vSize, vSize, vSize
+                  );
                 }
               }
+            }
           }
         });
       }
@@ -1344,7 +1345,7 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
       if (map.objects && map.objects.length > 0) {
         const cleanedObjs = cleanDuplicateObjects(map.objects.filter(o => o.layer !== 'base'));
         cleanedObjs.forEach((obj) => {
-          const rootRow = obj.y + obj.height - 1;
+          const rootRow = Math.max(0, Math.min(map.height - 1, obj.y + obj.height - 1));
           if (!objectRootRowMap[rootRow]) {
             objectRootRowMap[rootRow] = [];
           }
@@ -1387,46 +1388,46 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         if (objectsAtRow && objectsAtRow.length > 0) {
           const sortedObjs = [...objectsAtRow].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
           sortedObjs.forEach((obj) => {
-            const tsInfo = getTilesetInfo(obj.tilesetKey);
-            const img = images[obj.tilesetKey];
-            if (img && tsInfo) {
-              const tileW = Math.max(1, Math.floor(img.width / tsInfo.cols));
-              const tileH = Math.max(1, Math.floor(img.height / tsInfo.rows));
-              for (let ody = 0; ody < obj.height; ody++) {
-                for (let odx = 0; odx < obj.width; odx++) {
-                  const targetTx = obj.x + odx;
-                  const targetTy = obj.y + ody;
-                  if (targetTx >= 0 && targetTx < map.width && targetTy >= 0 && targetTy < map.height) {
-                    if (obj.tiles && obj.tiles[ody] && obj.tiles[ody][odx] !== undefined) {
-                      const tileIdx = obj.tiles[ody][odx];
-                      if (tileIdx !== -1) {
-                        const drawInfo = getTileDrawInfo(tileIdx, obj.tilesetKey || map.tileset);
-                        if (drawInfo) {
-                          const tImg = images[drawInfo.tilesetKey];
-                          if (tImg) {
-                            const tTsInfo = getTilesetInfo(drawInfo.tilesetKey);
-                            const tTileW = Math.max(1, Math.floor(tImg.width / tTsInfo.cols));
-                            const tTileH = Math.max(1, Math.floor(tImg.height / tTsInfo.rows));
-                            const srcX = (drawInfo.localIdx % tTsInfo.cols) * tTileW;
-                            const srcY = Math.floor(drawInfo.localIdx / tTsInfo.cols) * tTileH;
-                            ctx.drawImage(
-                              tImg,
-                              srcX, srcY, tTileW, tTileH,
-                              targetTx * vSize, targetTy * vSize, vSize, vSize
-                            );
-                          }
+            const tsKey = obj.tilesetKey || map.tileset;
+            const tsInfo = getTilesetInfo(tsKey);
+            const img = images[tsKey];
+
+            for (let ody = 0; ody < obj.height; ody++) {
+              for (let odx = 0; odx < obj.width; odx++) {
+                const targetTx = obj.x + odx;
+                const targetTy = obj.y + ody;
+                if (targetTx >= 0 && targetTx < map.width && targetTy >= 0 && targetTy < map.height) {
+                  if (obj.tiles && obj.tiles[ody] && obj.tiles[ody][odx] !== undefined) {
+                    const tileIdx = obj.tiles[ody][odx];
+                    if (tileIdx !== -1) {
+                      const drawInfo = getTileDrawInfo(tileIdx, tsKey);
+                      if (drawInfo) {
+                        const tImg = images[drawInfo.tilesetKey];
+                        if (tImg) {
+                          const tTsInfo = getTilesetInfo(drawInfo.tilesetKey);
+                          const tTileW = Math.max(1, Math.floor(tImg.width / tTsInfo.cols));
+                          const tTileH = Math.max(1, Math.floor(tImg.height / tTsInfo.rows));
+                          const srcX = (drawInfo.localIdx % tTsInfo.cols) * tTileW;
+                          const srcY = Math.floor(drawInfo.localIdx / tTsInfo.cols) * tTileH;
+                          ctx.drawImage(
+                            tImg,
+                            srcX, srcY, tTileW, tTileH,
+                            targetTx * vSize, targetTy * vSize, vSize, vSize
+                          );
                         }
                       }
-                    } else {
-                      const localIdx = (obj.startRow + ody) * tsInfo.cols + (obj.startCol + odx);
-                      const srcX = (localIdx % tsInfo.cols) * tileW;
-                      const srcY = Math.floor(localIdx / tsInfo.cols) * tileH;
-                      ctx.drawImage(
-                        img,
-                        srcX, srcY, tileW, tileH,
-                        targetTx * vSize, targetTy * vSize, vSize, vSize
-                      );
                     }
+                  } else if (img && tsInfo) {
+                    const tileW = Math.max(1, Math.floor(img.width / tsInfo.cols));
+                    const tileH = Math.max(1, Math.floor(img.height / tsInfo.rows));
+                    const localIdx = (obj.startRow + ody) * tsInfo.cols + (obj.startCol + odx);
+                    const srcX = (localIdx % tsInfo.cols) * tileW;
+                    const srcY = Math.floor(localIdx / tsInfo.cols) * tileH;
+                    ctx.drawImage(
+                      img,
+                      srcX, srcY, tileW, tileH,
+                      targetTx * vSize, targetTy * vSize, vSize, vSize
+                    );
                   }
                 }
               }

@@ -1603,6 +1603,9 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       });
 
       if (clickedObj) {
+        setMapBoxSelection(null);
+        setMapBoxSelectStart(null);
+
         if (isMultiSelectKey) {
           setSelectedObjectIds(prev =>
             prev.includes(clickedObj.id) ? prev.filter(id => id !== clickedObj.id) : [...prev, clickedObj.id]
