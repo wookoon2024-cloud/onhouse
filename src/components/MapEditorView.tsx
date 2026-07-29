@@ -1629,7 +1629,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     if (!isPainting.current || (tool as string) !== 'brush' || e.altKey || isAltPressed) return;
 
     // Do NOT drag-spawn multi-tile objects on MouseMove!
-    const isMultiTile = !!paletteSelection || brushSize > 1;
+    const isMultiTile = (paletteSelection && (paletteSelection.cols > 1 || paletteSelection.rows > 1)) || brushSize > 1;
     if (isMultiTile) return;
 
     if (lastPaintedCellRef.current?.x === tx && lastPaintedCellRef.current?.y === ty) return;
@@ -2949,6 +2949,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                           setBrushSize(1);
                           setSelectedTile(prefixedIdx);
                           setSelectedObjectId(null);
+                          if (tool === 'select') setTool('brush');
                         }}
                         onMouseEnter={() => {
                           setHoverPaletteTile({ col: c, row: r });
