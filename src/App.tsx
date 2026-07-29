@@ -53,15 +53,19 @@ export default function App() {
   const [activeMaps, setActiveMaps] = useState<Record<string, MapDefinition>>(() => {
     const initial = JSON.parse(JSON.stringify(maps));
     try {
-      Object.keys(initial).forEach((id) => {
-        const saved = localStorage.getItem('on_house_map_' + id);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed && parsed.width && parsed.height) {
-            initial[id] = parsed;
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('on_house_map_')) {
+          const mapId = key.replace('on_house_map_', '');
+          const saved = localStorage.getItem(key);
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed && parsed.width && parsed.height) {
+              initial[mapId] = parsed;
+            }
           }
         }
-      });
+      }
     } catch (e) {}
     return initial;
   });
@@ -134,16 +138,22 @@ export default function App() {
     const rawStatus = localStorage.getItem('on_house_status');
     const savedStatus = (rawStatus === '반가워요!' || !rawStatus) ? '' : rawStatus;
 
-    // Default to My Room spawn point
-    const spawn = maps.room.spawnPoints[0];
+    // Default to the first map on the far-left of availableMapIds!
+    const initialMapIds = getInitialAvailableMapIds();
+    const firstMapId = initialMapIds[0] || 'room';
+    const firstMapObj = activeMaps[firstMapId] || maps.room || maps[firstMapId];
+    const firstSpawn = (firstMapObj && firstMapObj.spawnPoints && firstMapObj.spawnPoints[0])
+      ? firstMapObj.spawnPoints[0]
+      : { x: 10, y: 10 };
+
     return {
       id: deviceId.current,
       nickname: savedName,
       spriteType: savedSprite,
       hue: savedHue,
-      mapId: 'room',
-      x: spawn.x * 16,
-      y: spawn.y * 16,
+      mapId: firstMapId,
+      x: firstSpawn.x * 16,
+      y: firstSpawn.y * 16,
       dir: 'down',
       isMoving: false,
       isOnline: true,
