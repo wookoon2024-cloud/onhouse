@@ -340,6 +340,9 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
     scale?: number;
   }>>([]);
 
+  // Active RPG movement click target markers
+  const clickMarkersRef = useRef<Array<{ x: number; y: number; startTime: number; duration: number }>>([]);
+
   useEffect(() => {
     const handleSpawnParticle = (e: Event) => {
       const detail = (e as CustomEvent).detail;
@@ -461,6 +464,14 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
           waypoints,
           onArrival: detail.onArrival
         };
+
+        // Add visual click target marker!
+        clickMarkersRef.current.push({
+          x: detail.x,
+          y: detail.y,
+          startTime: performance.now(),
+          duration: 650
+        });
       }
     };
 
@@ -1513,6 +1524,74 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
           ctx.restore();
         });
       }
+
+      // 3.6. Render Animated RPG Movement Click Target Markers
+      const nowMs = performance.now();
+      clickMarkersRef.current = clickMarkersRef.current.filter((marker) => {
+        const elapsed = nowMs - marker.startTime;
+        if (elapsed >= marker.duration) return false;
+
+        const progress = elapsed / marker.duration;
+        const opacity = progress > 0.75 ? (1 - progress) / 0.25 : 1;
+        const ringRadius = 4 + progress * 20;
+        const pinOffset = 16 - progress * 8;
+
+        const markerCanvasX = (marker.x / 16) * vSize + vSize / 2;
+        const markerCanvasY = (marker.y / 16) * vSize + vSize / 2;
+
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, Math.min(1, opacity));
+
+        // 1. Outer Glowing Expanding Ring
+        ctx.beginPath();
+        ctx.arc(markerCanvasX, markerCanvasY, ringRadius, 0, Math.PI * 2);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#a78bfa';
+        ctx.stroke();
+
+        // 2. Inner Translucent Filled Target Ring
+        ctx.beginPath();
+        ctx.arc(markerCanvasX, markerCanvasY, Math.max(2, ringRadius * 0.4), 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(167, 139, 250, 0.3)';
+        ctx.fill();
+
+        // 3. Directional Pin Crosshairs (Top, Bottom, Left, Right)
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#f5c2e7';
+
+        // Top pin
+        ctx.beginPath();
+        ctx.moveTo(markerCanvasX, markerCanvasY - pinOffset);
+        ctx.lineTo(markerCanvasX, markerCanvasY - pinOffset - 5);
+        ctx.stroke();
+
+        // Bottom pin
+        ctx.beginPath();
+        ctx.moveTo(markerCanvasX, markerCanvasY + pinOffset);
+        ctx.lineTo(markerCanvasX, markerCanvasY + pinOffset + 5);
+        ctx.stroke();
+
+        // Left pin
+        ctx.beginPath();
+        ctx.moveTo(markerCanvasX - pinOffset, markerCanvasY);
+        ctx.lineTo(markerCanvasX - pinOffset - 5, markerCanvasY);
+        ctx.stroke();
+
+        // Right pin
+        ctx.beginPath();
+        ctx.moveTo(markerCanvasX + pinOffset, markerCanvasY);
+        ctx.lineTo(markerCanvasX + pinOffset + 5, markerCanvasY);
+        ctx.stroke();
+
+        // 4. Center Glowing Dot
+        ctx.beginPath();
+        ctx.arc(markerCanvasX, markerCanvasY, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+
+        ctx.restore();
+        return true;
+      });
 
       // 4. Render Animated Visual Particles (Flying Hearts & Cheering Claps)
       const nowTime = performance.now();
