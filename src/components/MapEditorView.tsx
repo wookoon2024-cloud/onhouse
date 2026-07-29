@@ -387,7 +387,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       const remainingObjs = currentObjs.filter(o => !selectedObjectIds.includes(o.id));
       const finalObjs = [...remainingObjs, ...new1x1Objects];
 
-      setSelectedObjectIds(new1x1Objects.map(o => o.id));
+      setSelectedObjectIds([]);
       setPickedToast(`💥 ${targetObjs.length}개 오브젝트가 ${new1x1Objects.length}개의 1x1 개별 오브젝트로 해체 분리되었습니다!`);
       setTimeout(() => setPickedToast(null), 2500);
 
