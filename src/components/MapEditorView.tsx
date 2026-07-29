@@ -764,29 +764,9 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       }
     }
 
-    // 2. Decor Layer
+    // 2. Decor Layer & Objects
     if (showDecor) {
-      for (let y = 0; y < localMap.height; y++) {
-        for (let x = 0; x < localMap.width; x++) {
-          const idx = localMap.decorLayer[y][x];
-          const drawInfo = getTileDrawInfo(idx, localMap.tileset);
-          if (drawInfo) {
-            const img = images[drawInfo.tilesetKey];
-            if (img) {
-              const tsInfo = getTilesetInfoLocal(drawInfo.tilesetKey);
-              const srcX = (drawInfo.localIdx % tsInfo.cols) * 16;
-              const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * 16;
-              ctx.drawImage(
-                img,
-                srcX, srcY, 16, 16,
-                x * tileSize, y * tileSize, tileSize, tileSize
-              );
-            }
-          }
-        }
-      }
-
-      // 2.5 Decor Objects Layer (MapObjectInstance[]) - Standing Decor Entity Rendering
+      // 2.1 Decor Objects Layer (MapObjectInstance[]) - Standing Decor Entity / Building Structure Rendering
       if (cleanedDecorObjects.length > 0) {
         const sortedObjects = [...cleanedDecorObjects].sort((a, b) => {
           const overlaps = !(b.x + b.width <= a.x || b.x >= a.x + a.width || b.y + b.height <= a.y || b.y >= a.y + a.height);
@@ -843,6 +823,27 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
             }
           }
         });
+      }
+
+      // 2.2 Decor Layer Tiles (Painted overlay tiles render on top of objects!)
+      for (let y = 0; y < localMap.height; y++) {
+        for (let x = 0; x < localMap.width; x++) {
+          const idx = localMap.decorLayer[y][x];
+          const drawInfo = getTileDrawInfo(idx, localMap.tileset);
+          if (drawInfo) {
+            const img = images[drawInfo.tilesetKey];
+            if (img) {
+              const tsInfo = getTilesetInfoLocal(drawInfo.tilesetKey);
+              const srcX = (drawInfo.localIdx % tsInfo.cols) * 16;
+              const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * 16;
+              ctx.drawImage(
+                img,
+                srcX, srcY, 16, 16,
+                x * tileSize, y * tileSize, tileSize, tileSize
+              );
+            }
+          }
+        }
       }
     }
 
@@ -1382,8 +1383,6 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                   if (autoCollision) {
                     newCollision[pty][ptx] = tileToPaint !== -1;
                   }
-                  // Remove any older object at this tile position so newly painted decor tiles are drawn on top!
-                  nextObjects = nextObjects.filter(o => !(ptx >= o.x && ptx < o.x + o.width && pty >= o.y && pty < o.y + o.height));
                 }
               } else if (autoCollision) {
                 newCollision[pty][ptx] = true;
@@ -1407,19 +1406,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           zIndex: Date.now()
         };
 
-        // Remove any overlapping older objects so the newly placed stamp object is drawn on top!
-        nextObjects = nextObjects.filter(o => {
-          const oMinX = o.x;
-          const oMinY = o.y;
-          const oMaxX = o.x + o.width;
-          const oMaxY = o.y + o.height;
-          const stampMinX = tx;
-          const stampMinY = ty;
-          const stampMaxX = tx + cols;
-          const stampMaxY = ty + rows;
-          const overlaps = !(oMaxX <= stampMinX || oMinX >= stampMaxX || oMaxY <= stampMinY || oMinY >= stampMaxY);
-          return !overlaps;
-        });
+        // Remove any exact overlapping same-origin object if replacing
+        nextObjects = nextObjects.filter(o => !(o.x === tx && o.y === ty));
         nextObjects.push(newObj);
         setSelectedObjectId(newObj.id);
       }
