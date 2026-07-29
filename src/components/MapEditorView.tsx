@@ -1454,59 +1454,51 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
     setLocalMap(prev => {
       const newDecor = prev.decorLayer.map(r => [...r]);
-      let nextObjects = prev.objects ? [...prev.objects] : [];
-
-      // Determine primary tile in the selection box to identify tileset
-      let sampleTileIdx = -1;
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          const curTx = startCol + c;
-          const curTy = startRow + r;
-          if (curTx >= 0 && curTx < prev.width && curTy >= 0 && curTy < prev.height) {
-            const dIdx = prev.decorLayer[curTy][curTx];
-            const bIdx = prev.baseLayer[curTy][curTx];
-            if (dIdx !== -1) {
-              sampleTileIdx = dIdx;
-              break;
-            } else if (bIdx !== -1 && sampleTileIdx === -1) {
-              sampleTileIdx = bIdx;
-            }
-          }
-        }
-        if (sampleTileIdx !== -1 && sampleTileIdx !== 1199 && sampleTileIdx !== 2000) break;
-      }
-
-      if (sampleTileIdx === -1) sampleTileIdx = selectedTile !== -1 ? selectedTile : getPrefixedIndex(0, activeTileset);
-
-      const drawInfo = getTileDrawInfo(sampleTileIdx, activeTileset);
-      const targetTsKey = drawInfo?.tilesetKey || activeTileset;
-      const tsInfo = getTilesetInfoLocal(targetTsKey);
-
-      let objStartCol = 0;
-      let objStartRow = 0;
-      if (drawInfo && tsInfo) {
-        objStartCol = drawInfo.localIdx % tsInfo.cols;
-        objStartRow = Math.floor(drawInfo.localIdx / tsInfo.cols);
-      }
-
-      const emptyBase = -1; // 100% Pure Black Canvas Ground (-1)!
       const newBase = prev.baseLayer.map(r => [...r]);
       const newCollision = prev.collision.map(r => [...r]);
+      let nextObjects = prev.objects ? [...prev.objects] : [];
+
       const tilesGrid: number[][] = [];
+
       for (let r = 0; r < rows; r++) {
         const rowTiles: number[] = [];
         for (let c = 0; c < cols; c++) {
           const curTx = startCol + c;
           const curTy = startRow + r;
+
           if (curTx >= 0 && curTx < prev.width && curTy >= 0 && curTy < prev.height) {
-            const dIdx = prev.decorLayer[curTy][curTx];
-            const bIdx = prev.baseLayer[curTy][curTx];
-            const tileVal = dIdx !== -1 ? dIdx : bIdx;
+            let tileVal = -1;
+
+            // Check existing objects at (curTx, curTy) first
+            if (nextObjects.length > 0) {
+              const sortedObjs = [...nextObjects].sort((a, b) => (b.zIndex || 0) - (a.zIndex || 0));
+              for (const obj of sortedObjs) {
+                if (curTx >= obj.x && curTx < obj.x + obj.width && curTy >= obj.y && curTy < obj.y + obj.height) {
+                  const relR = curTy - obj.y;
+                  const relC = curTx - obj.x;
+                  const val = getTileValueForCell(obj, relR, relC);
+                  if (val !== -1) {
+                    tileVal = val;
+                    break;
+                  }
+                }
+              }
+            }
+
+            // Fallback to decorLayer or baseLayer
+            if (tileVal === -1) {
+              const dIdx = prev.decorLayer[curTy][curTx];
+              const bIdx = prev.baseLayer[curTy][curTx];
+              tileVal = dIdx !== -1 ? dIdx : bIdx;
+            }
+
             rowTiles.push(tileVal);
-            
-            // 🎯 ERASE BOTH LAYERS AT VACATED CELLS TO BLACK EMPTY GROUND (-1)!
+
+            // Erase vacated map layers at this cell
             newDecor[curTy][curTx] = -1;
-            if (editLayer === "base") { newBase[curTy][curTx] = emptyBase; }
+            if (editLayer === "base") {
+              newBase[curTy][curTx] = -1;
+            }
             if (autoCollision) {
               newCollision[curTy][curTx] = tileVal !== -1;
             }
@@ -1515,6 +1507,30 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           }
         }
         tilesGrid.push(rowTiles);
+      }
+
+      // Sample primary tile from tilesGrid
+      let sampleTileIdx = -1;
+      for (const row of tilesGrid) {
+        for (const val of row) {
+          if (val !== -1 && val !== 1199 && val !== 2000) {
+            sampleTileIdx = val;
+            break;
+          }
+        }
+        if (sampleTileIdx !== -1) break;
+      }
+      if (sampleTileIdx === -1) sampleTileIdx = selectedTile !== -1 ? selectedTile : getPrefixedIndex(0, activeTileset);
+
+      const drawInfo = getTileDrawInfo(sampleTileIdx, activeTileset);
+      const targetTsKey = drawInfo?.tilesetKey || activeTileset;
+      const tsInfo = getTilesetInfoLocal(targetTsKey) || getTilesetInfo(targetTsKey);
+
+      let objStartCol = 0;
+      let objStartRow = 0;
+      if (drawInfo && tsInfo) {
+        objStartCol = drawInfo.localIdx % tsInfo.cols;
+        objStartRow = Math.floor(drawInfo.localIdx / tsInfo.cols);
       }
 
       const newObj: MapObjectInstance = {
@@ -1544,6 +1560,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         const overlaps = !(oMaxX <= boxMinX || oMinX >= boxMaxX || oMaxY <= boxMinY || oMinY >= boxMaxY);
         return !overlaps;
       });
+
       nextObjects.push(newObj);
       setSelectedObjectId(newObj.id);
 
