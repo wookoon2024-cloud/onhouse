@@ -1848,21 +1848,21 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   return (
     <div style={{
       position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
-      width: '1180px', maxWidth: '94vw', height: '86vh', maxHeight: '880px',
+      width: '980px', maxWidth: '88vw', height: '80vh', maxHeight: '760px',
       zIndex: 150, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px',
       border: '1px solid #3b3b54', background: '#161622',
-      boxShadow: '0 20px 60px rgba(0,0,0,0.85)', borderRadius: 0
+      boxShadow: '0 20px 60px rgba(0,0,0,0.85)', borderRadius: '6px'
     }}>
-      {/* Header Bar */}
+      {/* 1. Top Header Bar (ONLY Title, Tabs, and Close button!) */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #3b3b54', paddingBottom: '10px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-          {/* Renamed Title */}
-          <h3 className="pixel-text" style={{ fontSize: '15px', color: '#a78bfa', margin: 0, display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'normal' }}>
-            <Sparkles size={16} /> 픽셀 에디터
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          {/* Title */}
+          <h3 className="pixel-text" style={{ fontSize: '17px', color: '#a78bfa', margin: 0, display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'normal' }}>
+            <Sparkles size={18} /> 픽셀 에디터
           </h3>
 
-          {/* 1. Classic Sharp Main Category Tabs: 캐릭터 / 맵 */}
-          <div style={{ display: 'flex', gap: '2px', alignItems: 'flex-end', borderBottom: '1px solid #3b3b54' }}>
+          {/* Main Category Tabs: 캐릭터 / 맵 */}
+          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
             <button
               onClick={() => {
                 setActiveTab('character');
@@ -1870,16 +1870,15 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 setSelectedTileState(null);
               }}
               style={{
-                padding: '7px 16px', fontSize: '11px', borderRadius: 0,
+                padding: '8px 18px', fontSize: '13px', borderRadius: '4px',
                 background: activeTab === 'character' ? '#252538' : '#14141e',
                 color: activeTab === 'character' ? '#fff' : '#8a8a9e',
-                border: activeTab === 'character' ? '1px solid #4a4a6b' : '1px solid #28283a',
-                borderBottom: activeTab === 'character' ? '2px solid #a78bfa' : '1px solid #28283a',
+                border: activeTab === 'character' ? '1px solid #a78bfa' : '1px solid #28283a',
                 cursor: 'pointer', fontWeight: 'normal',
-                display: 'flex', alignItems: 'center', gap: '5px', transition: 'all 0.1s ease'
+                display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.1s ease'
               }}
             >
-              <User size={12} /> 캐릭터 ({charOptions.length})
+              <User size={14} /> 캐릭터 ({charOptions.length})
             </button>
             <button
               onClick={() => {
@@ -1888,204 +1887,221 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 setSelectedTileState(null);
               }}
               style={{
-                padding: '7px 16px', fontSize: '11px', borderRadius: 0,
+                padding: '8px 18px', fontSize: '13px', borderRadius: '4px',
                 background: activeTab === 'map' ? '#252538' : '#14141e',
                 color: activeTab === 'map' ? '#fff' : '#8a8a9e',
-                border: activeTab === 'map' ? '1px solid #4a4a6b' : '1px solid #28283a',
-                borderBottom: activeTab === 'map' ? '2px solid #a78bfa' : '1px solid #28283a',
+                border: activeTab === 'map' ? '1px solid #a78bfa' : '1px solid #28283a',
                 cursor: 'pointer', fontWeight: 'normal',
-                display: 'flex', alignItems: 'center', gap: '5px', transition: 'all 0.1s ease'
+                display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.1s ease'
               }}
             >
-              <Layers size={12} /> 맵 ({mapOptions.length})
+              <Layers size={14} /> 맵 ({mapOptions.length})
             </button>
           </div>
+        </div>
 
-          {/* 2. Sub-selection Select Box Dropdown & Delete Button */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '11px', color: '#a0a0b8' }}>
-              {activeTab === 'character' ? '선택:' : '타일셋 선택:'}
-            </span>
-            <select
-              value={currentSelectedId}
-              onChange={(e) => {
-                if (activeTab === 'character') setSelectedCharId(e.target.value);
-                else setSelectedMapId(e.target.value);
-                setHoveredTile(null);
-                setSelectedTileState(null);
-              }}
+        {/* Close Button Only */}
+        <button
+          onClick={onClose}
+          style={{
+            background: '#252538', color: '#fff', border: '1px solid #4a4a6b',
+            padding: '6px 14px', borderRadius: '4px', fontSize: '13px', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 'normal'
+          }}
+        >
+          <X size={15} /> 닫기
+        </button>
+      </div>
+
+      {/* 2. Sub-Control Toolbar (Sub-selection Dropdown, Market Share, Display Size, Add Asset, Zoom) */}
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        background: '#14141e', border: '1px solid #3b3b54', padding: '8px 12px',
+        borderRadius: '4px', flexWrap: 'wrap', gap: '8px'
+      }}>
+        {/* Left Controls: Select Dropdown, Delete, Market Share, Map Output Size */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '12px', color: '#a0a0b8' }}>
+            {activeTab === 'character' ? '선택:' : '타일셋 선택:'}
+          </span>
+          <select
+            value={currentSelectedId}
+            onChange={(e) => {
+              if (activeTab === 'character') setSelectedCharId(e.target.value);
+              else setSelectedMapId(e.target.value);
+              setHoveredTile(null);
+              setSelectedTileState(null);
+            }}
+            style={{
+              background: '#1c1c2b', color: '#fff', border: '1px solid #4a4a6b',
+              borderRadius: '4px', padding: '6px 12px', fontSize: '12px', fontWeight: 'normal',
+              outline: 'none', cursor: 'pointer'
+            }}
+          >
+            {currentOptionList.map((opt) => (
+              <option key={opt.id} value={opt.id}>
+                {opt.name} ({opt.cols}x{opt.rows} 타일)
+              </option>
+            ))}
+          </select>
+
+          {/* If currently selected option is custom, show delete button */}
+          {currentOption?.isCustom && (
+            <button
+              onClick={() => handleDeleteCustomAsset(currentOption.id)}
+              title="커스텀 에셋 삭제"
               style={{
-                background: '#1c1c2b', color: '#fff', border: '1px solid #4a4a6b',
-                borderRadius: 0, padding: '5px 10px', fontSize: '11px', fontWeight: 'normal',
-                outline: 'none', cursor: 'pointer'
+                background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444',
+                color: '#ff6b6b', borderRadius: '4px', padding: '6px 10px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 'normal'
               }}
             >
-              {currentOptionList.map((opt) => (
-                <option key={opt.id} value={opt.id}>
-                  {opt.name} ({opt.cols}x{opt.rows} 타일)
-                </option>
-              ))}
-            </select>
+              <Trash2 size={13} /> 삭제
+            </button>
+          )}
 
-            {/* If currently selected option is custom, show delete button */}
-            {currentOption?.isCustom && (
-              <button
-                onClick={() => handleDeleteCustomAsset(currentOption.id)}
-                title="커스텀 에셋 삭제"
-                style={{
-                  background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444',
-                  color: '#ff6b6b', borderRadius: 0, padding: '5px 8px', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', fontWeight: 'normal'
-                }}
-              >
-                <Trash2 size={12} /> 삭제
-              </button>
-            )}
+          {/* Open Market Share Button for Any Selected Asset */}
+          {currentOption && (
+            <button
+              type="button"
+              onClick={() => {
+                setPublishTitle(currentOption.name || '');
+                setPublishDesc('');
+                setPublishCreator(localStorage.getItem('on_house_nickname') || '익명 크리에이터');
+                setShowPublishModal(true);
+              }}
+              title="오픈 마켓 상점에 에셋 공유 게시"
+              style={{
+                background: 'rgba(167, 139, 250, 0.15)', border: '1px solid #a78bfa',
+                color: '#a78bfa', borderRadius: '4px', padding: '6px 12px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', fontWeight: 'normal'
+              }}
+            >
+              🛒 마켓에 공유
+            </button>
+          )}
 
-            {/* Open Market Share Button for Any Selected Asset */}
-            {currentOption && (
+          {/* Per-Character Map Display Size Adjustment Control */}
+          {activeTab === 'character' && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              background: 'rgba(139, 92, 246, 0.12)', border: '1px solid #4a4a6b',
+              padding: '4px 10px', borderRadius: '4px'
+            }}>
+              <span style={{ fontSize: '12px', color: '#fff', fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                📏 맵 출력 크기:
+              </span>
+
+              {/* Decrease (-) Button */}
               <button
                 type="button"
                 onClick={() => {
-                  setPublishTitle(currentOption.name || '');
-                  setPublishDesc('');
-                  setPublishCreator(localStorage.getItem('on_house_nickname') || '익명 크리에이터');
-                  setShowPublishModal(true);
+                  const currentDisplaySize = charImageOverrides[currentSelectedId]?.size || 16;
+                  const next = Math.max(8, currentDisplaySize - 2);
+                  handleUpdateCharacterDisplaySize(currentSelectedId, next);
                 }}
-                title="오픈 마켓 상점에 에셋 공유 게시"
+                title="크기 줄이기 (-2px)"
                 style={{
-                  background: 'rgba(167, 139, 250, 0.15)', border: '1px solid #a78bfa',
-                  color: '#a78bfa', borderRadius: 0, padding: '5px 10px', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 'normal'
+                  background: '#252538', border: '1px solid #4a4a6b',
+                  color: '#fff', width: '24px', height: '24px', borderRadius: '3px',
+                  fontSize: '14px', fontWeight: 'normal', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: 0
                 }}
               >
-                🛒 마켓에 공유
+                -
               </button>
-            )}
 
-            {/* Per-Character Map Display Size Adjustment Control (Direct Typing & - / + Buttons!) */}
-            {activeTab === 'character' && (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: '5px',
-                background: 'rgba(139, 92, 246, 0.12)', border: '1px solid #4a4a6b',
-                padding: '3px 8px', borderRadius: 0
-              }}>
-                <span style={{ fontSize: '11px', color: '#fff', fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  📏 맵 출력 크기:
-                </span>
+              {/* Direct Editable Number Box */}
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={sizeInputText !== null ? sizeInputText : (charImageOverrides[currentSelectedId]?.size || 16)}
+                onFocus={(e) => {
+                  const curr = charImageOverrides[currentSelectedId]?.size || 16;
+                  setSizeInputText(curr.toString());
+                  e.target.select();
+                }}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSizeInputText(val);
+                  const num = parseInt(val, 10);
+                  if (!isNaN(num) && num >= 8 && num <= 128) {
+                    handleUpdateCharacterDisplaySize(currentSelectedId, num);
+                  }
+                }}
+                onBlur={() => {
+                  const curr = charImageOverrides[currentSelectedId]?.size || 16;
+                  const num = parseInt(sizeInputText !== null ? sizeInputText : curr.toString(), 10);
+                  const validNum = isNaN(num) ? 16 : Math.max(8, Math.min(128, num));
+                  handleUpdateCharacterDisplaySize(currentSelectedId, validNum);
+                  setSizeInputText(null);
+                }}
+                style={{
+                  width: '42px',
+                  background: '#0d0d12',
+                  border: '1px solid #4a4a6b',
+                  borderRadius: '3px',
+                  color: '#fff',
+                  fontSize: '12px',
+                  fontWeight: 'normal',
+                  textAlign: 'center',
+                  padding: '3px 0',
+                  outline: 'none'
+                }}
+              />
 
-                {/* Decrease (-) Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const currentDisplaySize = charImageOverrides[currentSelectedId]?.size || 16;
-                    const next = Math.max(8, currentDisplaySize - 2);
-                    handleUpdateCharacterDisplaySize(currentSelectedId, next);
-                  }}
-                  title="크기 줄이기 (-2px)"
-                  style={{
-                    background: '#252538', border: '1px solid #4a4a6b',
-                    color: '#fff', width: '22px', height: '22px', borderRadius: 0,
-                    fontSize: '13px', fontWeight: 'normal', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    padding: 0
-                  }}
-                >
-                  -
-                </button>
+              {/* Increase (+) Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  const currentDisplaySize = charImageOverrides[currentSelectedId]?.size || 16;
+                  const next = Math.min(128, currentDisplaySize + 2);
+                  handleUpdateCharacterDisplaySize(currentSelectedId, next);
+                }}
+                title="크기 키우기 (+2px)"
+                style={{
+                  background: '#252538', border: '1px solid #4a4a6b',
+                  color: '#fff', width: '24px', height: '24px', borderRadius: '3px',
+                  fontSize: '14px', fontWeight: 'normal', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: 0
+                }}
+              >
+                +
+              </button>
 
-                {/* Direct Editable Number Box */}
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={sizeInputText !== null ? sizeInputText : (charImageOverrides[currentSelectedId]?.size || 16)}
-                  onFocus={(e) => {
-                    const curr = charImageOverrides[currentSelectedId]?.size || 16;
-                    setSizeInputText(curr.toString());
-                    e.target.select();
-                  }}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setSizeInputText(val);
-                    const num = parseInt(val, 10);
-                    if (!isNaN(num) && num >= 8 && num <= 128) {
-                      handleUpdateCharacterDisplaySize(currentSelectedId, num);
-                    }
-                  }}
-                  onBlur={() => {
-                    const curr = charImageOverrides[currentSelectedId]?.size || 16;
-                    const num = parseInt(sizeInputText !== null ? sizeInputText : curr.toString(), 10);
-                    const validNum = isNaN(num) ? 16 : Math.max(8, Math.min(128, num));
-                    handleUpdateCharacterDisplaySize(currentSelectedId, validNum);
-                    setSizeInputText(null);
-                  }}
-                  style={{
-                    width: '38px',
-                    background: '#0d0d12',
-                    border: '1px solid #4a4a6b',
-                    borderRadius: 0,
-                    color: '#fff',
-                    fontSize: '11px',
-                    fontWeight: 'normal',
-                    textAlign: 'center',
-                    padding: '2px 0',
-                    outline: 'none'
-                  }}
-                />
+              <span style={{ fontSize: '11px', color: '#aaa' }}>px</span>
+            </div>
+          )}
+        </div>
 
-                {/* Increase (+) Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const currentDisplaySize = charImageOverrides[currentSelectedId]?.size || 16;
-                    const next = Math.min(128, currentDisplaySize + 2);
-                    handleUpdateCharacterDisplaySize(currentSelectedId, next);
-                  }}
-                  title="크기 키우기 (+2px)"
-                  style={{
-                    background: '#252538', border: '1px solid #4a4a6b',
-                    color: '#fff', width: '22px', height: '22px', borderRadius: 0,
-                    fontSize: '13px', fontWeight: 'normal', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    padding: 0
-                  }}
-                >
-                  +
-                </button>
+        {/* Right Controls: Add Asset Button & Zoom Selector */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            onClick={() => {
+              setUploadCategory(activeTab);
+              setShowUploadModal(true);
+            }}
+            style={{
+              padding: '6px 14px', fontSize: '12px', borderRadius: '4px',
+              background: '#2a2a3e', color: '#a78bfa',
+              border: '1px solid #4a4a6b', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 'normal'
+            }}
+          >
+            <Plus size={14} /> 추가
+          </button>
 
-                <span style={{ fontSize: '10px', color: '#aaa' }}>px</span>
-              </div>
-            )}
-          </div>
-
-          {/* 3. Renamed Add Asset Button ("+ 추가") & Backup / Restore */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <button
-              onClick={() => {
-                setUploadCategory(activeTab);
-                setShowUploadModal(true);
-              }}
-              style={{
-                padding: '5px 12px', fontSize: '11px', borderRadius: 0,
-                background: '#2a2a3e', color: '#a78bfa',
-                border: '1px solid #4a4a6b', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'normal'
-              }}
-            >
-              <Plus size={13} /> 추가
-            </button>
-          </div>
-
-          {/* 4. Grid Zoom Scale Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#14141e', padding: '3px 6px', borderRadius: 0, border: '1px solid #3b3b54' }}>
-            <ZoomIn size={12} style={{ color: '#aaa', marginRight: '2px' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#14141e', padding: '4px 8px', borderRadius: '4px', border: '1px solid #3b3b54' }}>
+            <ZoomIn size={14} style={{ color: '#aaa', marginRight: '3px' }} />
             {([1.0, 1.5, 2.0, 3.0] as const).map((z) => (
               <button
                 key={z}
                 onClick={() => setGridZoom(z)}
                 style={{
-                  padding: '3px 6px', fontSize: '10px', borderRadius: 0, border: 'none',
+                  padding: '4px 8px', fontSize: '11px', borderRadius: '3px', border: 'none',
                   background: gridZoom === z ? '#a78bfa' : 'transparent',
                   color: gridZoom === z ? '#000' : '#ccc', cursor: 'pointer', fontWeight: 'normal'
                 }}
@@ -2095,17 +2111,6 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
             ))}
           </div>
         </div>
-
-        <button
-          onClick={onClose}
-          style={{
-            background: '#252538', color: '#fff', border: '1px solid #4a4a6b',
-            padding: '5px 12px', borderRadius: 0, fontSize: '12px', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'normal'
-          }}
-        >
-          <X size={14} /> 닫기
-        </button>
       </div>
 
       {/* Main Grid Viewport & Side Panel */}
