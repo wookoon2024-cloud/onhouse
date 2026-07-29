@@ -2397,7 +2397,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                   key={tabKey}
                   onClick={() => setLeftSidebarTab(tabKey)}
                   style={{
-                    flex: 1, padding: '7px 2px', fontSize: '11px', fontWeight: isActive ? 'bold' : 'normal',
+                    flex: 1, padding: '7px 2px', fontSize: '12px', fontWeight: 'normal',
                     color: isActive ? '#fff' : 'rgba(255, 255, 255, 0.6)',
                     background: isActive ? '#1e1e2e' : 'rgba(255, 255, 255, 0.02)',
                     borderTop: isActive ? '2px solid #89b4fa' : '2px solid transparent',
@@ -2421,11 +2421,11 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               <>
                 {/* Section 1: 레이어 (Layer Selector) */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <h4 style={{ fontSize: '11px', color: 'var(--accent)', margin: '0 0 2px 0', borderBottom: '1px solid var(--border-glass)', paddingBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontSize: '9px', opacity: 0.7 }}>▪</span> 레이어
+                  <h4 style={{ fontSize: '13px', color: 'var(--accent)', margin: '0 0 2px 0', borderBottom: '1px solid var(--border-glass)', paddingBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'normal' }}>
+                    <span style={{ fontSize: '10px', opacity: 0.7 }}>▪</span> 레이어
                   </h4>
 
-                  {/* 1. 1단계 레이어(바닥) + 노출 체크박스 */}
+                  {/* 1. 1단계(배경) + 노출 체크박스 */}
                   <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
                     <button
                       onClick={() => {
@@ -2433,22 +2433,21 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                         if (selectedTile === 1 || selectedTile === 0 || selectedTile === -1) {
                           setSelectedTile(getPrefixedIndex(0, activeTileset));
                         }
-                        if (tool === "select") setTool("brush");
                       }}
                       style={{
-                        flex: 1, padding: "7px 10px", fontSize: "11px", borderRadius: "4px",
+                        flex: 1, padding: "7px 10px", fontSize: "12px", borderRadius: "4px",
                         background: editLayer === "base" ? "rgba(139, 92, 246, 0.2)" : "rgba(255,255,255,0.03)",
                         color: editLayer === "base" ? "var(--accent)" : "#fff",
                         border: editLayer === "base" ? "1px solid var(--accent)" : "1px solid var(--border-glass)",
                         textAlign: "left", cursor: "pointer", fontWeight: "normal"
                       }}
                     >
-                      1단계 레이어(바닥)
+                      1단계(배경)
                     </button>
                     <label
                       style={{
                         display: "flex", alignItems: "center", gap: "3px", padding: "6px 8px",
-                        fontSize: "11px", color: showBase ? "var(--accent)" : "#888",
+                        fontSize: "12px", color: showBase ? "var(--accent)" : "#888",
                         background: showBase ? "rgba(139, 92, 246, 0.1)" : "rgba(255,255,255,0.02)",
                         border: showBase ? "1px solid var(--accent)" : "1px solid var(--border-glass)",
                         borderRadius: "4px", cursor: "pointer", whiteSpace: "nowrap"
@@ -2465,7 +2464,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                     </label>
                   </div>
 
-                  {/* 2. 2단계 레이어(장식) + 노출 체크박스 */}
+                  {/* 2. 2단계(오브젝트) + 노출 체크박스 */}
                   <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
                     <button
                       onClick={() => {
@@ -2473,22 +2472,21 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                         if (selectedTile === 1 || selectedTile === 0 || selectedTile === -1) {
                           setSelectedTile(getPrefixedIndex(0, activeTileset));
                         }
-                        if (tool === "select") setTool("brush");
                       }}
                       style={{
-                        flex: 1, padding: "7px 10px", fontSize: "11px", borderRadius: "4px",
+                        flex: 1, padding: "7px 10px", fontSize: "12px", borderRadius: "4px",
                         background: editLayer === "decor" ? "rgba(139, 92, 246, 0.2)" : "rgba(255,255,255,0.03)",
                         color: editLayer === "decor" ? "var(--accent)" : "#fff",
                         border: editLayer === "decor" ? "1px solid var(--accent)" : "1px solid var(--border-glass)",
                         textAlign: "left", cursor: "pointer", fontWeight: "normal"
                       }}
                     >
-                      2단계 레이어(장식)
+                      2단계(오브젝트)
                     </button>
                     <label
                       style={{
                         display: "flex", alignItems: "center", gap: "3px", padding: "6px 8px",
-                        fontSize: "11px", color: showDecor ? "var(--accent)" : "#888",
+                        fontSize: "12px", color: showDecor ? "var(--accent)" : "#888",
                         background: showDecor ? "rgba(139, 92, 246, 0.1)" : "rgba(255,255,255,0.02)",
                         border: showDecor ? "1px solid var(--accent)" : "1px solid var(--border-glass)",
                         borderRadius: "4px", cursor: "pointer", whiteSpace: "nowrap"
@@ -2505,19 +2503,18 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                     </label>
                   </div>
 
-                  {/* 3. 이동 불가지역 Row with [추가] and [제거] buttons right next to it! */}
+                  {/* 3. 이동 불가지역 Row with Eye Toggle, [추가], and [제거] buttons */}
                   <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
                     <button
                       onClick={() => {
                         setEditLayer('collision');
                         setSelectedTile(1);
-                        setTool('brush');
                         setSelectedObjectId(null);
                         setPaletteSelection(null);
                         setShowCollision(true);
                       }}
                       style={{
-                        flex: 1, padding: '7px 8px', fontSize: '11px', borderRadius: '4px',
+                        flex: 1, padding: '7px 8px', fontSize: '12px', borderRadius: '4px',
                         background: editLayer === 'collision' ? 'rgba(243, 139, 168, 0.2)' : 'rgba(255,255,255,0.03)',
                         color: editLayer === 'collision' ? '#f38ba8' : '#fff',
                         border: editLayer === 'collision' ? '1px solid #f38ba8' : '1px solid var(--border-glass)',
@@ -2527,17 +2524,35 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                       이동 불가지역
                     </button>
 
+                    <label
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '3px', padding: '6px 8px',
+                        fontSize: '12px', color: showCollision ? 'var(--accent)' : '#888',
+                        background: showCollision ? 'rgba(139, 92, 246, 0.1)' : 'rgba(255,255,255,0.02)',
+                        border: showCollision ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
+                        borderRadius: '4px', cursor: 'pointer', whiteSpace: 'nowrap'
+                      }}
+                      title="이동 불가지역 노출/숨김"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={showCollision}
+                        onChange={(e) => setShowCollision(e.target.checked)}
+                        style={{ accentColor: 'var(--accent)', cursor: 'pointer' }}
+                      />
+                      👁️
+                    </label>
+
                     <button
                       onClick={() => {
                         setEditLayer('collision');
                         setSelectedTile(1);
-                        setTool('brush');
                         setSelectedObjectId(null);
                         setPaletteSelection(null);
                         setShowCollision(true);
                       }}
                       style={{
-                        padding: '7px 8px', fontSize: '10px', borderRadius: '4px',
+                        padding: '7px 8px', fontSize: '11px', borderRadius: '4px',
                         background: editLayer === 'collision' && selectedTile === 1 ? 'var(--danger)' : 'rgba(255,255,255,0.04)',
                         color: editLayer === 'collision' && selectedTile === 1 ? '#fff' : 'rgba(255,255,255,0.7)',
                         border: editLayer === 'collision' && selectedTile === 1 ? '1px solid var(--danger)' : '1px solid var(--border-glass)',
@@ -2552,13 +2567,12 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                       onClick={() => {
                         setEditLayer('collision');
                         setSelectedTile(0);
-                        setTool('brush');
                         setSelectedObjectId(null);
                         setPaletteSelection(null);
                         setShowCollision(true);
                       }}
                       style={{
-                        padding: '7px 8px', fontSize: '10px', borderRadius: '4px',
+                        padding: '7px 8px', fontSize: '11px', borderRadius: '4px',
                         background: editLayer === 'collision' && selectedTile === 0 ? '#a6e3a1' : 'rgba(255,255,255,0.04)',
                         color: editLayer === 'collision' && selectedTile === 0 ? '#000' : 'rgba(255,255,255,0.7)',
                         border: editLayer === 'collision' && selectedTile === 0 ? '1px solid #a6e3a1' : '1px solid var(--border-glass)',
@@ -2571,10 +2585,10 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                   </div>
                 </div>
 
-                {/* Section 2: 그리기 도구 설정 (Vertical Tools Stack - Disabled when in collision layer mode!) */}
+                {/* Section 2: 그리기 도구 설정 */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
-                  <h4 style={{ fontSize: '11px', color: 'var(--accent)', margin: '0 0 2px 0', borderBottom: '1px solid var(--border-glass)', paddingBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontSize: '9px', opacity: 0.7 }}>▪</span> 그리기 도구 설정
+                  <h4 style={{ fontSize: '13px', color: 'var(--accent)', margin: '0 0 2px 0', borderBottom: '1px solid var(--border-glass)', paddingBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'normal' }}>
+                    <span style={{ fontSize: '10px', opacity: 0.7 }}>▪</span> 그리기 도구 설정
                   </h4>
                   
                   {/* Vertical Tool Switcher Column */}
@@ -2584,17 +2598,17 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                       onClick={() => setTool('select')}
                       disabled={editLayer === 'collision'}
                       style={{
-                        width: '100%', padding: '6px 10px', fontSize: '11px', borderRadius: '4px',
+                        width: '100%', padding: '6px 10px', fontSize: '12px', borderRadius: '4px',
                         background: tool === 'select' && editLayer !== 'collision' ? 'rgba(245, 194, 231, 0.3)' : 'rgba(255,255,255,0.03)',
                         color: tool === 'select' && editLayer !== 'collision' ? '#f5c2e7' : '#fff',
                         border: tool === 'select' && editLayer !== 'collision' ? '1px solid #f5c2e7' : '1px solid var(--border-glass)',
                         display: 'flex', alignItems: 'center', gap: '6px', cursor: editLayer === 'collision' ? 'not-allowed' : 'pointer',
-                        fontWeight: tool === 'select' && editLayer !== 'collision' ? 'bold' : 'normal',
+                        fontWeight: 'normal',
                         opacity: editLayer === 'collision' ? 0.4 : 1
                       }}
                       title="오브젝트 스마트 선택 & 이동/편집 (단축키: V)"
                     >
-                      <MousePointer size={12} /> 선택(V)
+                      <MousePointer size={14} /> 선택(V)
                     </button>
 
                     {/* 2. 스포이드(E) */}
@@ -2605,16 +2619,17 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                       }}
                       disabled={editLayer === 'collision'}
                       style={{
-                        width: '100%', padding: '6px 10px', fontSize: '11px', borderRadius: '4px',
+                        width: '100%', padding: '6px 10px', fontSize: '12px', borderRadius: '4px',
                         background: (tool === 'eyedropper' || isAltPressed) && editLayer !== 'collision' ? 'rgba(137, 220, 235, 0.3)' : 'rgba(255,255,255,0.03)',
                         color: (tool === 'eyedropper' || isAltPressed) && editLayer !== 'collision' ? '#89dceb' : '#fff',
                         border: (tool === 'eyedropper' || isAltPressed) && editLayer !== 'collision' ? '1px solid #89dceb' : '1px solid var(--border-glass)',
                         display: 'flex', alignItems: 'center', gap: '6px', cursor: editLayer === 'collision' ? 'not-allowed' : 'pointer',
+                        fontWeight: 'normal',
                         opacity: editLayer === 'collision' ? 0.4 : 1
                       }}
                       title="스포이드 (단축키: Alt + 클릭 / E)"
                     >
-                      <Pipette size={12} /> 스포이드(E)
+                      <Pipette size={14} /> 스포이드(E)
                     </button>
 
                     {/* 3. 브러시(B) */}
@@ -2625,16 +2640,17 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                       }}
                       disabled={editLayer === 'collision'}
                       style={{
-                        width: '100%', padding: '6px 10px', fontSize: '11px', borderRadius: '4px',
+                        width: '100%', padding: '6px 10px', fontSize: '12px', borderRadius: '4px',
                         background: tool === 'brush' && selectedTile !== -1 && editLayer !== 'collision' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(255,255,255,0.03)',
                         color: tool === 'brush' && selectedTile !== -1 && editLayer !== 'collision' ? 'var(--accent)' : '#fff',
                         border: tool === 'brush' && selectedTile !== -1 && editLayer !== 'collision' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
                         display: 'flex', alignItems: 'center', gap: '6px', cursor: editLayer === 'collision' ? 'not-allowed' : 'pointer',
+                        fontWeight: 'normal',
                         opacity: editLayer === 'collision' ? 0.4 : 1
                       }}
                       title="일반 브러시 타일 그리기 (단축키: B)"
                     >
-                      <Paintbrush size={12} /> 브러시(B)
+                      <Paintbrush size={14} /> 브러시(B)
                     </button>
 
                     {/* 4. 채우기(F) */}
@@ -2645,16 +2661,17 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                       }}
                       disabled={editLayer === 'collision'}
                       style={{
-                        width: '100%', padding: '6px 10px', fontSize: '11px', borderRadius: '4px',
+                        width: '100%', padding: '6px 10px', fontSize: '12px', borderRadius: '4px',
                         background: tool === 'bucket' && selectedTile !== -1 && editLayer !== 'collision' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(255,255,255,0.03)',
                         color: tool === 'bucket' && selectedTile !== -1 && editLayer !== 'collision' ? 'var(--accent)' : '#fff',
                         border: tool === 'bucket' && selectedTile !== -1 && editLayer !== 'collision' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
                         display: 'flex', alignItems: 'center', gap: '6px', cursor: editLayer === 'collision' ? 'not-allowed' : 'pointer',
+                        fontWeight: 'normal',
                         opacity: editLayer === 'collision' ? 0.4 : 1
                       }}
                       title="영역 채우기 (단축키: F)"
                     >
-                      <PaintBucket size={12} /> 채우기(F)
+                      <PaintBucket size={14} /> 채우기(F)
                     </button>
 
                     {/* 5. 오브젝트(O) */}
@@ -2665,17 +2682,17 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                       }}
                       disabled={editLayer === 'collision'}
                       style={{
-                        width: '100%', padding: '6px 10px', fontSize: '11px', borderRadius: '4px',
+                        width: '100%', padding: '6px 10px', fontSize: '12px', borderRadius: '4px',
                         background: tool === 'object' && editLayer !== 'collision' ? 'rgba(250, 179, 135, 0.3)' : 'rgba(255,255,255,0.03)',
                         color: tool === 'object' && editLayer !== 'collision' ? '#fab387' : '#fff',
                         border: tool === 'object' && editLayer !== 'collision' ? '1px solid #fab387' : '1px solid var(--border-glass)',
                         display: 'flex', alignItems: 'center', gap: '6px', cursor: editLayer === 'collision' ? 'not-allowed' : 'pointer',
-                        fontWeight: tool === 'object' && editLayer !== 'collision' ? 'bold' : 'normal',
+                        fontWeight: 'normal',
                         opacity: editLayer === 'collision' ? 0.4 : 1
                       }}
                       title="독립 오브젝트 스탬프 배치 (단축키: O)"
                     >
-                      <Layers size={12} /> 오브젝트(O)
+                      <Layers size={14} /> 오브젝트(O)
                     </button>
 
                     {/* 6. 지우개 모드(X) */}
@@ -2686,33 +2703,33 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                       }}
                       disabled={editLayer === 'collision'}
                       style={{
-                        width: '100%', padding: '6px 10px', fontSize: '11px', borderRadius: '4px',
+                        width: '100%', padding: '6px 10px', fontSize: '12px', borderRadius: '4px',
                         background: selectedTile === -1 && editLayer !== 'collision' ? 'var(--danger)' : 'rgba(255,255,255,0.03)',
                         color: '#fff', border: selectedTile === -1 && editLayer !== 'collision' ? '1px solid var(--danger)' : '1px solid var(--border-glass)',
                         display: 'flex', alignItems: 'center', gap: '6px', cursor: editLayer === 'collision' ? 'not-allowed' : 'pointer',
-                        fontWeight: selectedTile === -1 && editLayer !== 'collision' ? 'bold' : 'normal',
+                        fontWeight: 'normal',
                         opacity: editLayer === 'collision' ? 0.4 : 1
                       }}
                       title="지우개 (단축키: X)"
                     >
-                      <Eraser size={12} /> 지우개 모드(X)
+                      <Eraser size={14} /> 지우개 모드(X)
                     </button>
 
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: '#ccc', cursor: 'pointer', marginTop: '4px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#ccc', cursor: 'pointer', marginTop: '4px', fontWeight: 'normal' }}>
                       <input
                         type="checkbox"
                         checked={autoCollision}
                         onChange={(e) => setAutoCollision(e.target.checked)}
                       />
-                      가구 배치 시 자동 충돌막 설정
+                      오브젝트 배치 시 이동 불가 설정
                     </label>
                   </div>
                 </div>
 
-                {/* Section 3: 브러시 크기 (Title size matching Section 1 & 2!) */}
+                {/* Section 3: 브러시 크기 */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
-                  <h4 style={{ fontSize: '11px', color: 'var(--accent)', margin: '0 0 2px 0', borderBottom: '1px solid var(--border-glass)', paddingBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontSize: '9px', opacity: 0.7 }}>▪</span> 브러시 크기
+                  <h4 style={{ fontSize: '13px', color: 'var(--accent)', margin: '0 0 2px 0', borderBottom: '1px solid var(--border-glass)', paddingBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'normal' }}>
+                    <span style={{ fontSize: '10px', opacity: 0.7 }}>▪</span> 브러시 크기
                   </h4>
 
                   {/* Preset 1x1, 2x2, 3x3, 4x4 Row */}
@@ -2728,7 +2745,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                             setPaletteSelection(null);
                           }}
                           style={{
-                            flex: 1, padding: '5px 2px', fontSize: '10px', borderRadius: '4px',
+                            flex: 1, padding: '5px 2px', fontSize: '11px', borderRadius: '4px',
                             background: isSelected ? 'var(--accent)' : 'rgba(255,255,255,0.03)',
                             color: isSelected ? '#000' : '#fff',
                             border: isSelected ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
@@ -2741,7 +2758,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                     })}
                   </div>
 
-                  {/* Custom Size Input Row: [숫자] x [숫자] [적용] (Selected Pink Background when custom size is active!) */}
+                  {/* Custom Size Input Row */}
                   {(() => {
                     const isCustomSelected = !([1, 2, 3, 4].includes(brushSize));
                     return (
@@ -2753,7 +2770,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                         transition: 'all 0.15s ease',
                         boxShadow: isCustomSelected ? '0 0 10px rgba(245, 194, 231, 0.2)' : 'none'
                       }}>
-                        <span style={{ fontSize: '10px', color: isCustomSelected ? '#f5c2e7' : 'var(--text-secondary)', fontWeight: isCustomSelected ? 'bold' : 'normal' }}>
+                        <span style={{ fontSize: '11px', color: isCustomSelected ? '#f5c2e7' : 'var(--text-secondary)', fontWeight: 'normal' }}>
                           사용자 정의:
                         </span>
                         <input
@@ -2765,10 +2782,10 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                           style={{
                             width: '36px', background: '#0a0a0f',
                             border: isCustomSelected ? '1px solid #f5c2e7' : '1px solid var(--border-glass)',
-                            borderRadius: '3px', padding: '3px 4px', fontSize: '11px', color: '#fff', textAlign: 'center'
+                            borderRadius: '3px', padding: '3px 4px', fontSize: '12px', color: '#fff', textAlign: 'center'
                           }}
                         />
-                        <span style={{ fontSize: '10px', color: isCustomSelected ? '#f5c2e7' : 'var(--text-muted)' }}>x</span>
+                        <span style={{ fontSize: '11px', color: isCustomSelected ? '#f5c2e7' : 'var(--text-muted)' }}>x</span>
                         <input
                           type="number"
                           min="1"
@@ -2778,7 +2795,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                           style={{
                             width: '36px', background: '#0a0a0f',
                             border: isCustomSelected ? '1px solid #f5c2e7' : '1px solid var(--border-glass)',
-                            borderRadius: '3px', padding: '3px 4px', fontSize: '11px', color: '#fff', textAlign: 'center'
+                            borderRadius: '3px', padding: '3px 4px', fontSize: '12px', color: '#fff', textAlign: 'center'
                           }}
                         />
                         <button
@@ -2793,7 +2810,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                             }
                           }}
                           style={{
-                            marginLeft: 'auto', padding: '3px 8px', fontSize: '10px', borderRadius: '3px',
+                            marginLeft: 'auto', padding: '3px 8px', fontSize: '11px', borderRadius: '3px',
                             background: isCustomSelected ? '#f5c2e7' : 'var(--primary)',
                             color: isCustomSelected ? '#000' : '#fff',
                             border: 'none', fontWeight: 'normal', cursor: 'pointer',
@@ -2806,7 +2823,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                     );
                   })()}
                 </div>
-                {/* Section 4: 현재 선택된 브러시 (Placed under Section 3 브러시 크기!) */}
+
+                {/* Section 4: 현재 선택된 브러시 */}
                 {(() => {
                   const selInfo = getTileDrawInfo(selectedTile, activeTileset);
                   const tsInfo = selInfo ? getTilesetInfoLocal(selInfo.tilesetKey) : null;
@@ -2818,8 +2836,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
                   return (
                     <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "6px" }}>
-                      <h4 style={{ fontSize: "11px", color: "var(--accent)", margin: "0 0 2px 0", borderBottom: "1px solid var(--border-glass)", paddingBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
-                        <span style={{ fontSize: "9px", opacity: 0.7 }}>▪</span> 현재 선택된 브러시
+                      <h4 style={{ fontSize: "13px", color: "var(--accent)", margin: "0 0 2px 0", borderBottom: "1px solid var(--border-glass)", paddingBottom: "4px", display: "flex", alignItems: "center", gap: "6px", fontWeight: "normal" }}>
+                        <span style={{ fontSize: "10px", opacity: 0.7 }}>▪</span> 현재 선택된 브러시
                       </h4>
                       <div style={{
                         padding: "8px 10px", borderRadius: "6px",
@@ -2864,10 +2882,10 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                           )}
                         </div>
                         <div style={{ minWidth: 0, overflow: "hidden" }}>
-                          <div style={{ fontSize: "9px", color: "var(--text-secondary)" }}>
+                          <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
                             {curCols}x{curRows} 크기 브러시
                           </div>
-                          <div style={{ fontSize: "10px", color: "var(--accent)", fontWeight: "bold", marginTop: "2px", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+                          <div style={{ fontSize: "12px", color: "var(--accent)", fontWeight: "normal", marginTop: "2px", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
                             {selectedTile === -1 ? "지우개 🧽" : `${tileDetails.label}`}
                           </div>
                         </div>
