@@ -1641,7 +1641,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     }
 
     if (tool === "select") {
-      const isMultiSelectKey = e.ctrlKey || e.metaKey || e.shiftKey;
+      const isCtrlHeld = e.ctrlKey || e.metaKey || e.shiftKey;
 
       // A. Check existing MapObjectInstance at (tx, ty) strictly matching current editLayer!
       const clickedObj = (localMap.objects || []).slice().reverse().find(o => {
@@ -1652,38 +1652,42 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         return true;
       });
 
-      if (clickedObj) {
-        setMapBoxSelection(null);
-        setMapBoxSelectStart(null);
-
-        const isAlreadySelected = selectedObjectIds.includes(clickedObj.id);
-
-        if (isMultiSelectKey) {
-          const nextSelected = isAlreadySelected
-            ? selectedObjectIds.filter(id => id !== clickedObj.id)
-            : [...selectedObjectIds, clickedObj.id];
-
-          setSelectedObjectIds(nextSelected);
-          setIsDraggingObject(nextSelected.length > 0);
-          setObjectDragStart({ originX: e.clientX, originY: e.clientY, startTx: clickedObj.x, startTy: clickedObj.y });
-        } else {
-          if (!isAlreadySelected) {
-            setSelectedObjectIds([clickedObj.id]);
-          }
-          setIsDraggingObject(true);
-          setObjectDragStart({ originX: e.clientX, originY: e.clientY, startTx: clickedObj.x, startTy: clickedObj.y });
+      if (isCtrlHeld) {
+        // 🎯 CTRL KEY HELD: Box Drag Multi-Selection OR Ctrl+Click Object Addition!
+        if (clickedObj) {
+          setSelectedObjectIds(prev =>
+            prev.includes(clickedObj.id) ? prev.filter(id => id !== clickedObj.id) : [...prev, clickedObj.id]
+          );
         }
+        setMapBoxSelectStart({ tx, ty });
+        setMapBoxSelection({ startCol: tx, startRow: ty, cols: 1, rows: 1 });
+        setIsDraggingObject(false);
+        setObjectDragStart(null);
         return;
       }
 
-      // B. Click anywhere else (empty ground cell or non-object) -> ALWAYS Start Box Multi-Selection!
-      if (!isMultiSelectKey) {
-        setSelectedObjectIds([]);
+      // 🎯 NO CTRL KEY: Normal Select & Drag-to-Move Mode!
+      setMapBoxSelectStart(null);
+      setMapBoxSelection(null);
+
+      if (clickedObj) {
+        const isAlreadySelected = selectedObjectIds.includes(clickedObj.id);
+        if (!isAlreadySelected) {
+          setSelectedObjectIds([clickedObj.id]);
+        }
+        setIsDraggingObject(true);
+        setObjectDragStart({ originX: e.clientX, originY: e.clientY, startTx: clickedObj.x, startTy: clickedObj.y });
+        return;
       }
-      setIsDraggingObject(false);
-      setObjectDragStart(null);
-      setMapBoxSelectStart({ tx, ty });
-      setMapBoxSelection({ startCol: tx, startRow: ty, cols: 1, rows: 1 });
+
+      // If clicked on empty space without Ctrl
+      if (selectedObjectIds.length > 0) {
+        setIsDraggingObject(true);
+        setObjectDragStart({ originX: e.clientX, originY: e.clientY, startTx: tx, startTy: ty });
+      } else {
+        setIsDraggingObject(false);
+        setObjectDragStart(null);
+      }
       return;
     }
 
@@ -1741,8 +1745,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       return;
     }
 
-    // Drag to select box area on map in select mode
-    if (tool === 'select' && mapBoxSelectStart && e.buttons === 1) {
+    // Drag to select box area on map ONLY when Ctrl / Shift / Cmd is held in select mode!
+    if (tool === 'select' && mapBoxSelectStart && (e.ctrlKey || e.metaKey || e.shiftKey) && e.buttons === 1) {
       const sCol = Math.min(mapBoxSelectStart.tx, tx);
       const sRow = Math.min(mapBoxSelectStart.ty, ty);
       const eCol = Math.max(mapBoxSelectStart.tx, tx);
@@ -1789,11 +1793,12 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       });
 
       if (overlapped.length > 0) {
-        setSelectedObjectIds(overlapped.map(o => o.id));
+        const newIds = overlapped.map(o => o.id);
+        setSelectedObjectIds(prev => Array.from(new Set([...prev, ...newIds])));
         setMapBoxSelection(null);
-        setPickedToast(`📦 ${overlapped.length}개 오브젝트가 선택되었습니다!`);
+        setPickedToast(`📦 ${overlapped.length}개 오브젝트가 다중 선택에 추가되었습니다!`);
         setTimeout(() => setPickedToast(null), 2000);
-      } else if (mapBoxSelection.cols === 1 && mapBoxSelection.rows === 1) {
+      } else {
         setMapBoxSelection(null);
       }
     }
