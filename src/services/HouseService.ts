@@ -105,6 +105,56 @@ export const saveHouseDeletedMapsToDB = async (houseCode: string, deletedIds: st
   }
 };
 
+// Fetch map order for a house code from Supabase DB
+export const fetchHouseMapOrder = async (houseCode: string): Promise<string[]> => {
+  try {
+    const res = await withTimeout(
+      supabase
+        .from('house_assets')
+        .select('asset_data')
+        .eq('house_code', houseCode)
+        .eq('asset_type', 'map_order'),
+      3000
+    );
+
+    if (res.data && res.data.length > 0 && res.data[0].asset_data?.order && Array.isArray(res.data[0].asset_data.order)) {
+      return res.data[0].asset_data.order;
+    }
+  } catch (err) {
+    console.warn('[OnHouse Sync] fetchHouseMapOrder network/timeout, returning empty list:', err);
+  }
+  return [];
+};
+
+// Save map order to Supabase DB
+export const saveHouseMapOrderToDB = async (houseCode: string, order: string[]) => {
+  try {
+    await withTimeout(
+      supabase
+        .from('house_assets')
+        .delete()
+        .eq('house_code', houseCode)
+        .eq('asset_type', 'map_order'),
+      3000
+    );
+
+    await withTimeout(
+      supabase
+        .from('house_assets')
+        .insert({
+          house_code: houseCode,
+          asset_type: 'map_order',
+          asset_data: { order },
+          updated_at: new Date().toISOString()
+        }),
+      3000
+    );
+    console.log('[OnHouse Sync] Saved map order to Supabase DB:', houseCode, order);
+  } catch (err) {
+    console.warn('[OnHouse Sync] Failed to save map order to Supabase DB:', err);
+  }
+};
+
 // Fetch or initialize all maps for a given house code directly from DB
 export const fetchHouseMaps = async (houseCode: string): Promise<Record<string, MapDefinition>> => {
   try {

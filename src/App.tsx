@@ -23,7 +23,7 @@ import { MarketModal } from './components/MarketModal';
 import { HouseJoinModal } from './components/HouseJoinModal';
 import { PlayerInteractionModal } from './components/PlayerInteractionModal';
 import { DMRequestModal } from './components/DMRequestModal';
-import { getSavedHouseCode, setSavedHouseCode, fetchHouseMaps, saveHouseMapToDB, deleteHouseMapFromDB, fetchHouseAssets, type MarketItem } from './services/HouseService';
+import { getSavedHouseCode, setSavedHouseCode, fetchHouseMaps, saveHouseMapToDB, deleteHouseMapFromDB, fetchHouseAssets, fetchHouseMapOrder, saveHouseMapOrderToDB, type MarketItem } from './services/HouseService';
 import { supabase } from './lib/supabase';
 import { APP_VERSION } from './config/version';
 import type { MapMemo, InventoryItem } from './types/memo';
@@ -88,14 +88,16 @@ export default function App() {
   const [dbCustomCharSprites, setDbCustomCharSprites] = useState<any[]>([]);
 
   // Helper to update activeMaps while strictly preserving user's custom tab order!
-  const applyFetchedMapOrder = (mapsData: Record<string, MapDefinition>) => {
+  const applyFetchedMapOrder = (mapsData: Record<string, MapDefinition>, dbOrder?: string[]) => {
     setActiveMaps(mapsData);
     const fetchedMapIds = Object.keys(mapsData);
-    let savedOrder: string[] = [];
-    try {
-      const raw = localStorage.getItem('on_house_available_maps') || localStorage.getItem('on_house_available_map_ids');
-      if (raw) savedOrder = JSON.parse(raw);
-    } catch (e) {}
+    let savedOrder: string[] = dbOrder && dbOrder.length > 0 ? dbOrder : [];
+    if (savedOrder.length === 0) {
+      try {
+        const raw = localStorage.getItem('on_house_available_maps') || localStorage.getItem('on_house_available_map_ids');
+        if (raw) savedOrder = JSON.parse(raw);
+      } catch (e) {}
+    }
 
     const orderedIds = [
       ...savedOrder.filter(id => fetchedMapIds.includes(id)),
@@ -531,10 +533,11 @@ export default function App() {
     // 1. Load house maps & custom assets from Supabase DB
     Promise.all([
       fetchHouseMaps(houseCode),
-      fetchHouseAssets(houseCode)
-    ]).then(([mapsData, assetsData]) => {
+      fetchHouseAssets(houseCode),
+      fetchHouseMapOrder(houseCode)
+    ]).then(([mapsData, assetsData, dbMapOrder]) => {
       if (mapsData && Object.keys(mapsData).length > 0) {
-        applyFetchedMapOrder(mapsData);
+        applyFetchedMapOrder(mapsData, dbMapOrder);
       }
 
       if (assetsData) {
@@ -563,6 +566,15 @@ export default function App() {
     const channel = supabase.channel(`house:${houseCode}`);
 
     channel
+      .on('broadcast', { event: 'map_order_update' }, ({ payload }) => {
+        if (payload && Array.isArray(payload.order) && payload.order.length > 0) {
+          setAvailableMapIds(payload.order);
+          try {
+            localStorage.setItem('on_house_available_maps', JSON.stringify(payload.order));
+            localStorage.setItem('on_house_available_map_ids', JSON.stringify(payload.order));
+          } catch (e) {}
+        }
+      })
       .on('broadcast', { event: 'player_join' }, ({ payload }) => {
         if (!payload || !payload.id || payload.id === deviceId.current) return;
         const joinName = payload.nickname || payload.player?.nickname || '플레이어';
@@ -2656,7 +2668,18 @@ export default function App() {
             setAvailableMapIds(newOrder);
             try {
               localStorage.setItem('on_house_available_maps', JSON.stringify(newOrder));
+              localStorage.setItem('on_house_available_map_ids', JSON.stringify(newOrder));
             } catch (e) {}
+
+            saveHouseMapOrderToDB(houseCode, newOrder);
+
+            if (channelRef.current) {
+              channelRef.current.send({
+                type: 'broadcast',
+                event: 'map_order_update',
+                payload: { order: newOrder }
+              });
+            }
           }}
           onSaveMap={(mapId, updatedMap) => {
             setActiveMaps((prev) => {
