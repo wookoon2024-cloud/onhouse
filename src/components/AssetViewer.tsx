@@ -151,7 +151,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
 
   const [selectedMapId, setSelectedMapId] = useState<string>('interior');
   const [selectedCharId, setSelectedCharId] = useState<string>('samurai_blue');
-  const [gridZoom, setGridZoom] = useState<number>(2.0);
+  const [gridZoom, setGridZoom] = useState<number>(1.5);
 
   // Temporary string state for direct typing in 맵 출력 크기 input box
   const [sizeInputText, setSizeInputText] = useState<string | null>(null);
@@ -1848,20 +1848,20 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   return (
     <div style={{
       position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
-      width: '980px', maxWidth: '88vw', height: '80vh', maxHeight: '760px',
-      zIndex: 150, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px',
-      border: '1px solid #3b3b54', background: '#161622',
+      width: '920px', maxWidth: '85vw', height: '72vh', maxHeight: '660px',
+      zIndex: 150, padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: '10px',
+      border: '1px solid #585b70', background: '#161622',
       boxShadow: '0 20px 60px rgba(0,0,0,0.85)', borderRadius: '6px'
     }}>
-      {/* 1. Top Header Bar (ONLY Title, Tabs, and Close button!) */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #3b3b54', paddingBottom: '10px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          {/* Title */}
-          <h3 className="pixel-text" style={{ fontSize: '17px', color: '#a78bfa', margin: 0, display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'normal' }}>
-            <Sparkles size={18} /> 픽셀 에디터
+      {/* 1. Top Header Bar (Title, Tabs, and Close button - all 12px font matching 마켓에 공유!) */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #585b70', paddingBottom: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          {/* Title (fontSize: 12px) */}
+          <h3 className="pixel-text" style={{ fontSize: '12px', color: '#a78bfa', margin: 0, display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'normal' }}>
+            <Sparkles size={14} /> 픽셀 에디터
           </h3>
 
-          {/* Main Category Tabs: 캐릭터 / 맵 */}
+          {/* Main Category Tabs: 캐릭터 / 맵 (fontSize: 12px) */}
           <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
             <button
               onClick={() => {
@@ -1870,15 +1870,15 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 setSelectedTileState(null);
               }}
               style={{
-                padding: '8px 18px', fontSize: '13px', borderRadius: '4px',
+                padding: '6px 14px', fontSize: '12px', borderRadius: '4px',
                 background: activeTab === 'character' ? '#252538' : '#14141e',
                 color: activeTab === 'character' ? '#fff' : '#8a8a9e',
-                border: activeTab === 'character' ? '1px solid #a78bfa' : '1px solid #28283a',
+                border: activeTab === 'character' ? '1px solid #a78bfa' : '1px solid #585b70',
                 cursor: 'pointer', fontWeight: 'normal',
-                display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.1s ease'
+                display: 'flex', alignItems: 'center', gap: '5px', transition: 'all 0.1s ease'
               }}
             >
-              <User size={14} /> 캐릭터 ({charOptions.length})
+              <User size={13} /> 캐릭터 ({charOptions.length})
             </button>
             <button
               onClick={() => {
@@ -1887,39 +1887,39 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 setSelectedTileState(null);
               }}
               style={{
-                padding: '8px 18px', fontSize: '13px', borderRadius: '4px',
+                padding: '6px 14px', fontSize: '12px', borderRadius: '4px',
                 background: activeTab === 'map' ? '#252538' : '#14141e',
                 color: activeTab === 'map' ? '#fff' : '#8a8a9e',
-                border: activeTab === 'map' ? '1px solid #a78bfa' : '1px solid #28283a',
+                border: activeTab === 'map' ? '1px solid #a78bfa' : '1px solid #585b70',
                 cursor: 'pointer', fontWeight: 'normal',
-                display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.1s ease'
+                display: 'flex', alignItems: 'center', gap: '5px', transition: 'all 0.1s ease'
               }}
             >
-              <Layers size={14} /> 맵 ({mapOptions.length})
+              <Layers size={13} /> 맵 ({mapOptions.length})
             </button>
           </div>
         </div>
 
-        {/* Close Button Only */}
+        {/* Close Button Only (fontSize: 12px) */}
         <button
           onClick={onClose}
           style={{
-            background: '#252538', color: '#fff', border: '1px solid #4a4a6b',
-            padding: '6px 14px', borderRadius: '4px', fontSize: '13px', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 'normal'
+            background: '#252538', color: '#fff', border: '1px solid #585b70',
+            padding: '5px 12px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'normal'
           }}
         >
-          <X size={15} /> 닫기
+          <X size={14} /> 닫기
         </button>
       </div>
 
-      {/* 2. Sub-Control Toolbar (Sub-selection Dropdown, Market Share, Display Size, Add Asset, Zoom) */}
+      {/* 2. Sub-Control Toolbar */}
       <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        background: '#14141e', border: '1px solid #3b3b54', padding: '8px 12px',
-        borderRadius: '4px', flexWrap: 'wrap', gap: '8px'
+        display: 'flex', flexDirection: 'column', gap: '8px',
+        background: '#14141e', border: '1px solid #585b70', padding: '8px 12px',
+        borderRadius: '4px'
       }}>
-        {/* Left Controls: Select Dropdown, Delete, Market Share, Map Output Size */}
+        {/* Top Row: Dropdown, Delete (if custom), "+ 추가" (moved to LEFT of "마켓에 공유"), "🛒 마켓에 공유" */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '12px', color: '#a0a0b8' }}>
             {activeTab === 'character' ? '선택:' : '타일셋 선택:'}
@@ -1933,8 +1933,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
               setSelectedTileState(null);
             }}
             style={{
-              background: '#1c1c2b', color: '#fff', border: '1px solid #4a4a6b',
-              borderRadius: '4px', padding: '6px 12px', fontSize: '12px', fontWeight: 'normal',
+              background: '#1c1c2b', color: '#fff', border: '1px solid #585b70',
+              borderRadius: '4px', padding: '5px 10px', fontSize: '12px', fontWeight: 'normal',
               outline: 'none', cursor: 'pointer'
             }}
           >
@@ -1945,14 +1945,13 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
             ))}
           </select>
 
-          {/* If currently selected option is custom, show delete button */}
           {currentOption?.isCustom && (
             <button
               onClick={() => handleDeleteCustomAsset(currentOption.id)}
               title="커스텀 에셋 삭제"
               style={{
                 background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444',
-                color: '#ff6b6b', borderRadius: '4px', padding: '6px 10px', cursor: 'pointer',
+                color: '#ff6b6b', borderRadius: '4px', padding: '5px 10px', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 'normal'
               }}
             >
@@ -1960,7 +1959,23 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
             </button>
           )}
 
-          {/* Open Market Share Button for Any Selected Asset */}
+          {/* "+ 추가" button on the LEFT of "마켓에 공유"! */}
+          <button
+            onClick={() => {
+              setUploadCategory(activeTab);
+              setShowUploadModal(true);
+            }}
+            style={{
+              padding: '5px 12px', fontSize: '12px', borderRadius: '4px',
+              background: '#2a2a3e', color: '#a78bfa',
+              border: '1px solid #585b70', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'normal'
+            }}
+          >
+            <Plus size={13} /> 추가
+          </button>
+
+          {/* "🛒 마켓에 공유" button */}
           {currentOption && (
             <button
               type="button"
@@ -1973,26 +1988,44 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
               title="오픈 마켓 상점에 에셋 공유 게시"
               style={{
                 background: 'rgba(167, 139, 250, 0.15)', border: '1px solid #a78bfa',
-                color: '#a78bfa', borderRadius: '4px', padding: '6px 12px', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', fontWeight: 'normal'
+                color: '#a78bfa', borderRadius: '4px', padding: '5px 12px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 'normal'
               }}
             >
               🛒 마켓에 공유
             </button>
           )}
+        </div>
 
-          {/* Per-Character Map Display Size Adjustment Control */}
+        {/* Bottom Row: Zoom Selector (left) and "맵 출력 크기" (placed to the RIGHT of Zoom!) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#14141e', padding: '3px 6px', borderRadius: '4px', border: '1px solid #585b70' }}>
+            <ZoomIn size={13} style={{ color: '#aaa', marginRight: '2px' }} />
+            {([1.0, 1.5, 2.0, 3.0] as const).map((z) => (
+              <button
+                key={z}
+                onClick={() => setGridZoom(z)}
+                style={{
+                  padding: '3px 6px', fontSize: '11px', borderRadius: '3px', border: 'none',
+                  background: gridZoom === z ? '#a78bfa' : 'transparent',
+                  color: gridZoom === z ? '#000' : '#ccc', cursor: 'pointer', fontWeight: 'normal'
+                }}
+              >
+                {z}x
+              </button>
+            ))}
+          </div>
+
           {activeTab === 'character' && (
             <div style={{
               display: 'flex', alignItems: 'center', gap: '6px',
-              background: 'rgba(139, 92, 246, 0.12)', border: '1px solid #4a4a6b',
-              padding: '4px 10px', borderRadius: '4px'
+              background: 'rgba(139, 92, 246, 0.12)', border: '1px solid #585b70',
+              padding: '3px 8px', borderRadius: '4px'
             }}>
               <span style={{ fontSize: '12px', color: '#fff', fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 📏 맵 출력 크기:
               </span>
 
-              {/* Decrease (-) Button */}
               <button
                 type="button"
                 onClick={() => {
@@ -2002,9 +2035,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 }}
                 title="크기 줄이기 (-2px)"
                 style={{
-                  background: '#252538', border: '1px solid #4a4a6b',
-                  color: '#fff', width: '24px', height: '24px', borderRadius: '3px',
-                  fontSize: '14px', fontWeight: 'normal', cursor: 'pointer',
+                  background: '#252538', border: '1px solid #585b70',
+                  color: '#fff', width: '22px', height: '22px', borderRadius: '3px',
+                  fontSize: '13px', fontWeight: 'normal', cursor: 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   padding: 0
                 }}
@@ -2012,7 +2045,6 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 -
               </button>
 
-              {/* Direct Editable Number Box */}
               <input
                 type="text"
                 inputMode="numeric"
@@ -2039,20 +2071,19 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                   setSizeInputText(null);
                 }}
                 style={{
-                  width: '42px',
+                  width: '38px',
                   background: '#0d0d12',
-                  border: '1px solid #4a4a6b',
+                  border: '1px solid #585b70',
                   borderRadius: '3px',
                   color: '#fff',
                   fontSize: '12px',
                   fontWeight: 'normal',
                   textAlign: 'center',
-                  padding: '3px 0',
+                  padding: '2px 0',
                   outline: 'none'
                 }}
               />
 
-              {/* Increase (+) Button */}
               <button
                 type="button"
                 onClick={() => {
@@ -2062,9 +2093,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 }}
                 title="크기 키우기 (+2px)"
                 style={{
-                  background: '#252538', border: '1px solid #4a4a6b',
-                  color: '#fff', width: '24px', height: '24px', borderRadius: '3px',
-                  fontSize: '14px', fontWeight: 'normal', cursor: 'pointer',
+                  background: '#252538', border: '1px solid #585b70',
+                  color: '#fff', width: '22px', height: '22px', borderRadius: '3px',
+                  fontSize: '13px', fontWeight: 'normal', cursor: 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   padding: 0
                 }}
@@ -2076,49 +2107,14 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
             </div>
           )}
         </div>
-
-        {/* Right Controls: Add Asset Button & Zoom Selector */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button
-            onClick={() => {
-              setUploadCategory(activeTab);
-              setShowUploadModal(true);
-            }}
-            style={{
-              padding: '6px 14px', fontSize: '12px', borderRadius: '4px',
-              background: '#2a2a3e', color: '#a78bfa',
-              border: '1px solid #4a4a6b', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 'normal'
-            }}
-          >
-            <Plus size={14} /> 추가
-          </button>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#14141e', padding: '4px 8px', borderRadius: '4px', border: '1px solid #3b3b54' }}>
-            <ZoomIn size={14} style={{ color: '#aaa', marginRight: '3px' }} />
-            {([1.0, 1.5, 2.0, 3.0] as const).map((z) => (
-              <button
-                key={z}
-                onClick={() => setGridZoom(z)}
-                style={{
-                  padding: '4px 8px', fontSize: '11px', borderRadius: '3px', border: 'none',
-                  background: gridZoom === z ? '#a78bfa' : 'transparent',
-                  color: gridZoom === z ? '#000' : '#ccc', cursor: 'pointer', fontWeight: 'normal'
-                }}
-              >
-                {z}x
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
 
       {/* Main Grid Viewport & Side Panel */}
       <div style={{ flex: 1, display: 'flex', gap: '14px', overflow: 'hidden' }}>
         {/* Left Grid Viewer Canvas Container */}
         <div style={{
-          flex: 1, overflow: 'auto', background: '#0e0e16', borderRadius: 0,
-          border: '1px solid #3b3b54', display: 'block', padding: '24px 36px', position: 'relative'
+          flex: 1, overflow: 'auto', background: '#0e0e16', borderRadius: '4px',
+          border: '1px solid #585b70', display: 'block', padding: '16px 24px', position: 'relative'
         }}>
           {/* Outer Canvas Wrapper */}
           <div style={{
@@ -2347,27 +2343,14 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
 
         {/* Right Details Panel */}
         <div style={{
-          width: '300px', display: 'flex', flexDirection: 'column', gap: '14px',
-          background: '#1c1c2b', padding: '16px', borderRadius: 0,
-          border: '1px solid #3b3b54', flexShrink: 0, overflowY: 'auto'
+          width: '280px', display: 'flex', flexDirection: 'column', gap: '14px',
+          background: '#1c1c2b', padding: '14px', borderRadius: '4px',
+          border: '1px solid #585b70', flexShrink: 0, overflowY: 'auto'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #3b3b54', paddingBottom: '8px' }}>
-            <h4 className="pixel-text" style={{ fontSize: '13px', color: '#a78bfa', margin: 0, fontWeight: 'normal' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #585b70', paddingBottom: '8px' }}>
+            <h4 className="pixel-text" style={{ fontSize: '12px', color: '#a78bfa', margin: 0, fontWeight: 'normal' }}>
               {activeTab === 'map' ? '🗺️ 선택된 타일 정보' : '👤 선택된 스프라이트 정보'}
             </h4>
-            {selectedTileState && (
-              <button
-                onClick={() => setSelectedTileState(null)}
-                title="선택 고정 해제"
-                style={{
-                  background: 'rgba(255,255,255,0.06)', border: '1px solid #4a4a6b',
-                  color: '#ff79c6', borderRadius: 0, padding: '3px 6px', fontSize: '10px',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 'normal'
-                }}
-              >
-                <Pin size={10} /> 📌 고정 해제
-              </button>
-            )}
           </div>
 
           {activeDisplayTile ? (
