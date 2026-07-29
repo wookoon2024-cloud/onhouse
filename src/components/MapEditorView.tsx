@@ -1379,7 +1379,27 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                   // Remove any accidental object at this tile when painting ground floor tiles
                   nextObjects = nextObjects.filter(o => !(ptx >= o.x && ptx < o.x + o.width && pty >= o.y && pty < o.y + o.height));
                 } else if (editLayer === 'decor') {
-                  newDecor[pty][ptx] = tileToPaint;
+                  // 🎨 Paint 1x1 decor tiles as 1x1 MapObjectInstance so each 1x1 tile is selectable & moveable!
+                  const tsKey = drawInfo?.tilesetKey || activeTileset;
+                  const singleTsInfo = getTilesetInfoLocal(tsKey) || getTilesetInfo(tsKey);
+                  const startCol = drawInfo && singleTsInfo ? (drawInfo.localIdx % singleTsInfo.cols) : 0;
+                  const startRow = drawInfo && singleTsInfo ? Math.floor(drawInfo.localIdx / singleTsInfo.cols) : 0;
+
+                  const new1x1Obj: MapObjectInstance = {
+                    id: `obj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}_${pty}_${ptx}`,
+                    tilesetKey: tsKey,
+                    startCol,
+                    startRow,
+                    width: 1,
+                    height: 1,
+                    x: ptx,
+                    y: pty,
+                    layer: 'decor',
+                    zIndex: Date.now(),
+                    tiles: [[tileToPaint]]
+                  };
+                  nextObjects = nextObjects.filter(o => !(o.x === ptx && o.y === pty && o.width === 1 && o.height === 1));
+                  nextObjects.push(new1x1Obj);
                   if (autoCollision) {
                     newCollision[pty][ptx] = tileToPaint !== -1;
                   }
@@ -1722,6 +1742,72 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         }
         setIsDraggingObject(true);
         setObjectDragStart({ originX: e.clientX, originY: e.clientY, startTx: clickedObj.x, startTy: clickedObj.y });
+        return;
+      }
+
+      // B. Check 1x1 tile at (tx, ty) on decorLayer or baseLayer matching editLayer!
+      const dTile = localMap.decorLayer[ty] ? localMap.decorLayer[ty][tx] : -1;
+      const bTile = localMap.baseLayer[ty] ? localMap.baseLayer[ty][tx] : -1;
+      const defaultBase = localMap.tileset === "interior" ? 1199 : 2000;
+
+      let isBasePick = false;
+      let targetTile = -1;
+
+      if (editLayer === "base") {
+        isBasePick = true;
+        targetTile = (bTile !== -1 && bTile !== defaultBase) ? bTile : -1;
+      } else if (editLayer === "decor") {
+        isBasePick = false;
+        targetTile = dTile;
+      }
+
+      if (targetTile !== -1 && targetTile !== 1199 && targetTile !== 2000) {
+        setHistory(prev => [...prev, localMap]);
+        setRedoHistory([]);
+
+        const drawInfo = getTileDrawInfo(targetTile, activeTileset);
+        const tsKey = drawInfo?.tilesetKey || activeTileset;
+        const tsInfo = getTilesetInfoLocal(tsKey) || getTilesetInfo(tsKey);
+        const startCol = drawInfo && tsInfo ? (drawInfo.localIdx % tsInfo.cols) : 0;
+        const startRow = drawInfo && tsInfo ? Math.floor(drawInfo.localIdx / tsInfo.cols) : 0;
+
+        const newObj: MapObjectInstance = {
+          id: `obj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          tilesetKey: tsKey,
+          startCol,
+          startRow,
+          width: 1,
+          height: 1,
+          x: tx,
+          y: ty,
+          layer: isBasePick ? 'base' : 'decor',
+          zIndex: Date.now(),
+          tiles: [[targetTile]]
+        };
+
+        setLocalMap(prev => {
+          const newDecor = prev.decorLayer.map(r => [...r]);
+          const newBase = prev.baseLayer.map(r => [...r]);
+          if (isBasePick) {
+            newBase[ty][tx] = -1;
+          } else {
+            newDecor[ty][tx] = -1;
+          }
+          return {
+            ...prev,
+            decorLayer: newDecor,
+            baseLayer: newBase,
+            objects: [...(prev.objects || []), newObj]
+          };
+        });
+
+        if (isCtrlHeld) {
+          setSelectedObjectIds(prev => [...prev, newObj.id]);
+        } else {
+          setSelectedObjectIds([newObj.id]);
+        }
+        setIsDraggingObject(true);
+        setObjectDragStart({ originX: e.clientX, originY: e.clientY, startTx: tx, startTy: ty });
         return;
       }
 
