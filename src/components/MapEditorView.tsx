@@ -791,8 +791,9 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                 const targetTx = obj.x + odx;
                 const targetTy = obj.y + ody;
                 if (targetTx >= 0 && targetTx < localMap.width && targetTy >= 0 && targetTy < localMap.height) {
-                  if (obj.tiles && obj.tiles[ody] && obj.tiles[ody][odx] !== undefined) {
-                    const tileIdx = obj.tiles[ody][odx];
+                  if (obj.tiles) {
+                    const row = obj.tiles[ody];
+                    const tileIdx = row && row[odx] !== undefined ? row[odx] : -1;
                     if (tileIdx !== -1) {
                       const drawInfo = getTileDrawInfo(tileIdx, obj.tilesetKey || localMap.tileset);
                       if (drawInfo) {
