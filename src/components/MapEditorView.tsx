@@ -411,16 +411,9 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               const tileVal = getTileValueForCell(obj, r, c);
               if (tileVal !== -1) {
                 if (isBase) {
-                  // Only write if cell is empty, so brush painted tiles on top are NEVER overwritten!
-                  if (newBase[tileY][tileX] === -1 || newBase[tileY][tileX] === 2000) {
-                    newBase[tileY][tileX] = tileVal;
-                  }
+                  newBase[tileY][tileX] = tileVal;
                 } else {
-                  // Decor layer: Only write to decorLayer if cell is empty (-1).
-                  // If a Brush tile was painted on top of this object, newDecor[tileY][tileX] is NOT -1, so the painted brush tile stays on top!
-                  if (newDecor[tileY][tileX] === -1) {
-                    newDecor[tileY][tileX] = tileVal;
-                  }
+                  newDecor[tileY][tileX] = tileVal;
                 }
                 restoredCount++;
               }
