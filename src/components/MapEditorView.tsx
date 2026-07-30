@@ -830,7 +830,12 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
     // 2. Decor Layer & Objects
     if (showDecor) {
-      // 2.1 Decor Layer Tiles (Painted wall/decor overlay tiles)
+      // 2.1 Decor Layer Objects (Decor objects like grouped buildings, structures, furniture)
+      if (localMap.objects && localMap.objects.length > 0) {
+        drawObjectList(localMap.objects.filter(o => o.layer !== 'base'));
+      }
+
+      // 2.2 Decor Layer Tiles (Painted wall/decor overlay tiles drawn WITH BRUSH TOOL ON TOP OF OBJECTS!)
       for (let y = 0; y < localMap.height; y++) {
         for (let x = 0; x < localMap.width; x++) {
           const idx = localMap.decorLayer[y][x];
@@ -849,11 +854,6 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
             }
           }
         }
-      }
-
-      // 2.2 Decor Layer Objects (Decor objects like windows, paintings, lamps render ON TOP of decorLayer!)
-      if (localMap.objects && localMap.objects.length > 0) {
-        drawObjectList(localMap.objects.filter(o => o.layer !== 'base'));
       }
     }
 

@@ -1516,30 +1516,7 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
 
       let renderPlayerIdx = 0;
       for (let ty = 0; ty < map.height; ty++) {
-        // A. Render Standalone Layer 2 Decor Tiles for current row ty
-        for (let tx = 0; tx < map.width; tx++) {
-          const tileIdx = map.decorLayer[ty][tx];
-          const drawInfo = getTileDrawInfo(tileIdx, map.tileset);
-          if (drawInfo) {
-            const img = images[drawInfo.tilesetKey];
-            if (img && img.complete && img.naturalWidth > 0) {
-              const tsInfo = getTilesetInfo(drawInfo.tilesetKey);
-              const tileW = Math.max(1, Math.floor(img.width / tsInfo.cols));
-              const tileH = Math.max(1, Math.floor(img.height / tsInfo.rows));
-              const srcX = (drawInfo.localIdx % tsInfo.cols) * tileW;
-              const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * tileH;
-              if (srcX >= 0 && srcX < img.width && srcY >= 0 && srcY < img.height) {
-                ctx.drawImage(
-                  img,
-                  srcX, srcY, tileW, tileH,
-                  tx * vSize, ty * vSize, vSize, vSize
-                );
-              }
-            }
-          }
-        }
-
-        // B. Render Objects rooted at this row (ty), sorted by zIndex ascending
+        // A. Render Objects rooted at this row (ty), sorted by zIndex ascending
         const objectsAtRow = objectRootRowMap[ty];
         if (objectsAtRow && objectsAtRow.length > 0) {
           const sortedObjs = [...objectsAtRow].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
@@ -1590,6 +1567,29 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
               }
             }
           });
+        }
+
+        // B. Render Standalone Layer 2 Decor Tiles for current row ty (Painted brush tiles on top of objects!)
+        for (let tx = 0; tx < map.width; tx++) {
+          const tileIdx = map.decorLayer[ty][tx];
+          const drawInfo = getTileDrawInfo(tileIdx, map.tileset);
+          if (drawInfo) {
+            const img = images[drawInfo.tilesetKey];
+            if (img && img.complete && img.naturalWidth > 0) {
+              const tsInfo = getTilesetInfo(drawInfo.tilesetKey);
+              const tileW = Math.max(1, Math.floor(img.width / tsInfo.cols));
+              const tileH = Math.max(1, Math.floor(img.height / tsInfo.rows));
+              const srcX = (drawInfo.localIdx % tsInfo.cols) * tileW;
+              const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * tileH;
+              if (srcX >= 0 && srcX < img.width && srcY >= 0 && srcY < img.height) {
+                ctx.drawImage(
+                  img,
+                  srcX, srcY, tileW, tileH,
+                  tx * vSize, ty * vSize, vSize, vSize
+                );
+              }
+            }
+          }
         }
 
         // C. Render all players whose feet Y falls within or before current row ty
