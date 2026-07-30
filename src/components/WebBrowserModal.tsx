@@ -4,14 +4,27 @@ interface WebBrowserModalProps {
   url: string;
   onClose: () => void;
   isMessengerOpen?: boolean;
+  isSyncActive?: boolean;
+  onToggleSync?: () => void;
+  onNavigateUrl?: (newUrl: string) => void;
 }
 
 export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
   url,
   onClose,
-  isMessengerOpen
+  isMessengerOpen,
+  isSyncActive,
+  onToggleSync,
+  onNavigateUrl
 }) => {
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+
+  const [inputUrl, setInputUrl] = useState(url);
+
+  // Sync internal input state when prop url changes
+  useEffect(() => {
+    setInputUrl(url);
+  }, [url]);
 
   // Extract domain for title
   const domain = useMemo(() => {
@@ -96,13 +109,24 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
     };
   }, []);
 
+  const handleGo = () => {
+    if (!inputUrl.trim()) return;
+    let finalUrl = inputUrl.trim();
+    if (!/^https?:\/\//i.test(finalUrl)) {
+      finalUrl = 'https://' + finalUrl;
+    }
+    if (onNavigateUrl) {
+      onNavigateUrl(finalUrl);
+    }
+  };
+
   return (
     <div
       style={{
         position: 'fixed',
         ...initialStyle,
-        width: isMobile ? 'calc(100vw - 20px)' : '520px',
-        height: isMobile ? '320px' : '420px',
+        width: isMobile ? 'calc(100vw - 20px)' : '540px',
+        height: isMobile ? '340px' : '440px',
         minWidth: '320px',
         minHeight: '220px',
         maxWidth: '92vw',
@@ -112,8 +136,10 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
         background: 'rgba(15, 15, 25, 0.96)',
         backdropFilter: 'blur(16px)',
         borderRadius: '12px',
-        border: '2px solid rgba(56, 189, 248, 0.6)',
-        boxShadow: '0 16px 48px rgba(0, 0, 0, 0.8), 0 0 24px rgba(56, 189, 248, 0.35)',
+        border: isSyncActive ? '2px solid #10b981' : '2px solid rgba(56, 189, 248, 0.6)',
+        boxShadow: isSyncActive
+          ? '0 16px 48px rgba(0, 0, 0, 0.8), 0 0 24px rgba(16, 185, 129, 0.4)'
+          : '0 16px 48px rgba(0, 0, 0, 0.8), 0 0 24px rgba(56, 189, 248, 0.35)',
         zIndex: 9999,
         display: 'flex',
         flexDirection: 'column'
@@ -128,7 +154,9 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
           alignItems: 'center',
           justify: 'space-between',
           padding: '8px 12px',
-          background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.3), rgba(15, 15, 25, 0.9))',
+          background: isSyncActive
+            ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.35), rgba(15, 15, 25, 0.9))'
+            : 'linear-gradient(135deg, rgba(56, 189, 248, 0.3), rgba(15, 15, 25, 0.9))',
           borderBottom: '1px solid rgba(255, 255, 255, 0.12)',
           fontFamily: 'var(--font-pixel)',
           fontSize: '12px',
@@ -139,13 +167,17 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, overflow: 'hidden' }}>
-          <span style={{ color: '#38bdf8', fontSize: '14px', flexShrink: 0 }}>🌐</span>
+          <span style={{ color: isSyncActive ? '#6ee7b7' : '#38bdf8', fontSize: '14px', flexShrink: 0 }}>
+            {isSyncActive ? '📡' : '🌐'}
+          </span>
           <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
             {domain}
           </span>
-          <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.45)', marginLeft: '2px', flexShrink: 0 }}>
-            (드래그 이동 / 크기 조절)
-          </span>
+          {isSyncActive && (
+            <span style={{ fontSize: '9px', background: '#10b981', color: '#fff', padding: '1px 6px', borderRadius: '4px', marginLeft: '4px' }}>
+              공유 중
+            </span>
+          )}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
@@ -186,9 +218,83 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
         </div>
       </div>
 
+      {/* Address Bar & Co-Browsing Sync Bar */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        padding: '5px 10px',
+        background: 'rgba(0, 0, 0, 0.45)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+        fontSize: '11px',
+        fontFamily: 'var(--font-pixel)'
+      }}>
+        <input
+          type="text"
+          value={inputUrl}
+          onChange={(e) => setInputUrl(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleGo()}
+          placeholder="https://..."
+          style={{
+            flex: 1,
+            background: 'rgba(255, 255, 255, 0.1)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            borderRadius: '4px',
+            color: '#fff',
+            padding: '3px 8px',
+            fontSize: '11px',
+            outline: 'none'
+          }}
+        />
+        <button
+          type="button"
+          onClick={handleGo}
+          style={{
+            background: 'rgba(56, 189, 248, 0.3)',
+            border: '1px solid rgba(56, 189, 248, 0.5)',
+            color: '#fff',
+            borderRadius: '4px',
+            padding: '3px 8px',
+            fontSize: '10px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          이동
+        </button>
+
+        {onToggleSync && (
+          <button
+            type="button"
+            onClick={onToggleSync}
+            style={{
+              background: isSyncActive
+                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                : 'rgba(255, 255, 255, 0.1)',
+              border: isSyncActive
+                ? '1px solid #6ee7b7'
+                : '1px solid rgba(255, 255, 255, 0.25)',
+              color: '#fff',
+              borderRadius: '4px',
+              padding: '3px 8px',
+              fontSize: '10px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              boxShadow: isSyncActive ? '0 0 10px rgba(16, 185, 129, 0.5)' : 'none'
+            }}
+            title="상대방과 같은 웹페이지를 실시간으로 함께 보기"
+          >
+            {isSyncActive ? '📡 화면 동기화 중' : '📡 화면 함께보기'}
+          </button>
+        )}
+      </div>
+
       {/* Web View Iframe Container */}
       <div style={{ flex: 1, width: '100%', background: '#fff', position: 'relative' }}>
         <iframe
+          key={url}
           width="100%"
           height="100%"
           src={url}
