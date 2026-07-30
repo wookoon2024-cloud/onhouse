@@ -7,13 +7,22 @@ interface MessengerProps {
   activeTarget: PlayerState | null; // Selected user to DM
   onClose: () => void;
   onSendDM: (toId: string, text: string) => void;
+  onWatchYouTube?: (videoId: string) => void;
 }
+
+const extractYouTubeId = (text: string): string | null => {
+  if (!text) return null;
+  const regex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+  const match = text.match(regex);
+  return match ? match[1] : null;
+};
 
 export const Messenger: React.FC<MessengerProps> = ({
   localPlayer,
   activeTarget,
   onClose,
-  onSendDM
+  onSendDM,
+  onWatchYouTube
 }) => {
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -138,12 +147,13 @@ export const Messenger: React.FC<MessengerProps> = ({
         ) : (
           messages.map((msg) => {
             const isMe = msg.fromId === localPlayer.id;
+            const ytId = extractYouTubeId(msg.text);
             return (
               <div
                 key={msg.id}
                 style={{
                   alignSelf: isMe ? 'flex-end' : 'flex-start',
-                  maxWidth: '75%',
+                  maxWidth: '80%',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: isMe ? 'flex-end' : 'flex-start'
@@ -157,9 +167,45 @@ export const Messenger: React.FC<MessengerProps> = ({
                   background: isMe ? 'var(--primary)' : 'rgba(255, 255, 255, 0.08)',
                   color: '#fff',
                   boxShadow: isMe ? '0 2px 8px var(--primary-glow)' : 'none',
-                  border: isMe ? 'none' : '1px solid var(--border-glass)'
+                  border: isMe ? 'none' : '1px solid var(--border-glass)',
+                  wordBreak: 'break-word',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px'
                 }}>
-                  {msg.text}
+                  <div>{msg.text}</div>
+                  {ytId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onWatchYouTube) {
+                          onWatchYouTube(ytId);
+                        } else {
+                          window.dispatchEvent(new CustomEvent('on_house_watch_youtube', { detail: { videoId: ytId } }));
+                        }
+                      }}
+                      style={{
+                        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                        color: '#ffffff',
+                        border: '1px solid rgba(255, 255, 255, 0.4)',
+                        borderRadius: '4px',
+                        padding: '3px 8px',
+                        fontSize: '10px',
+                        fontFamily: 'var(--font-pixel)',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        boxShadow: '0 2px 8px rgba(239, 68, 68, 0.4)',
+                        alignSelf: isMe ? 'flex-end' : 'flex-start',
+                        outline: 'none'
+                      }}
+                      title="유튜브 영상 팝업 재생하기"
+                    >
+                      ▶️ 보기
+                    </button>
+                  )}
                 </div>
                 <span style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' }}>
                   {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

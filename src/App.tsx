@@ -224,6 +224,18 @@ export default function App() {
   const [isChatLogCollapsed, setIsChatLogCollapsed] = useState<boolean>(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const [activeYouTubeVideoId, setActiveYouTubeVideoId] = useState<string | null>(null);
 
+  // Listen for YouTube Watch custom event from any component
+  useEffect(() => {
+    const handleWatchYT = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail && detail.videoId) {
+        setActiveYouTubeVideoId(detail.videoId);
+      }
+    };
+    window.addEventListener('on_house_watch_youtube', handleWatchYT);
+    return () => window.removeEventListener('on_house_watch_youtube', handleWatchYT);
+  }, []);
+
   const handleMarketItemImported = (item: MarketItem, resultId?: string) => {
     fetchHouseMaps(houseCode).then((mapsData) => {
       setActiveMaps(mapsData);
@@ -2513,6 +2525,7 @@ export default function App() {
           activeTarget={activeDMTarget}
           onClose={handleCloseDMChat}
           onSendDM={handleSendDM}
+          onWatchYouTube={(ytId) => setActiveYouTubeVideoId(ytId)}
         />
       )}
 
