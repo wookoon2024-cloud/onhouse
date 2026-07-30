@@ -597,19 +597,30 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
       let loadedCount = 0;
       const totalCount = Object.keys(assets).length;
 
+      if (totalCount === 0) {
+        setAssetsLoaded(true);
+        return;
+      }
+
       Object.entries(assets).forEach(([key, url]) => {
         const img = new Image();
         img.src = url;
-        img.onload = () => {
-          loadedImages[key] = img;
+
+        const checkProgress = (success: boolean) => {
+          if (success) {
+            loadedImages[key] = img;
+          }
           loadedCount++;
-          if (loadedCount === totalCount) {
-            setImages(loadedImages);
+          setImages((prev) => ({ ...prev, ...loadedImages }));
+          if (loadedCount >= totalCount) {
             setAssetsLoaded(true);
           }
         };
+
+        img.onload = () => checkProgress(true);
         img.onerror = () => {
-          console.error(`Failed to load asset: ${key}`);
+          console.warn(`[OnHouse] Asset load error for key: ${key}`);
+          checkProgress(false);
         };
       });
     };
@@ -1034,24 +1045,48 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
       // Disable image smoothing for crisp pixel rendering (cross-browser)
       ctx.imageSmoothingEnabled = false;
 
-      // 1. Draw Base Floor Layer
+      // 1. Draw Base Floor Layer (with robust fallback for mobile & slow asset loading)
       for (let ty = 0; ty < map.height; ty++) {
         for (let tx = 0; tx < map.width; tx++) {
           const tileIdx = map.baseLayer[ty][tx];
+          let drawn = false;
           const drawInfo = getTileDrawInfo(tileIdx, map.tileset);
+
           if (drawInfo) {
             const img = images[drawInfo.tilesetKey];
-            if (img) {
+            if (img && img.complete && img.naturalWidth > 0) {
               const tsInfo = getTilesetInfo(drawInfo.tilesetKey);
               const tileW = Math.max(1, Math.floor(img.width / tsInfo.cols));
               const tileH = Math.max(1, Math.floor(img.height / tsInfo.rows));
               const srcX = (drawInfo.localIdx % tsInfo.cols) * tileW;
               const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * tileH;
+
+              if (srcX >= 0 && srcX < img.width && srcY >= 0 && srcY < img.height) {
+                ctx.drawImage(
+                  img,
+                  srcX, srcY, tileW, tileH,
+                  tx * vSize, ty * vSize, vSize, vSize
+                );
+                drawn = true;
+              }
+            }
+          }
+
+          // Fallback if custom tileset image is loading / missing or out-of-bounds
+          if (!drawn) {
+            const defaultImg = images['interior'] || images['outdoor'];
+            if (defaultImg && defaultImg.complete && defaultImg.naturalWidth > 0) {
+              const defTsInfo = getTilesetInfo('interior');
+              const defW = Math.max(1, Math.floor(defaultImg.width / defTsInfo.cols));
+              const defH = Math.max(1, Math.floor(defaultImg.height / defTsInfo.rows));
               ctx.drawImage(
-                img,
-                srcX, srcY, tileW, tileH,
+                defaultImg,
+                0, 0, defW, defH,
                 tx * vSize, ty * vSize, vSize, vSize
               );
+            } else {
+              ctx.fillStyle = '#1e1e2e';
+              ctx.fillRect(tx * vSize, ty * vSize, vSize, vSize);
             }
           }
         }
@@ -1414,17 +1449,19 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
           const drawInfo = getTileDrawInfo(tileIdx, map.tileset);
           if (drawInfo) {
             const img = images[drawInfo.tilesetKey];
-            if (img) {
+            if (img && img.complete && img.naturalWidth > 0) {
               const tsInfo = getTilesetInfo(drawInfo.tilesetKey);
               const tileW = Math.max(1, Math.floor(img.width / tsInfo.cols));
               const tileH = Math.max(1, Math.floor(img.height / tsInfo.rows));
               const srcX = (drawInfo.localIdx % tsInfo.cols) * tileW;
               const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * tileH;
-              ctx.drawImage(
-                img,
-                srcX, srcY, tileW, tileH,
-                tx * vSize, ty * vSize, vSize, vSize
-              );
+              if (srcX >= 0 && srcX < img.width && srcY >= 0 && srcY < img.height) {
+                ctx.drawImage(
+                  img,
+                  srcX, srcY, tileW, tileH,
+                  tx * vSize, ty * vSize, vSize, vSize
+                );
+              }
             }
           }
         }

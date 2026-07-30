@@ -372,7 +372,7 @@ export const fetchHouseAssets = async (houseCode: string) => {
         .eq('house_code', houseCode)
         .order('id', { ascending: false })
         .limit(200),
-      3500
+      12000
     );
 
     const mapTilesets: any[] = [];
