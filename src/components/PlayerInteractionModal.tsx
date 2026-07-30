@@ -54,7 +54,7 @@ export const PlayerInteractionModal: React.FC<PlayerInteractionModalProps> = ({
         width: '320px', background: 'rgba(20, 20, 30, 0.95)',
         border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '10px',
         boxShadow: '0 12px 40px rgba(0, 0, 0, 0.7)', color: '#fff',
-        fontFamily: 'var(--font-pixel)', padding: '16px', display: 'flex',
+        fontFamily: 'var(--font-pixel)', fontWeight: 'normal', padding: '16px', display: 'flex',
         flexDirection: 'column', gap: '14px'
       }}>
         {/* Modal Header */}
@@ -65,7 +65,7 @@ export const PlayerInteractionModal: React.FC<PlayerInteractionModalProps> = ({
               background: '#a6e3a1',
               boxShadow: '0 0 8px #a6e3a1'
             }} />
-            <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#cdd6f4' }}>
+            <span style={{ fontSize: '13px', fontWeight: 'normal', color: '#cdd6f4' }}>
               {targetPlayer.nickname}
             </span>
             <span style={{
@@ -75,9 +75,9 @@ export const PlayerInteractionModal: React.FC<PlayerInteractionModalProps> = ({
               background: 'rgba(166, 227, 161, 0.15)',
               color: '#a6e3a1',
               border: '1px solid rgba(166, 227, 161, 0.3)',
-              fontWeight: 'bold'
+              fontWeight: 'normal'
             }}>
-              🟢 온라인
+              온라인
             </span>
           </div>
           <button
@@ -104,11 +104,11 @@ export const PlayerInteractionModal: React.FC<PlayerInteractionModalProps> = ({
             👤
           </div>
           <div>
-            <div style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 'bold' }}>
+            <div style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 'normal' }}>
               {targetPlayer.statusMessage ? `⚡ ${targetPlayer.statusMessage}` : '상태 메시지 없음'}
             </div>
-            <div style={{ fontSize: '10px', color: '#a6adc8', marginTop: '2px' }}>
-              {targetPlayer.isOnline ? '🟢 온하우스 온라인 탐험 중' : '💤 오프라인 부재 중'}
+            <div style={{ fontSize: '10px', color: '#a6adc8', marginTop: '2px', fontWeight: 'normal' }}>
+              {targetPlayer.isOnline ? '온하우스 온라인 탐험 중' : '오프라인 부재 중'}
             </div>
           </div>
         </div>
@@ -120,14 +120,14 @@ export const PlayerInteractionModal: React.FC<PlayerInteractionModalProps> = ({
             <button
               onClick={() => setActiveTab('info')}
               style={{
-                padding: '12px', background: 'rgba(255, 255, 255, 0.05)',
+                padding: '10px 8px', background: 'rgba(255, 255, 255, 0.05)',
                 border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '6px',
-                color: '#fff', fontSize: '11px', display: 'flex', flexDirection: 'column',
-                alignItems: 'center', gap: '6px', cursor: 'pointer'
+                color: '#fff', fontSize: '11px', fontWeight: 'normal', display: 'flex', flexDirection: 'column',
+                alignItems: 'center', gap: '5px', cursor: 'pointer'
               }}
             >
               <User size={18} style={{ color: '#89b4fa' }} />
-              <span>👤 정보보기</span>
+              <span>정보보기</span>
             </button>
 
             {/* 2. Request 1:1 Chat */}
@@ -138,44 +138,44 @@ export const PlayerInteractionModal: React.FC<PlayerInteractionModalProps> = ({
               }}
               disabled={!targetPlayer.isOnline}
               style={{
-                padding: '12px', background: targetPlayer.isOnline ? 'rgba(139, 92, 246, 0.25)' : 'rgba(255, 255, 255, 0.02)',
+                padding: '10px 8px', background: targetPlayer.isOnline ? 'rgba(139, 92, 246, 0.25)' : 'rgba(255, 255, 255, 0.02)',
                 border: targetPlayer.isOnline ? '1px solid var(--accent)' : '1px solid rgba(255, 255, 255, 0.05)',
                 borderRadius: '6px', color: targetPlayer.isOnline ? '#fff' : '#6c7086', fontSize: '11px',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
-                cursor: targetPlayer.isOnline ? 'pointer' : 'not-allowed', fontWeight: 'bold'
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px',
+                cursor: targetPlayer.isOnline ? 'pointer' : 'not-allowed', fontWeight: 'normal'
               }}
               title={targetPlayer.isOnline ? '1:1 놀기 신청' : '오프라인 사용자에겐 1:1 놀기를 신청할 수 없습니다'}
             >
               <MessageSquare size={18} style={{ color: targetPlayer.isOnline ? 'var(--accent)' : '#6c7086' }} />
-              <span>💬 1:1 놀기</span>
+              <span>1:1 놀기</span>
             </button>
 
             {/* 3. Leave Note */}
             <button
               onClick={() => setActiveTab('note')}
               style={{
-                padding: '12px', background: 'rgba(255, 255, 255, 0.05)',
+                padding: '10px 8px', background: 'rgba(255, 255, 255, 0.05)',
                 border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '6px',
-                color: '#fff', fontSize: '11px', display: 'flex', flexDirection: 'column',
-                alignItems: 'center', gap: '6px', cursor: 'pointer'
+                color: '#fff', fontSize: '11px', fontWeight: 'normal', display: 'flex', flexDirection: 'column',
+                alignItems: 'center', gap: '5px', cursor: 'pointer'
               }}
             >
               <StickyNote size={18} style={{ color: '#f9e2af' }} />
-              <span>📝 메모남기기</span>
+              <span>메모남기기</span>
             </button>
 
             {/* 4. Send Reaction */}
             <button
               onClick={() => setActiveTab('reaction')}
               style={{
-                padding: '12px', background: 'rgba(255, 255, 255, 0.05)',
+                padding: '10px 8px', background: 'rgba(255, 255, 255, 0.05)',
                 border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '6px',
-                color: '#fff', fontSize: '11px', display: 'flex', flexDirection: 'column',
-                alignItems: 'center', gap: '6px', cursor: 'pointer'
+                color: '#fff', fontSize: '11px', fontWeight: 'normal', display: 'flex', flexDirection: 'column',
+                alignItems: 'center', gap: '5px', cursor: 'pointer'
               }}
             >
               <Heart size={18} style={{ color: '#f38ba8' }} />
-              <span>👏 반응하기</span>
+              <span>반응하기</span>
             </button>
           </div>
         )}
@@ -184,16 +184,16 @@ export const PlayerInteractionModal: React.FC<PlayerInteractionModalProps> = ({
         {activeTab === 'info' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div style={{ fontSize: '11px', color: '#cdd6f4', display: 'flex', flexDirection: 'column', gap: '6px', background: 'rgba(0,0,0,0.3)', padding: '10px', borderRadius: '6px' }}>
-              <div>• <strong>닉네임</strong>: {targetPlayer.nickname}</div>
-              <div>• <strong>아바타 타입</strong>: {targetPlayer.spriteType || '닌자'}</div>
-              <div>• <strong>현재 접속 맵</strong>: {targetPlayer.mapId.toUpperCase()}</div>
-              <div>• <strong>상태 메시지</strong>: {targetPlayer.statusMessage || '없음'}</div>
+              <div>• 닉네임: {targetPlayer.nickname}</div>
+              <div>• 아바타 타입: {targetPlayer.spriteType || '닌자'}</div>
+              <div>• 현재 접속 맵: {targetPlayer.mapId.toUpperCase()}</div>
+              <div>• 상태 메시지: {targetPlayer.statusMessage || '없음'}</div>
             </div>
             <button
               onClick={() => setActiveTab('menu')}
               style={{
                 padding: '8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '4px', color: '#fff', fontSize: '11px', cursor: 'pointer'
+                borderRadius: '4px', color: '#fff', fontSize: '11px', fontWeight: 'normal', cursor: 'pointer'
               }}
             >
               ◀ 메뉴로 돌아가기
@@ -214,11 +214,12 @@ export const PlayerInteractionModal: React.FC<PlayerInteractionModalProps> = ({
               placeholder="메모 내용을 입력하세요..."
               style={{
                 width: '100%', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.15)',
-                borderRadius: '4px', padding: '8px', color: '#fff', fontSize: '11px', outline: 'none', resize: 'none'
+                borderRadius: '4px', padding: '8px', color: '#fff', fontSize: '11px', outline: 'none', resize: 'none',
+                fontWeight: 'normal'
               }}
             />
             {noteSentToast ? (
-              <div style={{ color: '#a6e3a1', fontSize: '11px', fontWeight: 'bold', textAlign: 'center', padding: '4px' }}>
+              <div style={{ color: '#a6e3a1', fontSize: '11px', fontWeight: 'normal', textAlign: 'center', padding: '4px' }}>
                 ✓ 메모가 전송되었습니다!
               </div>
             ) : (
@@ -228,7 +229,7 @@ export const PlayerInteractionModal: React.FC<PlayerInteractionModalProps> = ({
                   onClick={() => setActiveTab('menu')}
                   style={{
                     flex: 1, padding: '8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: '4px', color: '#fff', fontSize: '11px', cursor: 'pointer'
+                    borderRadius: '4px', color: '#fff', fontSize: '11px', fontWeight: 'normal', cursor: 'pointer'
                   }}
                 >
                   취소
@@ -238,7 +239,7 @@ export const PlayerInteractionModal: React.FC<PlayerInteractionModalProps> = ({
                   disabled={!noteInput.trim()}
                   style={{
                     flex: 1, padding: '8px', background: 'var(--primary)', border: 'none',
-                    borderRadius: '4px', color: '#fff', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer'
+                    borderRadius: '4px', color: '#fff', fontSize: '11px', fontWeight: 'normal', cursor: 'pointer'
                   }}
                 >
                   메모 보내기
@@ -265,7 +266,7 @@ export const PlayerInteractionModal: React.FC<PlayerInteractionModalProps> = ({
                   style={{
                     padding: '8px 4px', background: 'rgba(255,255,255,0.05)',
                     border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px',
-                    color: '#fff', fontSize: '11px', display: 'flex', flexDirection: 'column',
+                    color: '#fff', fontSize: '11px', fontWeight: 'normal', display: 'flex', flexDirection: 'column',
                     alignItems: 'center', gap: '2px', cursor: 'pointer'
                   }}
                 >
@@ -278,7 +279,7 @@ export const PlayerInteractionModal: React.FC<PlayerInteractionModalProps> = ({
               onClick={() => setActiveTab('menu')}
               style={{
                 padding: '8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '4px', color: '#fff', fontSize: '11px', cursor: 'pointer', marginTop: '4px'
+                borderRadius: '4px', color: '#fff', fontSize: '11px', fontWeight: 'normal', cursor: 'pointer', marginTop: '4px'
               }}
             >
               ◀ 메뉴로 돌아가기

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { type DirectMessage, type PlayerState, getDMs, saveDM, markDMsAsRead } from '../game/syncManager';
-import { Send, MessageSquare, ShieldAlert } from 'lucide-react';
+import { Send, MessageSquare, ShieldAlert, X } from 'lucide-react';
 
 interface MessengerProps {
   localPlayer: PlayerState;
@@ -262,18 +262,17 @@ export const Messenger: React.FC<MessengerProps> = ({
           type="button"
           onClick={onClose}
           style={{
-            background: 'rgba(255, 255, 255, 0.1)',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            color: 'var(--text-secondary)',
-            padding: '4px 10px',
-            borderRadius: '6px',
-            fontSize: '11px',
-            fontFamily: 'var(--font-pixel)',
-            letterSpacing: '0px',
-            cursor: 'pointer'
+            background: 'none',
+            border: 'none',
+            color: '#a6adc8',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            padding: '4px'
           }}
+          title="닫기"
         >
-          닫기
+          <X size={18} />
         </button>
       </div>
 
