@@ -1288,15 +1288,15 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       const newDecor = prev.decorLayer.map(r => [...r]);
       const newCollision = prev.collision.map(r => [...r]);
 
-      // 1. Erase decor & collision at old starting position (sTx, sTy)
-      for (let dy = 0; dy < obj.height; dy++) {
-        for (let dx = 0; dx < obj.width; dx++) {
-          const oldX = sTx + dx;
-          const oldY = sTy + dy;
-          if (oldX >= 0 && oldX < prev.width && oldY >= 0 && oldY < prev.height) {
-            newDecor[oldY][oldX] = -1;
-            if (obj.layer === "base" || editLayer === "base") { newBase[oldY][oldX] = -1; }
-            if (autoCollision) { newCollision[oldY][oldX] = false; }
+      // 1. Reset collision at old starting position (sTx, sTy) if autoCollision is enabled
+      if (autoCollision) {
+        for (let dy = 0; dy < obj.height; dy++) {
+          for (let dx = 0; dx < obj.width; dx++) {
+            const oldX = sTx + dx;
+            const oldY = sTy + dy;
+            if (oldX >= 0 && oldX < prev.width && oldY >= 0 && oldY < prev.height) {
+              newCollision[oldY][oldX] = false;
+            }
           }
         }
       }
@@ -1816,21 +1816,10 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           tiles: [[targetTile]]
         };
 
-        setLocalMap(prev => {
-          const newDecor = prev.decorLayer.map(r => [...r]);
-          const newBase = prev.baseLayer.map(r => [...r]);
-          if (isBasePick) {
-            newBase[ty][tx] = -1;
-          } else {
-            newDecor[ty][tx] = -1;
-          }
-          return {
-            ...prev,
-            decorLayer: newDecor,
-            baseLayer: newBase,
-            objects: [...(prev.objects || []), newObj]
-          };
-        });
+        setLocalMap(prev => ({
+          ...prev,
+          objects: [...(prev.objects || []), newObj]
+        }));
 
         if (isCtrlHeld) {
           setSelectedObjectIds(prev => [...prev, newObj.id]);
