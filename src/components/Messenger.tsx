@@ -220,7 +220,6 @@ export const Messenger: React.FC<MessengerProps> = ({
                             padding: '3px 8px',
                             fontSize: '10px',
                             fontFamily: 'var(--font-pixel)',
-                            fontWeight: 'bold',
                             cursor: 'pointer',
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -233,17 +232,17 @@ export const Messenger: React.FC<MessengerProps> = ({
                           ▶️ 보기
                         </button>
                         {isPartnerViewing && isMeViewing && (
-                          <span style={{ fontSize: '10px', color: '#f5c2e7', fontFamily: 'var(--font-pixel)', fontWeight: 'bold', textShadow: '0 0 6px rgba(245, 194, 231, 0.8)' }}>
+                          <span style={{ fontSize: '10px', color: '#f5c2e7', fontFamily: 'var(--font-pixel)', textShadow: '0 0 6px rgba(245, 194, 231, 0.8)' }}>
                             👀🔥 함께 보는 중
                           </span>
                         )}
                         {isPartnerViewing && !isMeViewing && (
-                          <span style={{ fontSize: '10px', color: '#fab387', fontFamily: 'var(--font-pixel)', fontWeight: 'bold' }}>
+                          <span style={{ fontSize: '10px', color: '#fab387', fontFamily: 'var(--font-pixel)' }}>
                             👀 상대 보는 중
                           </span>
                         )}
                         {!isPartnerViewing && isMeViewing && (
-                          <span style={{ fontSize: '10px', color: '#a6e3a1', fontFamily: 'var(--font-pixel)', fontWeight: 'bold' }}>
+                          <span style={{ fontSize: '10px', color: '#a6e3a1', fontFamily: 'var(--font-pixel)' }}>
                             👀 보는 중
                           </span>
                         )}
@@ -272,7 +271,6 @@ export const Messenger: React.FC<MessengerProps> = ({
                             padding: '3px 8px',
                             fontSize: '10px',
                             fontFamily: 'var(--font-pixel)',
-                            fontWeight: 'bold',
                             cursor: 'pointer',
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -285,17 +283,17 @@ export const Messenger: React.FC<MessengerProps> = ({
                           🌐 열기
                         </button>
                         {isPartnerViewing && isMeViewing && (
-                          <span style={{ fontSize: '10px', color: '#f5c2e7', fontFamily: 'var(--font-pixel)', fontWeight: 'bold', textShadow: '0 0 6px rgba(245, 194, 231, 0.8)' }}>
+                          <span style={{ fontSize: '10px', color: '#f5c2e7', fontFamily: 'var(--font-pixel)', textShadow: '0 0 6px rgba(245, 194, 231, 0.8)' }}>
                             👀🔥 함께 보는 중
                           </span>
                         )}
                         {isPartnerViewing && !isMeViewing && (
-                          <span style={{ fontSize: '10px', color: '#fab387', fontFamily: 'var(--font-pixel)', fontWeight: 'bold' }}>
+                          <span style={{ fontSize: '10px', color: '#fab387', fontFamily: 'var(--font-pixel)' }}>
                             👀 상대 보는 중
                           </span>
                         )}
                         {!isPartnerViewing && isMeViewing && (
-                          <span style={{ fontSize: '10px', color: '#a6e3a1', fontFamily: 'var(--font-pixel)', fontWeight: 'bold' }}>
+                          <span style={{ fontSize: '10px', color: '#a6e3a1', fontFamily: 'var(--font-pixel)' }}>
                             👀 보는 중
                           </span>
                         )}

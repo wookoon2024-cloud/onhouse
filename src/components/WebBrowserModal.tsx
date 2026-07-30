@@ -126,7 +126,7 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
         position: 'fixed',
         ...initialStyle,
         width: isMobile ? 'calc(100vw - 20px)' : '540px',
-        height: isMobile ? '340px' : '440px',
+        height: isMobile ? '350px' : '450px',
         minWidth: '320px',
         minHeight: '220px',
         maxWidth: '92vw',
@@ -160,7 +160,6 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
           borderBottom: '1px solid rgba(255, 255, 255, 0.12)',
           fontFamily: 'var(--font-pixel)',
           fontSize: '12px',
-          fontWeight: 'bold',
           color: '#fff',
           cursor: 'grab',
           userSelect: 'none'
@@ -191,7 +190,6 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
               borderRadius: '4px',
               padding: '2px 8px',
               fontSize: '10px',
-              fontWeight: 'bold',
               cursor: 'pointer',
               whiteSpace: 'nowrap'
             }}
@@ -209,7 +207,6 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
               borderRadius: '4px',
               padding: '2px 8px',
               fontSize: '11px',
-              fontWeight: 'bold',
               cursor: 'pointer'
             }}
           >
@@ -256,12 +253,11 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
             borderRadius: '4px',
             padding: '3px 8px',
             fontSize: '10px',
-            fontWeight: 'bold',
             cursor: 'pointer',
             whiteSpace: 'nowrap'
           }}
         >
-          이동
+          이동/공유
         </button>
 
         {onToggleSync && (
@@ -279,7 +275,6 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
               borderRadius: '4px',
               padding: '3px 8px',
               fontSize: '10px',
-              fontWeight: 'bold',
               cursor: 'pointer',
               whiteSpace: 'nowrap',
               boxShadow: isSyncActive ? '0 0 10px rgba(16, 185, 129, 0.5)' : 'none'
@@ -289,6 +284,18 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
             {isSyncActive ? '📡 화면 동기화 중' : '📡 화면 함께보기'}
           </button>
         )}
+      </div>
+
+      {/* Sync Tip Notice Bar */}
+      <div style={{
+        padding: '3px 8px',
+        background: 'rgba(10, 10, 18, 0.95)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+        fontSize: '10px',
+        color: '#a6adc8',
+        fontFamily: 'var(--font-pixel)'
+      }}>
+        💡 새 페이지로 이동 시 주소 입력 후 <span style={{ color: '#38bdf8' }}>[이동/공유]</span>를 누르면 상대방 화면도 실시간 함께 동기화됩니다.
       </div>
 
       {/* Web View Iframe Container */}

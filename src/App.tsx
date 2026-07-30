@@ -2747,7 +2747,6 @@ export default function App() {
                               padding: '2px 8px',
                               fontSize: '10px',
                               fontFamily: 'var(--font-pixel)',
-                              fontWeight: 'bold',
                               cursor: 'pointer',
                               display: 'inline-flex',
                               alignItems: 'center',
@@ -2762,17 +2761,17 @@ export default function App() {
                             ▶️ 보기
                           </button>
                           {isPartnerViewing && isMeViewing && (
-                            <span style={{ fontSize: '10px', color: '#f5c2e7', fontFamily: 'var(--font-pixel)', fontWeight: 'bold' }}>
+                            <span style={{ fontSize: '10px', color: '#f5c2e7', fontFamily: 'var(--font-pixel)' }}>
                               👀🔥 함께 보는 중
                             </span>
                           )}
                           {isPartnerViewing && !isMeViewing && (
-                            <span style={{ fontSize: '10px', color: '#fab387', fontFamily: 'var(--font-pixel)', fontWeight: 'bold' }}>
+                            <span style={{ fontSize: '10px', color: '#fab387', fontFamily: 'var(--font-pixel)' }}>
                               👀 상대 보는 중
                             </span>
                           )}
                           {!isPartnerViewing && isMeViewing && (
-                            <span style={{ fontSize: '10px', color: '#a6e3a1', fontFamily: 'var(--font-pixel)', fontWeight: 'bold' }}>
+                            <span style={{ fontSize: '10px', color: '#a6e3a1', fontFamily: 'var(--font-pixel)' }}>
                               👀 보는 중
                             </span>
                           )}
@@ -2795,7 +2794,6 @@ export default function App() {
                               padding: '2px 8px',
                               fontSize: '10px',
                               fontFamily: 'var(--font-pixel)',
-                              fontWeight: 'bold',
                               cursor: 'pointer',
                               display: 'inline-flex',
                               alignItems: 'center',
@@ -2810,17 +2808,17 @@ export default function App() {
                             🌐 열기
                           </button>
                           {isPartnerViewing && isMeViewing && (
-                            <span style={{ fontSize: '10px', color: '#f5c2e7', fontFamily: 'var(--font-pixel)', fontWeight: 'bold' }}>
+                            <span style={{ fontSize: '10px', color: '#f5c2e7', fontFamily: 'var(--font-pixel)' }}>
                               👀🔥 함께 보는 중
                             </span>
                           )}
                           {isPartnerViewing && !isMeViewing && (
-                            <span style={{ fontSize: '10px', color: '#fab387', fontFamily: 'var(--font-pixel)', fontWeight: 'bold' }}>
+                            <span style={{ fontSize: '10px', color: '#fab387', fontFamily: 'var(--font-pixel)' }}>
                               👀 상대 보는 중
                             </span>
                           )}
                           {!isPartnerViewing && isMeViewing && (
-                            <span style={{ fontSize: '10px', color: '#a6e3a1', fontFamily: 'var(--font-pixel)', fontWeight: 'bold' }}>
+                            <span style={{ fontSize: '10px', color: '#a6e3a1', fontFamily: 'var(--font-pixel)' }}>
                               👀 보는 중
                             </span>
                           )}

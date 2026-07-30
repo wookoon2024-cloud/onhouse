@@ -123,7 +123,6 @@ export const YouTubePlayerModal: React.FC<YouTubePlayerModalProps> = ({
           borderBottom: '1px solid rgba(255, 255, 255, 0.12)',
           fontFamily: 'var(--font-pixel)',
           fontSize: '12px',
-          fontWeight: 'bold',
           color: '#fff',
           cursor: 'grab',
           userSelect: 'none'
@@ -148,7 +147,6 @@ export const YouTubePlayerModal: React.FC<YouTubePlayerModalProps> = ({
               borderRadius: '4px',
               padding: '2px 8px',
               fontSize: '10px',
-              fontWeight: 'bold',
               cursor: 'pointer',
               whiteSpace: 'nowrap'
             }}
