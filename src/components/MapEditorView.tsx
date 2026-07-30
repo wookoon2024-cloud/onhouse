@@ -1572,7 +1572,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         tiles: tilesGrid
       };
 
-      // Filter out any small sub-objects previously contained or overlapping in this box
+      // Only remove sub-objects that are FULLY CONTAINED inside this selection box (preserve partially overlapping external objects!)
       nextObjects = nextObjects.filter(o => {
         const oMinX = o.x;
         const oMinY = o.y;
@@ -1582,8 +1582,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         const boxMinY = startRow;
         const boxMaxX = startCol + cols;
         const boxMaxY = startRow + rows;
-        const overlaps = !(oMaxX <= boxMinX || oMinX >= boxMaxX || oMaxY <= boxMinY || oMinY >= boxMaxY);
-        return !overlaps;
+        const isFullyContained = oMinX >= boxMinX && oMaxX <= boxMaxX && oMinY >= boxMinY && oMaxY <= boxMaxY;
+        return !isFullyContained;
       });
 
       nextObjects.push(newObj);
