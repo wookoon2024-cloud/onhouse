@@ -23,6 +23,19 @@ export const YouTubePlayerModal: React.FC<YouTubePlayerModalProps> = ({
     initY: 0
   });
 
+  // Open standalone mini popup window (bypasses YouTube iframe embed restrictions 100%!)
+  const openMiniPopupWindow = () => {
+    const width = 720;
+    const height = 440;
+    const left = (window.screen.width - width) / 2;
+    const top = (window.screen.height - height) / 2;
+    window.open(
+      `https://www.youtube.com/watch?v=${videoId}`,
+      'OnHouseYTPlayer',
+      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=no,status=no`
+    );
+  };
+
   // Calculate default initial position
   const initialStyle = useMemo(() => {
     if (pos) return { left: `${pos.x}px`, top: `${pos.y}px`, transform: 'none' };
@@ -92,10 +105,10 @@ export const YouTubePlayerModal: React.FC<YouTubePlayerModalProps> = ({
       style={{
         position: 'fixed',
         ...initialStyle,
-        width: isMobile ? 'calc(100vw - 20px)' : '480px',
-        height: isMobile ? '280px' : '310px',
+        width: isMobile ? 'calc(100vw - 20px)' : '490px',
+        height: isMobile ? '300px' : '330px',
         minWidth: '320px',
-        minHeight: '220px',
+        minHeight: '230px',
         maxWidth: '90vw',
         maxHeight: '85vh',
         resize: isMobile ? 'none' : 'both',
@@ -110,7 +123,7 @@ export const YouTubePlayerModal: React.FC<YouTubePlayerModalProps> = ({
         flexDirection: 'column'
       }}
     >
-      {/* Draggable Header */}
+      {/* Draggable Header Bar */}
       <div
         onMouseDown={handleDragStart}
         onTouchStart={handleDragStart}
@@ -133,28 +146,47 @@ export const YouTubePlayerModal: React.FC<YouTubePlayerModalProps> = ({
           <span style={{ color: '#ef4444', fontSize: '14px' }}>🎥</span>
           <span>유튜브 동영상</span>
           <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.45)', marginLeft: '2px' }}>
-            (드래그 이동 / 크기 조절 가능)
+            (드래그 이동 / 크기 조절)
           </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
           <button
             type="button"
-            onClick={() => window.open(`https://www.youtube.com/watch?v=${videoId}`, '_blank')}
+            onClick={openMiniPopupWindow}
             style={{
-              background: 'rgba(239, 68, 68, 0.25)',
-              border: '1px solid rgba(239, 68, 68, 0.5)',
-              color: '#fca5a5',
+              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+              border: '1px solid rgba(255, 255, 255, 0.4)',
+              color: '#ffffff',
               borderRadius: '4px',
               padding: '2px 8px',
               fontSize: '10px',
               fontWeight: 'bold',
               cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              boxShadow: '0 2px 6px rgba(239, 68, 68, 0.5)'
+            }}
+            title="소유자 퍼가기 제한 영상 무제한 재생 팝업"
+          >
+            ⚡ 미니 팝업 재생
+          </button>
+          <button
+            type="button"
+            onClick={() => window.open(`https://www.youtube.com/watch?v=${videoId}`, '_blank')}
+            style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              color: '#a6adc8',
+              borderRadius: '4px',
+              padding: '2px 6px',
+              fontSize: '10px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
               whiteSpace: 'nowrap'
             }}
-            title="유튜브에서 직접 열기"
+            title="유튜브 본사이트에서 보기"
           >
-            🔗 YouTube에서 보기
+            🔗 원본
           </button>
           <button
             type="button"
@@ -175,8 +207,8 @@ export const YouTubePlayerModal: React.FC<YouTubePlayerModalProps> = ({
         </div>
       </div>
 
-      {/* Video Container */}
-      <div style={{ flex: 1, width: '100%', height: 'calc(100% - 36px)', background: '#000', position: 'relative' }}>
+      {/* Video Frame Container */}
+      <div style={{ flex: 1, width: '100%', height: 'calc(100% - 60px)', background: '#000', position: 'relative' }}>
         <iframe
           width="100%"
           height="100%"
@@ -187,6 +219,38 @@ export const YouTubePlayerModal: React.FC<YouTubePlayerModalProps> = ({
           allowFullScreen
           style={{ display: 'block', width: '100%', height: '100%', border: 'none' }}
         />
+      </div>
+
+      {/* Bottom Tip Bar for Restricted Videos (NewJeans MV, VEVO, etc.) */}
+      <div style={{
+        padding: '4px 8px',
+        background: 'rgba(10, 10, 18, 0.95)',
+        borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+        fontSize: '10px',
+        color: '#a6adc8',
+        display: 'flex',
+        alignItems: 'center',
+        justify: 'space-between',
+        fontFamily: 'var(--font-pixel)'
+      }}>
+        <span style={{ color: 'rgba(255,255,255,0.6)' }}>
+          💡 기획사(HYBE/소속사)의 퍼가기 제한 영상은 상단 <strong style={{ color: '#ef4444' }}>[⚡ 미니 팝업 재생]</strong> 클릭 시 즉시 재생됩니다.
+        </span>
+        <button
+          type="button"
+          onClick={openMiniPopupWindow}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#89b4fa',
+            textDecoration: 'underline',
+            cursor: 'pointer',
+            fontSize: '10px',
+            padding: 0
+          }}
+        >
+          팝업 열기 ▶
+        </button>
       </div>
     </div>
   );
