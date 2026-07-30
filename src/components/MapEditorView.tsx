@@ -2123,12 +2123,15 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       return;
     }
 
-    if (!isPainting.current || (tool as string) !== 'brush' || e.altKey || isAltPressed) return;
+    if (!isPainting.current || e.altKey || isAltPressed) return;
 
-    // Do NOT drag-spawn multi-tile stamp objects on MouseMove!
-    // Exception: Eraser mode (selectedTile === -1) continuously erases tiles regardless of brush size!
-    const isEraser = selectedTile === -1;
-    const isMultiTileStamp = !isEraser && ((paletteSelection && (paletteSelection.cols > 1 || paletteSelection.rows > 1)) || brushSize > 1);
+    // Allow continuous drag-erasing and drag-painting for collision mode (editLayer === 'collision') as well as brush tool!
+    const isCollisionMode = editLayer === 'collision';
+    const isEraser = selectedTile === -1 || (isCollisionMode && selectedTile === 0);
+
+    if (!isCollisionMode && (tool as string) !== 'brush') return;
+
+    const isMultiTileStamp = !isEraser && !isCollisionMode && ((paletteSelection && (paletteSelection.cols > 1 || paletteSelection.rows > 1)) || brushSize > 1);
     if (isMultiTileStamp) return;
 
     if (lastPaintedCellRef.current?.x === tx && lastPaintedCellRef.current?.y === ty) return;
