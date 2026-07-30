@@ -228,7 +228,8 @@ export const Messenger: React.FC<MessengerProps> = ({
         borderRadius: '14px',
         boxShadow: '0 16px 48px rgba(0, 0, 0, 0.65)',
         fontFamily: 'var(--font-pixel)',
-        fontWeight: 'normal'
+        fontWeight: 'normal',
+        letterSpacing: '0px'
       }}
     >
       {/* Draggable Header */}
@@ -249,10 +250,10 @@ export const Messenger: React.FC<MessengerProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <MessageSquare size={18} style={{ color: 'var(--accent)' }} />
           <div>
-            <h4 style={{ fontSize: '11px', margin: 0, fontWeight: 'normal', fontFamily: 'var(--font-pixel)', color: '#fff' }}>
+            <h4 style={{ fontSize: '12px', margin: 0, fontWeight: 'normal', fontFamily: 'var(--font-pixel)', letterSpacing: '0px', color: '#fff' }}>
               {activeTarget.nickname}
             </h4>
-            <span style={{ fontSize: '10px', color: activeTarget.isOnline ? 'var(--success)' : 'var(--text-muted)', fontFamily: 'var(--font-pixel)' }}>
+            <span style={{ fontSize: '10px', color: activeTarget.isOnline ? 'var(--success)' : 'var(--text-muted)', fontFamily: 'var(--font-pixel)', letterSpacing: '0px' }}>
               {activeTarget.isOnline ? '● 온라인' : `● 오프라인 (${activeTarget.statusMessage || '부재중'})`}
             </span>
           </div>
@@ -266,8 +267,9 @@ export const Messenger: React.FC<MessengerProps> = ({
             color: 'var(--text-secondary)',
             padding: '4px 10px',
             borderRadius: '6px',
-            fontSize: '10px',
+            fontSize: '11px',
             fontFamily: 'var(--font-pixel)',
+            letterSpacing: '0px',
             cursor: 'pointer'
           }}
         >
@@ -285,10 +287,10 @@ export const Messenger: React.FC<MessengerProps> = ({
           <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center',
             justifyContent: 'center', height: '100%', color: 'var(--text-muted)',
-            textAlign: 'center', gap: '8px', fontFamily: 'var(--font-pixel)', fontSize: '11px'
+            textAlign: 'center', gap: '8px', fontFamily: 'var(--font-pixel)', fontSize: '12px', letterSpacing: '0px'
           }}>
             <MessageSquare size={24} style={{ opacity: 0.3 }} />
-            <p style={{ fontSize: '11px', margin: 0 }}>대화 내역이 없습니다.<br />첫 메시지를 보내보세요!</p>
+            <p style={{ fontSize: '12px', margin: 0 }}>대화 내역이 없습니다.<br />첫 메시지를 보내보세요!</p>
           </div>
         ) : (
           messages.map((msg, index) => {
@@ -327,9 +329,10 @@ export const Messenger: React.FC<MessengerProps> = ({
                   <div style={{
                     padding: '8px 12px',
                     borderRadius: '12px',
-                    fontSize: '11px',
+                    fontSize: '12px',
                     fontFamily: 'var(--font-pixel)',
                     fontWeight: 'normal',
+                    letterSpacing: '0px',
                     lineHeight: '1.5',
                     background: isMe ? 'var(--primary)' : 'rgba(255, 255, 255, 0.08)',
                     color: '#fff',
@@ -364,6 +367,7 @@ export const Messenger: React.FC<MessengerProps> = ({
                               fontSize: '10px',
                               fontFamily: 'var(--font-pixel)',
                               fontWeight: 'normal',
+                              letterSpacing: '0px',
                               cursor: 'pointer',
                               display: 'inline-flex',
                               alignItems: 'center',
@@ -376,17 +380,17 @@ export const Messenger: React.FC<MessengerProps> = ({
                             ▶️ 보기
                           </button>
                           {isPartnerViewing && isMeViewing && (
-                            <span style={{ fontSize: '10px', color: '#f5c2e7', fontFamily: 'var(--font-pixel)', textShadow: '0 0 6px rgba(245, 194, 231, 0.8)' }}>
+                            <span style={{ fontSize: '10px', color: '#f5c2e7', fontFamily: 'var(--font-pixel)', letterSpacing: '0px', textShadow: '0 0 6px rgba(245, 194, 231, 0.8)' }}>
                               👀🔥 함께 보는 중
                             </span>
                           )}
                           {isPartnerViewing && !isMeViewing && (
-                            <span style={{ fontSize: '10px', color: '#fab387', fontFamily: 'var(--font-pixel)' }}>
+                            <span style={{ fontSize: '10px', color: '#fab387', fontFamily: 'var(--font-pixel)', letterSpacing: '0px' }}>
                               👀 상대 보는 중
                             </span>
                           )}
                           {!isPartnerViewing && isMeViewing && (
-                            <span style={{ fontSize: '10px', color: '#a6e3a1', fontFamily: 'var(--font-pixel)' }}>
+                            <span style={{ fontSize: '10px', color: '#a6e3a1', fontFamily: 'var(--font-pixel)', letterSpacing: '0px' }}>
                               👀 보는 중
                             </span>
                           )}
@@ -416,6 +420,7 @@ export const Messenger: React.FC<MessengerProps> = ({
                               fontSize: '10px',
                               fontFamily: 'var(--font-pixel)',
                               fontWeight: 'normal',
+                              letterSpacing: '0px',
                               cursor: 'pointer',
                               display: 'inline-flex',
                               alignItems: 'center',
@@ -428,17 +433,17 @@ export const Messenger: React.FC<MessengerProps> = ({
                             🌐 열기
                           </button>
                           {isPartnerViewing && isMeViewing && (
-                            <span style={{ fontSize: '10px', color: '#f5c2e7', fontFamily: 'var(--font-pixel)', textShadow: '0 0 6px rgba(245, 194, 231, 0.8)' }}>
+                            <span style={{ fontSize: '10px', color: '#f5c2e7', fontFamily: 'var(--font-pixel)', letterSpacing: '0px', textShadow: '0 0 6px rgba(245, 194, 231, 0.8)' }}>
                               👀🔥 함께 보는 중
                             </span>
                           )}
                           {isPartnerViewing && !isMeViewing && (
-                            <span style={{ fontSize: '10px', color: '#fab387', fontFamily: 'var(--font-pixel)' }}>
+                            <span style={{ fontSize: '10px', color: '#fab387', fontFamily: 'var(--font-pixel)', letterSpacing: '0px' }}>
                               👀 상대 보는 중
                             </span>
                           )}
                           {!isPartnerViewing && isMeViewing && (
-                            <span style={{ fontSize: '10px', color: '#a6e3a1', fontFamily: 'var(--font-pixel)' }}>
+                            <span style={{ fontSize: '10px', color: '#a6e3a1', fontFamily: 'var(--font-pixel)', letterSpacing: '0px' }}>
                               👀 보는 중
                             </span>
                           )}
@@ -458,7 +463,8 @@ export const Messenger: React.FC<MessengerProps> = ({
                   lineHeight: '1.2',
                   flexShrink: 0,
                   marginBottom: '2px',
-                  fontFamily: 'var(--font-pixel)'
+                  fontFamily: 'var(--font-pixel)',
+                  letterSpacing: '0px'
                 }}>
                   {/* Unread '1' Badge for My Sent Messages */}
                   {isMe && !msg.read && (
@@ -466,6 +472,7 @@ export const Messenger: React.FC<MessengerProps> = ({
                       color: '#f6c177',
                       fontSize: '10px',
                       fontFamily: 'var(--font-pixel)',
+                      letterSpacing: '0px',
                       marginBottom: isLastInGroup ? '2px' : '0px'
                     }}>
                       1
@@ -474,7 +481,7 @@ export const Messenger: React.FC<MessengerProps> = ({
 
                   {/* Time Badge (Displayed ONLY on the LAST message of the consecutive minute group) */}
                   {isLastInGroup && (
-                    <span style={{ fontSize: '9px', color: 'rgba(255, 255, 255, 0.45)', whiteSpace: 'nowrap', fontFamily: 'var(--font-pixel)' }}>
+                    <span style={{ fontSize: '9px', color: 'rgba(255, 255, 255, 0.45)', whiteSpace: 'nowrap', fontFamily: 'var(--font-pixel)', letterSpacing: '0px' }}>
                       {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   )}
@@ -487,10 +494,10 @@ export const Messenger: React.FC<MessengerProps> = ({
           <div style={{
             display: 'flex', gap: '8px', background: 'rgba(243, 139, 168, 0.1)',
             padding: '10px', borderRadius: '8px', border: '1px solid rgba(243, 139, 168, 0.2)',
-            marginTop: 'auto', marginBottom: '8px', fontFamily: 'var(--font-pixel)'
+            marginTop: 'auto', marginBottom: '8px', fontFamily: 'var(--font-pixel)', letterSpacing: '0px'
           }}>
             <ShieldAlert size={14} style={{ color: 'var(--danger)', flexShrink: 0, marginTop: '2px' }} />
-            <p style={{ fontSize: '11px', color: 'var(--danger)', lineHeight: '1.4', margin: 0, fontFamily: 'var(--font-pixel)' }}>
+            <p style={{ fontSize: '11px', color: 'var(--danger)', lineHeight: '1.4', margin: 0, fontFamily: 'var(--font-pixel)', letterSpacing: '0px' }}>
               상대방이 오프라인 상태입니다. 쪽지를 전송하면 보관함에 저장되어, 상대방이 재접속 시 확인 가능합니다.
             </p>
           </div>
@@ -512,7 +519,7 @@ export const Messenger: React.FC<MessengerProps> = ({
           style={{
             flex: 1, padding: '10px 14px', borderRadius: '8px',
             background: 'rgba(255, 255, 255, 0.05)', border: '1px solid var(--border-glass)',
-            color: '#fff', fontSize: '11px', fontFamily: 'var(--font-pixel)', outline: 'none'
+            color: '#fff', fontSize: '12px', fontFamily: 'var(--font-pixel)', letterSpacing: '0px', outline: 'none'
           }}
         />
         <button

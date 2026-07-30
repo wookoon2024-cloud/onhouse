@@ -1,9 +1,17 @@
+@import url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2201-2@1.0/Galmuri11.woff2');
+@import url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2201-2@1.0/Galmuri9.woff2');
 @import url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2105_2@1.0/DungGeunMo.woff2');
-@import url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2201-2@1.0/Galmuri9.woff2');
+
+@font-face {
+  font-family: 'Galmuri11';
+  src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2201-2@1.0/Galmuri11.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+}
 
 @font-face {
   font-family: 'Galmuri9';
-  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2201-2@1.0/Galmuri9.woff2') format('woff2');
+  src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2201-2@1.0/Galmuri9.woff2') format('woff2');
   font-weight: normal;
   font-style: normal;
 }
@@ -16,8 +24,8 @@
 }
 
 :root {
-  --font-pixel: 'Galmuri9', 'DungGeunMo', monospace;
-  --font-sans: 'Galmuri9', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-pixel: 'Galmuri11', 'Galmuri9', 'DungGeunMo', sans-serif;
+  --font-sans: 'Galmuri11', 'Galmuri9', 'Inter', system-ui, -apple-system, sans-serif;
   
   /* Modern Dark/Glass Theme colors */
   --bg-primary: #12121e;
@@ -46,6 +54,7 @@
   padding: 0;
   font-family: var(--font-pixel);
   font-weight: normal;
+  letter-spacing: 0px;
 }
 
 body {
@@ -58,6 +67,7 @@ body {
   color: var(--text-primary);
   font-family: var(--font-pixel);
   font-weight: normal;
+  letter-spacing: 0px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -78,6 +88,7 @@ body {
   transition: all 0.3s ease;
   font-family: var(--font-pixel);
   font-weight: normal;
+  letter-spacing: 0px;
 }
 
 /* Pixel rendering styling */
@@ -90,7 +101,7 @@ body {
 .pixel-text {
   font-family: var(--font-pixel);
   font-weight: normal;
-  letter-spacing: 0.5px;
+  letter-spacing: 0px;
 }
 
 button {
@@ -99,6 +110,7 @@ button {
   outline: none;
   font-family: var(--font-pixel);
   font-weight: normal;
+  letter-spacing: 0px;
   transition: all 0.2s ease;
 }
 
@@ -109,6 +121,7 @@ input {
   outline: none;
   font-family: var(--font-pixel);
   font-weight: normal;
+  letter-spacing: 0px;
   border-radius: 8px;
   transition: all 0.2s ease;
 }
