@@ -919,11 +919,15 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 1. Base Floor Layer (Controlled by showBase toggle!)
-    if (showBase) {
+    const normLayers = getNormalizedLayers(localMap);
+
+    // 1. Base Floor Layer (Controlled by showBase toggle & layer 0 visibility!)
+    const baseLayerObj = normLayers[0];
+    if (showBase && baseLayerObj && baseLayerObj.visible !== false) {
+      const baseGrid = baseLayerObj.grid || localMap.baseLayer;
       for (let y = 0; y < localMap.height; y++) {
         for (let x = 0; x < localMap.width; x++) {
-          const idx = localMap.baseLayer[y][x];
+          const idx = baseGrid[y] ? baseGrid[y][x] : 0;
           const drawInfo = getTileDrawInfo(idx, localMap.tileset);
           if (drawInfo) {
             const img = images[drawInfo.tilesetKey];
@@ -1007,33 +1011,40 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       drawObjectList(localMap.objects.filter(o => o.layer === 'base'));
     }
 
-    // 2. Decor Layer & Objects
+    // 2. Decor Layer & Upper Custom Layers
     if (showDecor) {
       // 2.1 Decor Layer Objects (Decor objects like grouped buildings, structures, furniture)
       if (localMap.objects && localMap.objects.length > 0) {
         drawObjectList(localMap.objects.filter(o => o.layer !== 'base'));
       }
 
-      // 2.2 Decor Layer Tiles (Painted wall/decor overlay tiles drawn WITH BRUSH TOOL ON TOP OF OBJECTS!)
-      for (let y = 0; y < localMap.height; y++) {
-        for (let x = 0; x < localMap.width; x++) {
-          const idx = localMap.decorLayer[y][x];
-          const drawInfo = getTileDrawInfo(idx, localMap.tileset);
-          if (drawInfo) {
-            const img = images[drawInfo.tilesetKey];
-            if (img) {
-              const tsInfo = getTilesetInfoLocal(drawInfo.tilesetKey);
-              const srcX = (drawInfo.localIdx % tsInfo.cols) * 16;
-              const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * 16;
-              ctx.drawImage(
-                img,
-                srcX, srcY, 16, 16,
-                x * tileSize, y * tileSize, tileSize, tileSize
-              );
+      // 2.2 Upper Custom Layers (Layer 2, Layer 3, Layer 4... Painted tiles drawn ON TOP OF OBJECTS!)
+      const upperLayers = normLayers.slice(1);
+      upperLayers.forEach((layer) => {
+        if (layer.visible !== false && layer.grid) {
+          for (let y = 0; y < localMap.height; y++) {
+            for (let x = 0; x < localMap.width; x++) {
+              const idx = layer.grid[y] ? layer.grid[y][x] : -1;
+              if (idx !== -1 && idx !== undefined && idx !== null) {
+                const drawInfo = getTileDrawInfo(idx, localMap.tileset);
+                if (drawInfo) {
+                  const img = images[drawInfo.tilesetKey];
+                  if (img) {
+                    const tsInfo = getTilesetInfoLocal(drawInfo.tilesetKey);
+                    const srcX = (drawInfo.localIdx % tsInfo.cols) * 16;
+                    const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * 16;
+                    ctx.drawImage(
+                      img,
+                      srcX, srcY, 16, 16,
+                      x * tileSize, y * tileSize, tileSize, tileSize
+                    );
+                  }
+                }
+              }
             }
           }
         }
-      }
+      });
     }
 
     // 3. Collision red borders (100% Vivid Red for clear distinction!)
@@ -2675,41 +2686,6 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                           </div>
                         );
                       })}
-
-                      {/* Collision Layer Item */}
-                      <div
-                        onClick={() => {
-                          setEditLayer('collision');
-                          setSelectedTile(1);
-                          setSelectedObjectId(null);
-                          setPaletteSelection(null);
-                          setShowCollision(true);
-                        }}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          padding: '5px 8px',
-                          background: editLayer === 'collision' ? 'rgba(243, 139, 168, 0.25)' : 'transparent',
-                          color: editLayer === 'collision' ? '#f38ba8' : 'rgba(255,255,255,0.5)',
-                          cursor: 'pointer',
-                          fontSize: '12px',
-                          borderTop: '1px solid rgba(255,255,255,0.08)'
-                        }}
-                      >
-                        <span style={{ fontSize: '11px' }}>⛔</span>
-                        <span style={{ flex: 1, fontWeight: editLayer === 'collision' ? 'bold' : 'normal' }}>이동 불가지역 (충돌)</span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowCollision(!showCollision);
-                          }}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', opacity: showCollision ? 1 : 0.25 }}
-                        >
-                          {showCollision ? '👁️' : '🙈'}
-                        </button>
-                      </div>
                     </div>
 
                     {/* Compact Icon-Only Bottom Action Toolbar (Photoshop style - No Wordy Text Labels!) */}
@@ -2891,6 +2867,78 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                       />
                       오브젝트 배치 시 이동 불가 설정
                     </label>
+
+                    {/* Dedicated Collision Walls (이동 불가지역) Control Box */}
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px',
+                      marginTop: '6px',
+                      padding: '8px',
+                      background: editLayer === 'collision' ? 'rgba(243, 139, 168, 0.15)' : 'rgba(243, 139, 168, 0.06)',
+                      border: editLayer === 'collision' ? '1px solid #f38ba8' : '1px solid rgba(243, 139, 168, 0.2)',
+                      borderRadius: '6px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '12px', color: '#f38ba8', fontWeight: editLayer === 'collision' ? 'bold' : 'normal' }}>
+                          ⛔ 이동 불가지역 (충돌 벽)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowCollision(!showCollision)}
+                          title={showCollision ? "충돌 벽 표시 끄기" : "충돌 벽 표시 켜기"}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', opacity: showCollision ? 1 : 0.3 }}
+                        >
+                          {showCollision ? '👁️' : '🙈'}
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditLayer('collision');
+                            setSelectedTile(1);
+                            setSelectedObjectId(null);
+                            setPaletteSelection(null);
+                            setShowCollision(true);
+                          }}
+                          style={{
+                            flex: 1, padding: '6px 4px', fontSize: '11px', borderRadius: '4px',
+                            background: editLayer === 'collision' && selectedTile === 1 ? '#f38ba8' : 'rgba(255,255,255,0.04)',
+                            color: editLayer === 'collision' && selectedTile === 1 ? '#000' : '#fff',
+                            border: editLayer === 'collision' && selectedTile === 1 ? '1px solid #f38ba8' : '1px solid var(--border-glass)',
+                            fontWeight: editLayer === 'collision' && selectedTile === 1 ? 'bold' : 'normal',
+                            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
+                          }}
+                          title="벽 추가 (마우스로 칠해서 이동 불가지역 설정)"
+                        >
+                          🛑 벽 추가
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditLayer('collision');
+                            setSelectedTile(0);
+                            setSelectedObjectId(null);
+                            setPaletteSelection(null);
+                            setShowCollision(true);
+                          }}
+                          style={{
+                            flex: 1, padding: '6px 4px', fontSize: '11px', borderRadius: '4px',
+                            background: editLayer === 'collision' && selectedTile === 0 ? '#a6e3a1' : 'rgba(255,255,255,0.04)',
+                            color: editLayer === 'collision' && selectedTile === 0 ? '#000' : '#fff',
+                            border: editLayer === 'collision' && selectedTile === 0 ? '1px solid #a6e3a1' : '1px solid var(--border-glass)',
+                            fontWeight: editLayer === 'collision' && selectedTile === 0 ? 'bold' : 'normal',
+                            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
+                          }}
+                          title="벽 삭제 / 지우기 (마우스로 칠해서 이동 가능하게 해제)"
+                        >
+                          🧽 벽 삭제
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
