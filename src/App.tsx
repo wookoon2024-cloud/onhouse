@@ -32,6 +32,7 @@ import { CreateMemoModal } from './components/CreateMemoModal';
 import { ViewMemoModal } from './components/ViewMemoModal';
 import { InventoryModal } from './components/InventoryModal';
 import { CustomAlertModal } from './components/CustomAlertModal';
+import { YouTubePlayerModal } from './components/YouTubePlayerModal';
 import { Briefcase } from 'lucide-react';
 
 interface ChatLogMessage {
@@ -2541,73 +2542,13 @@ export default function App() {
         onItemImported={handleMarketItemImported}
       />
 
-      {/* 6.7. Floating Right-Side YouTube Video Player Modal */}
+      {/* 6.7. Draggable & Resizable YouTube Video Player Modal */}
       {activeYouTubeVideoId && (
-        <div style={{
-          position: 'fixed',
-          right: isMobile ? '50%' : '20px',
-          bottom: isMobile ? '50%' : '140px',
-          transform: isMobile ? 'translate(50%, 50%)' : 'none',
-          width: isMobile ? 'calc(100vw - 20px)' : '480px',
-          height: isMobile ? '280px' : '310px',
-          background: 'rgba(15, 15, 25, 0.95)',
-          backdropFilter: 'blur(16px)',
-          borderRadius: '12px',
-          border: '2px solid rgba(239, 68, 68, 0.6)',
-          boxShadow: '0 16px 48px rgba(0, 0, 0, 0.8), 0 0 20px rgba(239, 68, 68, 0.3)',
-          zIndex: 9999,
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden'
-        }}>
-          {/* Header */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justify: 'space-between',
-            padding: '8px 12px',
-            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(15, 15, 25, 0.8))',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-            fontFamily: 'var(--font-pixel)',
-            fontSize: '12px',
-            fontWeight: 'bold',
-            color: '#fff'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ color: '#ef4444', fontSize: '14px' }}>🎥</span>
-              <span>유튜브 동영상 플레이어</span>
-            </div>
-            <button
-              onClick={() => setActiveYouTubeVideoId(null)}
-              style={{
-                background: 'rgba(255, 255, 255, 0.12)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                color: '#fff',
-                borderRadius: '4px',
-                padding: '3px 8px',
-                fontSize: '11px',
-                fontWeight: 'bold',
-                cursor: 'pointer'
-              }}
-            >
-              ❌ 닫기
-            </button>
-          </div>
-
-          {/* Iframe Video Embed */}
-          <div style={{ flex: 1, width: '100%', background: '#000' }}>
-            <iframe
-              width="100%"
-              height="100%"
-              src={`https://www.youtube-nocookie.com/embed/${activeYouTubeVideoId}?autoplay=1`}
-              title="YouTube Video Player"
-              frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              style={{ display: 'block', width: '100%', height: '100%', border: 'none' }}
-            />
-          </div>
-        </div>
+        <YouTubePlayerModal
+          videoId={activeYouTubeVideoId}
+          onClose={() => setActiveYouTubeVideoId(null)}
+          isMessengerOpen={!!activeDMTarget}
+        />
       )}
 
       {/* 7. Classic Flat Translucent Integrated Chat Box */}
