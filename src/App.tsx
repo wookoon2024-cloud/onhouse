@@ -158,6 +158,28 @@ export default function App() {
       localStorage.setItem('on_house_available_maps', JSON.stringify(finalOrder));
       localStorage.setItem('on_house_available_map_ids', JSON.stringify(finalOrder));
     } catch (e) {}
+
+    // Guarantee initial entry always lands on the far-left first map (finalOrder[0])!
+    if (finalOrder.length > 0) {
+      const firstMapId = finalOrder[0];
+      const targetMap = mapsData[firstMapId] || maps[firstMapId];
+      const spawn = (targetMap && targetMap.spawnPoints && targetMap.spawnPoints[0])
+        ? targetMap.spawnPoints[0]
+        : { x: 10, y: 10 };
+
+      setLocalPlayer((p) => {
+        // If player is not already in a valid map within this house, or on initial load, snap to firstMapId
+        if (!finalOrder.includes(p.mapId) || p.mapId !== firstMapId) {
+          return {
+            ...p,
+            mapId: firstMapId,
+            x: spawn.x * 16,
+            y: spawn.y * 16
+          };
+        }
+        return p;
+      });
+    }
   };
 
   useEffect(() => {
