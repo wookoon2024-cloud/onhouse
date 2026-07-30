@@ -201,6 +201,8 @@ export default function App() {
     otherPlayersRef.current = otherPlayers;
   }, [otherPlayers]);
 
+  const pendingPingCallbacksRef = useRef<Record<string, (online: boolean) => void>>({});
+
   const [offlinePlayers, setOfflinePlayers] = useState<Record<string, PlayerState>>(() => getOfflineUsers());
 
   // 3. UI control states
@@ -1032,6 +1034,24 @@ export default function App() {
         });
         updateUnreadCount();
       })
+      .on('broadcast', { event: 'ping_check' }, ({ payload }) => {
+        if (!payload || payload.targetId !== deviceId.current) return;
+        try {
+          channel.send({
+            type: 'broadcast',
+            event: 'pong_reply',
+            payload: { fromId: deviceId.current, targetId: payload.fromId }
+          });
+        } catch (e) {}
+      })
+      .on('broadcast', { event: 'pong_reply' }, ({ payload }) => {
+        if (!payload || payload.targetId !== deviceId.current) return;
+        const cb = pendingPingCallbacksRef.current[payload.fromId];
+        if (cb) {
+          cb(true);
+          delete pendingPingCallbacksRef.current[payload.fromId];
+        }
+      })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           // Welcome message for self
@@ -1089,36 +1109,10 @@ export default function App() {
       }
     };
 
-    // Periodic Heartbeat Broadcast (every 3.5s) so mobile/desktop standing players stay online
-    const heartbeatTimer = setInterval(() => {
-      if (localPlayerRef.current) {
-        sendPlayerSync(localPlayerRef.current);
-      }
-    }, 3500);
-
-    // Auto-prune ghost players who haven't sent a heartbeat for > 10 seconds (e.g. mobile swipe-closed app)
-    const pruneTimer = setInterval(() => {
-      const now = Date.now();
-      setOtherPlayers((prev) => {
-        let changed = false;
-        const next = { ...prev };
-        Object.entries(next).forEach(([id, player]) => {
-          const lastActive = player.lastActive || 0;
-          if (lastActive > 0 && now - lastActive > 10000) {
-            delete next[id];
-            changed = true;
-          }
-        });
-        return changed ? next : prev;
-      });
-    }, 4000);
-
     window.addEventListener('beforeunload', handleUnload);
     window.addEventListener('pagehide', handleUnload);
 
     return () => {
-      clearInterval(heartbeatTimer);
-      clearInterval(pruneTimer);
       handleUnload();
       window.removeEventListener('beforeunload', handleUnload);
       window.removeEventListener('pagehide', handleUnload);
@@ -1850,18 +1844,66 @@ export default function App() {
     } catch (e) {}
   };
 
-  // Handle click on another player (opens Player Interaction Modal with online/offline status check)
-  const handlePlayerClick = (p: PlayerState) => {
+  // Fast On-Demand Online Verification (Pings target player only when clicked - ZERO background overhead!)
+  const checkPlayerOnline = (targetPlayer: PlayerState): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const now = Date.now();
+      // If target player moved or sent packet within last 3 seconds, they are definitely online!
+      if (targetPlayer.lastActive && now - targetPlayer.lastActive < 3000) {
+        resolve(true);
+        return;
+      }
+
+      let resolved = false;
+      const timer = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          delete pendingPingCallbacksRef.current[targetPlayer.id];
+          resolve(false); // Timed out (500ms) - player is offline!
+        }
+      }, 500);
+
+      pendingPingCallbacksRef.current[targetPlayer.id] = (online: boolean) => {
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timer);
+          resolve(online);
+        }
+      };
+
+      try {
+        if (channelRef.current) {
+          channelRef.current.send({
+            type: 'broadcast',
+            event: 'ping_check',
+            payload: { fromId: deviceId.current, targetId: targetPlayer.id }
+          });
+        } else {
+          clearTimeout(timer);
+          resolve(false);
+        }
+      } catch (e) {
+        clearTimeout(timer);
+        resolve(false);
+      }
+    });
+  };
+
+  // Handle click on another player (opens Player Interaction Modal with On-Demand Online Check!)
+  const handlePlayerClick = async (p: PlayerState) => {
     if (p.id === deviceId.current) {
       // Clicked self: open customizer
       setIsCustomizing(true);
     } else {
-      const now = Date.now();
-      const lastActive = p.lastActive || 0;
-      const isOnline = (lastActive > 0 ? (now - lastActive <= 10000) : true) && p.isOnline !== false;
+      const isOnline = await checkPlayerOnline(p);
 
-      if (!isOnline && lastActive > 0 && now - lastActive > 10000) {
-        // Player has disconnected or closed mobile app! Remove ghost character from map
+      if (isOnline) {
+        setInteractionTargetPlayer({
+          ...p,
+          isOnline: true
+        });
+      } else {
+        // Target player is offline! Prune ghost character from map immediately
         setOtherPlayers((prev) => {
           const next = { ...prev };
           delete next[p.id];
@@ -1873,17 +1915,11 @@ export default function App() {
             ...p,
             isOnline: false,
             statusMessage: '오프라인',
-            lastActive: p.lastActive || Date.now()
+            lastActive: Date.now()
           }
         }));
-        showToast(`💡 [${p.nickname}] 님은 현재 오프라인 상태입니다. (접속 종료됨)`);
-        return;
+        showToast(`💡 [${p.nickname}] 님은 오프라인 상태입니다. (접속 종료됨)`);
       }
-
-      setInteractionTargetPlayer({
-        ...p,
-        isOnline: true
-      });
     }
   };
 
