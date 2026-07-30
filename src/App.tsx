@@ -43,6 +43,14 @@ interface ChatLogMessage {
   mapName?: string;
 }
 
+// Helper function to extract YouTube video ID from various YouTube URL formats
+const extractYouTubeId = (text: string): string | null => {
+  if (!text) return null;
+  const regex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+  const match = text.match(regex);
+  return match ? match[1] : null;
+};
+
 export default function App() {
   const deviceId = useRef(getOrCreateDeviceId());
 
@@ -214,6 +222,7 @@ export default function App() {
   const [incomingDMRequest, setIncomingDMRequest] = useState<{ requesterId: string; requesterName: string; requesterPlayer: PlayerState } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isChatLogCollapsed, setIsChatLogCollapsed] = useState<boolean>(() => typeof window !== 'undefined' && window.innerWidth < 768);
+  const [activeYouTubeVideoId, setActiveYouTubeVideoId] = useState<string | null>(null);
 
   const handleMarketItemImported = (item: MarketItem, resultId?: string) => {
     fetchHouseMaps(houseCode).then((mapsData) => {
@@ -950,18 +959,18 @@ export default function App() {
         const partner = payload.accepterPlayer || otherPlayers[payload.fromId] || offlinePlayers[payload.fromId];
         if (partner) {
           setActiveDMTarget(partner);
-          showToast(`[${payload.fromName}] 님이 1:1 대화 요청을 수락했습니다!`);
+          showToast(`[${payload.fromName}] 님이 1:1 놀기 요청을 수락했습니다!`);
         }
       })
       .on('broadcast', { event: 'dm_decline' }, ({ payload }) => {
         if (!payload || payload.toId !== deviceId.current) return;
-        showToast(`[${payload.fromName}] 님이 1:1 대화 요청을 거절했습니다.`);
+        showToast(`[${payload.fromName}] 님이 1:1 놀기 요청을 거절했습니다.`);
       })
       .on('broadcast', { event: 'dm_close' }, ({ payload }) => {
         if (!payload || payload.toId !== deviceId.current) return;
         setActiveDMTarget(null);
         updateUnreadCount();
-        showToast(`[${payload.fromName}] 님이 1:1 대화를 종료했습니다.`);
+        showToast(`[${payload.fromName}] 님이 1:1 놀기를 종료했습니다.`);
       })
       .on('broadcast', { event: 'reaction_anim' }, ({ payload }) => {
         if (!payload) return;
@@ -1967,7 +1976,7 @@ export default function App() {
           toId: target.id
         }
       });
-      showToast(`[${target.nickname}] 님에게 1:1 대화를 신청했습니다. 응답 대기 중...`);
+      showToast(`[${target.nickname}] 님에게 1:1 놀기를 신청했습니다. 응답 대기 중...`);
     } catch (e) {}
   };
 
@@ -2519,6 +2528,75 @@ export default function App() {
         onItemImported={handleMarketItemImported}
       />
 
+      {/* 6.7. Floating Right-Side YouTube Video Player Modal */}
+      {activeYouTubeVideoId && (
+        <div style={{
+          position: 'fixed',
+          right: isMobile ? '50%' : '20px',
+          bottom: isMobile ? '50%' : '140px',
+          transform: isMobile ? 'translate(50%, 50%)' : 'none',
+          width: isMobile ? 'calc(100vw - 20px)' : '480px',
+          height: isMobile ? '280px' : '310px',
+          background: 'rgba(15, 15, 25, 0.95)',
+          backdropFilter: 'blur(16px)',
+          borderRadius: '12px',
+          border: '2px solid rgba(239, 68, 68, 0.6)',
+          boxShadow: '0 16px 48px rgba(0, 0, 0, 0.8), 0 0 20px rgba(239, 68, 68, 0.3)',
+          zIndex: 9999,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
+        }}>
+          {/* Header */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justify: 'space-between',
+            padding: '8px 12px',
+            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(15, 15, 25, 0.8))',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+            fontFamily: 'var(--font-pixel)',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            color: '#fff'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ color: '#ef4444', fontSize: '14px' }}>🎥</span>
+              <span>유튜브 동영상 플레이어</span>
+            </div>
+            <button
+              onClick={() => setActiveYouTubeVideoId(null)}
+              style={{
+                background: 'rgba(255, 255, 255, 0.12)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                color: '#fff',
+                borderRadius: '4px',
+                padding: '3px 8px',
+                fontSize: '11px',
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+            >
+              ❌ 닫기
+            </button>
+          </div>
+
+          {/* Iframe Video Embed */}
+          <div style={{ flex: 1, width: '100%', background: '#000' }}>
+            <iframe
+              width="100%"
+              height="100%"
+              src={`https://www.youtube-nocookie.com/embed/${activeYouTubeVideoId}?autoplay=1`}
+              title="YouTube Video Player"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              style={{ display: 'block', width: '100%', height: '100%', border: 'none' }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* 7. Classic Flat Translucent Integrated Chat Box */}
       <div style={{
         position: 'absolute',
@@ -2559,28 +2637,59 @@ export default function App() {
                 {isMobile ? "대화 내역이 없습니다." : "대화 내역이 없습니다. (Enter 키를 눌러 대화를 나누세요)"}
               </div>
             ) : (
-              chatLogs.map((log) => (
-                <div
-                  key={log.id}
-                  style={{
-                    fontSize: isMobile ? '11px' : '12px',
-                    fontFamily: 'var(--font-pixel)',
-                    color: '#fff',
-                    display: 'flex',
-                    gap: '4px',
-                    alignItems: 'baseline'
-                  }}
-                >
-                  <span style={{
-                    color: log.channel === 'map' ? '#a6e3a1' : '#fab387',
-                    whiteSpace: 'nowrap', flexShrink: 0
-                  }}>
-                    [{log.channel === 'map' ? `맵${log.mapName ? '·' + log.mapName : ''}` : '전체'}]
-                  </span>
-                  <span style={{ color: '#a6e3a1', whiteSpace: 'nowrap', flexShrink: 0 }}>{log.senderName} :</span>
-                  <span style={{ wordBreak: 'break-word', color: '#e6e9ef' }}>{log.text}</span>
-                </div>
-              ))
+              chatLogs.map((log) => {
+                const ytId = extractYouTubeId(log.text);
+                return (
+                  <div
+                    key={log.id}
+                    style={{
+                      fontSize: isMobile ? '11px' : '12px',
+                      fontFamily: 'var(--font-pixel)',
+                      color: '#fff',
+                      display: 'flex',
+                      gap: '4px',
+                      alignItems: 'center',
+                      flexWrap: 'wrap'
+                    }}
+                  >
+                    <span style={{
+                      color: log.channel === 'map' ? '#a6e3a1' : '#fab387',
+                      whiteSpace: 'nowrap', flexShrink: 0
+                    }}>
+                      [{log.channel === 'map' ? `맵${log.mapName ? '·' + log.mapName : ''}` : '전체'}]
+                    </span>
+                    <span style={{ color: '#a6e3a1', whiteSpace: 'nowrap', flexShrink: 0 }}>{log.senderName} :</span>
+                    <span style={{ wordBreak: 'break-word', color: '#e6e9ef' }}>{log.text}</span>
+                    {ytId && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveYouTubeVideoId(ytId)}
+                        style={{
+                          background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                          color: '#ffffff',
+                          border: '1px solid rgba(255, 255, 255, 0.4)',
+                          borderRadius: '4px',
+                          padding: '2px 8px',
+                          fontSize: '10px',
+                          fontFamily: 'var(--font-pixel)',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          boxShadow: '0 2px 8px rgba(239, 68, 68, 0.4)',
+                          flexShrink: 0,
+                          outline: 'none',
+                          lineHeight: '1.2'
+                        }}
+                        title="유튜브 영상 팝업 재생하기"
+                      >
+                        ▶️ 보기
+                      </button>
+                    )}
+                  </div>
+                );
+              })
             )}
           </div>
         )}

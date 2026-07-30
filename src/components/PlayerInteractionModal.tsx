@@ -144,10 +144,10 @@ export const PlayerInteractionModal: React.FC<PlayerInteractionModalProps> = ({
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
                 cursor: targetPlayer.isOnline ? 'pointer' : 'not-allowed', fontWeight: 'bold'
               }}
-              title={targetPlayer.isOnline ? '1:1 대화 신청' : '오프라인 사용자에겐 1:1 대화를 신청할 수 없습니다'}
+              title={targetPlayer.isOnline ? '1:1 놀기 신청' : '오프라인 사용자에겐 1:1 놀기를 신청할 수 없습니다'}
             >
               <MessageSquare size={18} style={{ color: targetPlayer.isOnline ? 'var(--accent)' : '#6c7086' }} />
-              <span>💬 1:1 대화하기</span>
+              <span>💬 1:1 놀기</span>
             </button>
 
             {/* 3. Leave Note */}

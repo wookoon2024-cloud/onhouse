@@ -44,7 +44,7 @@ export const DMRequestModal: React.FC<DMRequestModalProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px' }}>
           <MessageSquare size={18} style={{ color: 'var(--accent)' }} />
           <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--accent)' }}>
-            1:1 대화 요청 도착
+            1:1 놀기 요청 도착
           </span>
           <div style={{
             marginLeft: 'auto', fontSize: '11px', color: '#f9e2af',
@@ -58,7 +58,7 @@ export const DMRequestModal: React.FC<DMRequestModalProps> = ({
 
         {/* Message */}
         <div style={{ fontSize: '12px', color: '#cdd6f4', lineHeight: '1.5', textAlign: 'center', padding: '6px 0' }}>
-          <strong style={{ color: '#89b4fa' }}>[{requesterName}]</strong> 님이 1:1 대화를 신청했습니다.<br />
+          <strong style={{ color: '#89b4fa' }}>[{requesterName}]</strong> 님이 1:1 놀기를 신청했습니다.<br />
           수락하시겠습니까?
         </div>
 
