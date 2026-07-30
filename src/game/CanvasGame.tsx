@@ -1136,20 +1136,8 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
               }
 
               if (!drawn) {
-                const defaultImg = images['interior'] || images['outdoor'];
-                if (defaultImg && defaultImg.complete && defaultImg.naturalWidth > 0) {
-                  const defTsInfo = getTilesetInfo('interior');
-                  const defW = Math.max(1, Math.floor(defaultImg.width / defTsInfo.cols));
-                  const defH = Math.max(1, Math.floor(defaultImg.height / defTsInfo.rows));
-                  offCtx.drawImage(
-                    defaultImg,
-                    0, 0, defW, defH,
-                    tx * 16, ty * 16, 16, 16
-                  );
-                } else {
-                  offCtx.fillStyle = '#1e1e2e';
-                  offCtx.fillRect(tx * 16, ty * 16, 16, 16);
-                }
+                offCtx.fillStyle = '#09090f';
+                offCtx.fillRect(tx * 16, ty * 16, 16, 16);
               }
             }
           }

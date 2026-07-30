@@ -500,32 +500,32 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   };
 
   const handleBringToFront = (objId?: string) => {
-    const id = objId || selectedObjectId;
-    if (!id) return;
+    const ids = selectedObjectIds.length > 0 ? selectedObjectIds : (objId || selectedObjectId ? [objId || selectedObjectId!] : []);
+    if (ids.length === 0) return;
     setLocalMap(prev => {
       const objs = prev.objects || [];
       const maxZ = Math.max(...objs.map(o => o.zIndex || 0), 0);
       return {
         ...prev,
-        objects: objs.map(o => o.id === id ? { ...o, zIndex: maxZ + 1 } : o)
+        objects: objs.map(o => ids.includes(o.id) ? { ...o, zIndex: maxZ + 1 } : o)
       };
     });
-    setPickedToast('오브젝트를 맨 앞으로 가져왔습니다!');
+    setPickedToast(`오브젝트 ${ids.length}개를 맨 앞으로 가져왔습니다!`);
     setTimeout(() => setPickedToast(null), 1500);
   };
 
   const handleSendToBack = (objId?: string) => {
-    const id = objId || selectedObjectId;
-    if (!id) return;
+    const ids = selectedObjectIds.length > 0 ? selectedObjectIds : (objId || selectedObjectId ? [objId || selectedObjectId!] : []);
+    if (ids.length === 0) return;
     setLocalMap(prev => {
       const objs = prev.objects || [];
       const minZ = Math.min(...objs.map(o => o.zIndex || 0), 0);
       return {
         ...prev,
-        objects: objs.map(o => o.id === id ? { ...o, zIndex: minZ - 1 } : o)
+        objects: objs.map(o => ids.includes(o.id) ? { ...o, zIndex: minZ - 1 } : o)
       };
     });
-    setPickedToast('오브젝트를 맨 뒤로 보냈습니다!');
+    setPickedToast(`오브젝트 ${ids.length}개를 맨 뒤로 보냈습니다!`);
     setTimeout(() => setPickedToast(null), 1500);
   };
 
@@ -767,9 +767,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     const drawObjectList = (objsList: MapObjectInstance[]) => {
       if (objsList.length === 0) return;
       const sortedObjects = [...objsList].sort((a, b) => {
-        const overlaps = !(b.x + b.width <= a.x || b.x >= a.x + a.width || b.y + b.height <= a.y || b.y >= a.y + a.height);
-        if (overlaps && a.zIndex !== b.zIndex) {
-          return (a.zIndex || 0) - (b.zIndex || 0);
+        if (a.zIndex !== undefined && b.zIndex !== undefined && a.zIndex !== b.zIndex) {
+          return a.zIndex - b.zIndex;
         }
         const rootA = a.y + a.height - 1;
         const rootB = b.y + b.height - 1;
