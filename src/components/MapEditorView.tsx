@@ -1372,8 +1372,12 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                 newDecor[pty][ptx] = -1;
                 if (autoCollision) newCollision[pty][ptx] = false;
               }
-              // Erase any object overlapping eraser position
-              nextObjects = nextObjects.filter(o => !(ptx >= o.x && ptx < o.x + o.width && pty >= o.y && pty < o.y + o.height));
+              // Erase 1x1 standalone objects at eraser position (preserve multi-tile building structures!)
+              nextObjects = nextObjects.filter(o => {
+                const isOverlapped = ptx >= o.x && ptx < o.x + o.width && pty >= o.y && pty < o.y + o.height;
+                if (!isOverlapped) return true;
+                return !(o.width === 1 && o.height === 1);
+              });
             } else {
               let tileToPaint = selectedTile;
               if (paletteSelection && paletteSelection.tilesetKey === activeTileset && tsInfo) {
