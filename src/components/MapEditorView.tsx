@@ -1757,14 +1757,26 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     if (tool === "select") {
       const isCtrlHeld = e.ctrlKey || e.metaKey || e.shiftKey;
 
-      // A. Check existing MapObjectInstance at (tx, ty) strictly matching current editLayer!
-      const clickedObj = (localMap.objects || []).slice().reverse().find(o => {
+      // A. Check existing MapObjectInstance at (tx, ty)
+      // 1) Try matching current editLayer first
+      let clickedObj = (localMap.objects || []).slice().reverse().find(o => {
         const matchesPos = tx >= o.x && tx < o.x + o.width && ty >= o.y && ty < o.y + o.height;
         if (!matchesPos) return false;
         if (editLayer === "base") return o.layer === "base";
         if (editLayer === "decor") return o.layer !== "base";
         return true;
       });
+
+      // 2) Fallback: Search ANY object at (tx, ty) regardless of editLayer!
+      if (!clickedObj) {
+        clickedObj = (localMap.objects || []).slice().reverse().find(o => {
+          return tx >= o.x && tx < o.x + o.width && ty >= o.y && ty < o.y + o.height;
+        });
+        if (clickedObj) {
+          // Auto-switch editLayer to match the clicked object's layer!
+          setEditLayer(clickedObj.layer === "base" ? "base" : "decor");
+        }
+      }
 
       if (isCtrlHeld) {
         // 🎯 CTRL KEY HELD: Box Drag Multi-Selection OR Ctrl+Click Object Addition!
@@ -1959,7 +1971,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       const selectMaxX = mapBoxSelection.startCol + mapBoxSelection.cols;
       const selectMaxY = mapBoxSelection.startRow + mapBoxSelection.rows;
 
-      const overlapped = (localMap.objects || []).filter(o => {
+      let overlapped = (localMap.objects || []).filter(o => {
         if (editLayer === "base" && o.layer !== "base") return false;
         if (editLayer === "decor" && o.layer === "base") return false;
         const oMinX = o.x;
@@ -1968,6 +1980,20 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         const oMaxY = o.y + o.height;
         return !(oMaxX <= selectMinX || oMinX >= selectMaxX || oMaxY <= selectMinY || oMinY >= selectMaxY);
       });
+
+      // Fallback: If no objects matched on active editLayer, search ALL objects across all layers!
+      if (overlapped.length === 0) {
+        overlapped = (localMap.objects || []).filter(o => {
+          const oMinX = o.x;
+          const oMinY = o.y;
+          const oMaxX = o.x + o.width;
+          const oMaxY = o.y + o.height;
+          return !(oMaxX <= selectMinX || oMinX >= selectMaxX || oMaxY <= selectMinY || oMinY >= selectMaxY);
+        });
+        if (overlapped.length > 0) {
+          setEditLayer(overlapped[0].layer === "base" ? "base" : "decor");
+        }
+      }
 
       if (overlapped.length > 0) {
         setSelectedObjectIds(overlapped.map(o => o.id));
