@@ -264,7 +264,7 @@ export const Messenger: React.FC<MessengerProps> = ({
         onMouseDown={handleDragStart}
         onTouchStart={handleDragStart}
         style={{
-          padding: '12px 16px',
+          padding: '10px 14px',
           borderBottom: '1px solid var(--border-glass)',
           display: 'flex',
           justify: 'space-between',
@@ -274,16 +274,14 @@ export const Messenger: React.FC<MessengerProps> = ({
           userSelect: 'none'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <MessageSquare size={18} style={{ color: 'var(--accent)' }} />
-          <div>
-            <h4 style={{ fontSize: '12px', margin: 0, fontWeight: 'normal', fontFamily: 'var(--font-pixel)', letterSpacing: '0px', color: '#fff' }}>
-              {activeTarget.nickname}
-            </h4>
-            <span style={{ fontSize: '10px', color: activeTarget.isOnline ? 'var(--success)' : 'var(--text-muted)', fontFamily: 'var(--font-pixel)', letterSpacing: '0px' }}>
-              {activeTarget.isOnline ? '● 온라인' : `● 오프라인 (${activeTarget.statusMessage || '부재중'})`}
-            </span>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1, overflow: 'hidden' }}>
+          <MessageSquare size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+          <span style={{ fontSize: '12px', color: '#fff', fontFamily: 'var(--font-pixel)', letterSpacing: '0px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+            {activeTarget.nickname}
+          </span>
+          <span style={{ fontSize: '10px', color: activeTarget.isOnline ? 'var(--success)' : 'var(--text-muted)', fontFamily: 'var(--font-pixel)', letterSpacing: '0px', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            {activeTarget.isOnline ? '● 온라인' : `● 오프라인 (${activeTarget.statusMessage || '부재중'})`}
+          </span>
         </div>
         <button
           type="button"
@@ -295,7 +293,9 @@ export const Messenger: React.FC<MessengerProps> = ({
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            padding: '4px'
+            padding: '4px',
+            marginLeft: '8px',
+            flexShrink: 0
           }}
           title="닫기"
         >
