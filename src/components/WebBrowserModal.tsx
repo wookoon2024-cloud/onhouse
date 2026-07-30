@@ -18,6 +18,7 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
   onNavigateUrl
 }) => {
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   const [inputUrl, setInputUrl] = useState(url);
 
@@ -29,11 +30,34 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
   // Extract domain for title
   const domain = useMemo(() => {
     try {
-      return new URL(url).hostname;
+      return new URL(inputUrl || url).hostname;
     } catch {
-      return url;
+      return inputUrl || url;
     }
-  }, [url]);
+  }, [inputUrl, url]);
+
+  // Auto-detect URL changes inside iframe on load or navigation interval
+  const checkAndUpdateIframeUrl = () => {
+    try {
+      if (iframeRef.current && iframeRef.current.contentWindow) {
+        const currentHref = iframeRef.current.contentWindow.location.href;
+        if (currentHref && currentHref !== 'about:blank' && currentHref !== inputUrl) {
+          setInputUrl(currentHref);
+          if (isSyncActive && onNavigateUrl) {
+            onNavigateUrl(currentHref);
+          }
+        }
+      }
+    } catch (e) {
+      // Cross-origin restriction may catch here if the iframe domain differs
+    }
+  };
+
+  // Poll iframe location every 600ms while window is open
+  useEffect(() => {
+    const interval = setInterval(checkAndUpdateIframeUrl, 600);
+    return () => clearInterval(interval);
+  }, [inputUrl, isSyncActive]);
 
   // Custom position state for dragging
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
@@ -182,7 +206,7 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
           <button
             type="button"
-            onClick={() => window.open(url, '_blank')}
+            onClick={() => window.open(inputUrl || url, '_blank')}
             style={{
               background: 'rgba(56, 189, 248, 0.2)',
               border: '1px solid rgba(56, 189, 248, 0.5)',
@@ -295,16 +319,18 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
         color: '#a6adc8',
         fontFamily: 'var(--font-pixel)'
       }}>
-        💡 새 페이지로 이동 시 주소 입력 후 <span style={{ color: '#38bdf8' }}>[이동/공유]</span>를 누르면 상대방 화면도 실시간 함께 동기화됩니다.
+        💡 새 페이지 이동 시 주소창 입력 후 <span style={{ color: '#38bdf8' }}>[이동/공유]</span>를 누르거나 탭 내 링크 탐색 시 주소가 자동 갱신 및 실시간 동기화됩니다.
       </div>
 
       {/* Web View Iframe Container */}
       <div style={{ flex: 1, width: '100%', background: '#fff', position: 'relative' }}>
         <iframe
+          ref={iframeRef}
           key={url}
           width="100%"
           height="100%"
           src={url}
+          onLoad={checkAndUpdateIframeUrl}
           title="Web View Browser"
           frameBorder="0"
           sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-modals"
