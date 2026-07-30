@@ -408,7 +408,20 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
             const tileX = obj.x + c;
             const tileY = obj.y + r;
             if (tileX >= 0 && tileX < prev.width && tileY >= 0 && tileY < prev.height) {
-              const tileVal = getTileValueForCell(obj, r, c);
+              let tileVal = getTileValueForCell(obj, r, c);
+
+              // If tileVal is -1 inside the object grid, sample neighboring non-empty tiles from object to fill the gap!
+              if (tileVal === -1) {
+                const neighbors: number[] = [];
+                if (c > 0) { const v = getTileValueForCell(obj, r, c - 1); if (v !== -1) neighbors.push(v); }
+                if (c < obj.width - 1) { const v = getTileValueForCell(obj, r, c + 1); if (v !== -1) neighbors.push(v); }
+                if (r > 0) { const v = getTileValueForCell(obj, r - 1, c); if (v !== -1) neighbors.push(v); }
+                if (r < obj.height - 1) { const v = getTileValueForCell(obj, r + 1, c); if (v !== -1) neighbors.push(v); }
+                if (neighbors.length >= 1) {
+                  tileVal = neighbors[0];
+                }
+              }
+
               if (tileVal !== -1) {
                 if (isBase) {
                   newBase[tileY][tileX] = tileVal;
@@ -541,7 +554,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
             if (x > 0 && newDecor[y][x - 1] !== -1) neighbors.push(newDecor[y][x - 1]);
             if (x < prev.width - 1 && newDecor[y][x + 1] !== -1) neighbors.push(newDecor[y][x + 1]);
 
-            if (neighbors.length >= 2) {
+            if (neighbors.length >= 1) {
               newDecor[y][x] = neighbors[0];
               repairedHoles++;
             }
