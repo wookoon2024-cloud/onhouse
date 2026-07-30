@@ -1707,20 +1707,32 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       const isCtrlHeld = e.ctrlKey || e.metaKey || e.shiftKey;
 
       // A. Check existing MapObjectInstance at (tx, ty)
+      // Sort candidate objects at (tx, ty) in FRONT-TO-BACK order (highest zIndex / topmost rendered object first!)
+      const candidateObjectsAtPos = (localMap.objects || []).filter(o =>
+        tx >= o.x && tx < o.x + o.width && ty >= o.y && ty < o.y + o.height
+      ).sort((a, b) => {
+        if (a.zIndex !== undefined && b.zIndex !== undefined && a.zIndex !== b.zIndex) {
+          return b.zIndex - a.zIndex; // Higher zIndex comes first (frontmost)
+        }
+        const rootA = a.y + a.height - 1;
+        const rootB = b.y + b.height - 1;
+        if (rootA !== rootB) return rootB - rootA; // Lower Y position comes first (frontmost)
+        const areaA = a.width * a.height;
+        const areaB = b.width * b.height;
+        if (areaA !== areaB) return areaA - areaB; // Smaller foreground objects come first
+        return (b.zIndex || 0) - (a.zIndex || 0);
+      });
+
       // 1) Try matching current editLayer first
-      let clickedObj = (localMap.objects || []).slice().reverse().find(o => {
-        const matchesPos = tx >= o.x && tx < o.x + o.width && ty >= o.y && ty < o.y + o.height;
-        if (!matchesPos) return false;
+      let clickedObj = candidateObjectsAtPos.find(o => {
         if (editLayer === "base") return o.layer === "base";
         if (editLayer === "decor") return o.layer !== "base";
         return true;
       });
 
       // 2) Fallback: Search ANY object at (tx, ty) regardless of editLayer!
-      if (!clickedObj) {
-        clickedObj = (localMap.objects || []).slice().reverse().find(o => {
-          return tx >= o.x && tx < o.x + o.width && ty >= o.y && ty < o.y + o.height;
-        });
+      if (!clickedObj && candidateObjectsAtPos.length > 0) {
+        clickedObj = candidateObjectsAtPos[0];
         if (clickedObj) {
           // Auto-switch editLayer to match the clicked object's layer!
           setEditLayer(clickedObj.layer === "base" ? "base" : "decor");
