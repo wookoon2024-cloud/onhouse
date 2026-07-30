@@ -742,7 +742,6 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
     // 1. Base Floor Layer (Controlled by showBase toggle!)
     if (showBase) {
-      // 1. Base Floor Layer
       for (let y = 0; y < localMap.height; y++) {
         for (let x = 0; x < localMap.width; x++) {
           const idx = localMap.baseLayer[y][x];
@@ -762,119 +761,77 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           }
         }
       }
-  
-      // 1.5 Base Layer Objects (obj.layer === 'base' - Ground Overlay Objects like Stepping Stones, Rugs)
-      if (cleanedBaseObjects.length > 0) {
-        cleanedBaseObjects.forEach(obj => {
-          const img = images[obj.tilesetKey];
-          const tsInfo = getTilesetInfoLocal(obj.tilesetKey);
-          if (img && tsInfo) {
-            const tileW = Math.max(1, Math.floor(img.width / tsInfo.cols));
-            const tileH = Math.max(1, Math.floor(img.height / tsInfo.rows));
-  
-              for (let ody = 0; ody < obj.height; ody++) {
-                for (let odx = 0; odx < obj.width; odx++) {
-                  const targetTx = obj.x + odx;
-                  const targetTy = obj.y + ody;
-                  if (targetTx >= 0 && targetTx < localMap.width && targetTy >= 0 && targetTy < localMap.height) {
-                    if (obj.tiles && obj.tiles[ody] && obj.tiles[ody][odx] !== undefined) {
-                      const tileIdx = obj.tiles[ody][odx];
-                      if (tileIdx !== -1) {
-                        const drawInfo = getTileDrawInfo(tileIdx, obj.tilesetKey || localMap.tileset);
-                        if (drawInfo) {
-                          const tImg = images[drawInfo.tilesetKey];
-                          if (tImg) {
-                            const tsInfo = getTilesetInfoLocal(drawInfo.tilesetKey);
-                            const srcX = (drawInfo.localIdx % tsInfo.cols) * 16;
-                            const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * 16;
-                            ctx.drawImage(
-                              tImg,
-                              srcX, srcY, 16, 16,
-                              targetTx * tileSize, targetTy * tileSize, tileSize, tileSize
-                            );
-                          }
-                        }
-                      }
-                    } else {
-                      const srcX = (obj.startCol + odx) * tileW;
-                      const srcY = (obj.startRow + ody) * tileH;
-                      ctx.drawImage(
-                        img,
-                        srcX, srcY, tileW, tileH,
-                        targetTx * tileSize, targetTy * tileSize, tileSize, tileSize
-                      );
-                    }
-                  }
-                }
-              }
-          }
-        });
-      }
     }
 
-    // 2. Decor Layer & Objects
-    if (showDecor) {
-      // 2.1 Decor Objects Layer (MapObjectInstance[]) - Standing Decor Entity / Building Structure Rendering
-      if (cleanedDecorObjects.length > 0) {
-        const sortedObjects = [...cleanedDecorObjects].sort((a, b) => {
-          const overlaps = !(b.x + b.width <= a.x || b.x >= a.x + a.width || b.y + b.height <= a.y || b.y >= a.y + a.height);
-          if (overlaps && a.zIndex !== b.zIndex) {
-            return (a.zIndex || 0) - (b.zIndex || 0);
-          }
-          const rootA = a.y + a.height - 1;
-          const rootB = b.y + b.height - 1;
-          if (rootA !== rootB) return rootA - rootB;
+    // Helper to draw an object list
+    const drawObjectList = (objsList: MapObjectInstance[]) => {
+      if (objsList.length === 0) return;
+      const sortedObjects = [...objsList].sort((a, b) => {
+        const overlaps = !(b.x + b.width <= a.x || b.x >= a.x + a.width || b.y + b.height <= a.y || b.y >= a.y + a.height);
+        if (overlaps && a.zIndex !== b.zIndex) {
           return (a.zIndex || 0) - (b.zIndex || 0);
-        });
+        }
+        const rootA = a.y + a.height - 1;
+        const rootB = b.y + b.height - 1;
+        if (rootA !== rootB) return rootA - rootB;
+        return (a.zIndex || 0) - (b.zIndex || 0);
+      });
 
-        sortedObjects.forEach(obj => {
-          const img = images[obj.tilesetKey];
-          const tsInfo = getTilesetInfoLocal(obj.tilesetKey);
-          if (img && tsInfo) {
-            const tileW = Math.max(1, Math.floor(img.width / tsInfo.cols));
-            const tileH = Math.max(1, Math.floor(img.height / tsInfo.rows));
+      sortedObjects.forEach(obj => {
+        const img = images[obj.tilesetKey];
+        const tsInfo = getTilesetInfoLocal(obj.tilesetKey);
+        if (img && tsInfo) {
+          const tileW = Math.max(1, Math.floor(img.width / tsInfo.cols));
+          const tileH = Math.max(1, Math.floor(img.height / tsInfo.rows));
 
-            for (let ody = 0; ody < obj.height; ody++) {
-              for (let odx = 0; odx < obj.width; odx++) {
-                const targetTx = obj.x + odx;
-                const targetTy = obj.y + ody;
-                if (targetTx >= 0 && targetTx < localMap.width && targetTy >= 0 && targetTy < localMap.height) {
-                  if (obj.tiles) {
-                    const row = obj.tiles[ody];
-                    const tileIdx = row && row[odx] !== undefined ? row[odx] : -1;
-                    if (tileIdx !== -1) {
-                      const drawInfo = getTileDrawInfo(tileIdx, obj.tilesetKey || localMap.tileset);
-                      if (drawInfo) {
-                        const tImg = images[drawInfo.tilesetKey];
-                        if (tImg) {
-                          const tsInfo = getTilesetInfoLocal(drawInfo.tilesetKey);
-                          const srcX = (drawInfo.localIdx % tsInfo.cols) * 16;
-                          const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * 16;
-                          ctx.drawImage(
-                            tImg,
-                            srcX, srcY, 16, 16,
-                            targetTx * tileSize, targetTy * tileSize, tileSize, tileSize
-                          );
-                        }
+          for (let ody = 0; ody < obj.height; ody++) {
+            for (let odx = 0; odx < obj.width; odx++) {
+              const targetTx = obj.x + odx;
+              const targetTy = obj.y + ody;
+              if (targetTx >= 0 && targetTx < localMap.width && targetTy >= 0 && targetTy < localMap.height) {
+                if (obj.tiles) {
+                  const row = obj.tiles[ody];
+                  const tileIdx = row && row[odx] !== undefined ? row[odx] : -1;
+                  if (tileIdx !== -1) {
+                    const drawInfo = getTileDrawInfo(tileIdx, obj.tilesetKey || localMap.tileset);
+                    if (drawInfo) {
+                      const tImg = images[drawInfo.tilesetKey];
+                      if (tImg) {
+                        const tsInfo = getTilesetInfoLocal(drawInfo.tilesetKey);
+                        const srcX = (drawInfo.localIdx % tsInfo.cols) * 16;
+                        const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * 16;
+                        ctx.drawImage(
+                          tImg,
+                          srcX, srcY, 16, 16,
+                          targetTx * tileSize, targetTy * tileSize, tileSize, tileSize
+                        );
                       }
                     }
-                  } else {
-                    const srcX = (obj.startCol + odx) * tileW;
-                    const srcY = (obj.startRow + ody) * tileH;
-                    ctx.drawImage(
-                      img,
-                      srcX, srcY, tileW, tileH,
-                      targetTx * tileSize, targetTy * tileSize, tileSize, tileSize
-                    );
                   }
+                } else {
+                  const srcX = (obj.startCol + odx) * tileW;
+                  const srcY = (obj.startRow + ody) * tileH;
+                  ctx.drawImage(
+                    img,
+                    srcX, srcY, tileW, tileH,
+                    targetTx * tileSize, targetTy * tileSize, tileSize, tileSize
+                  );
                 }
               }
             }
           }
-        });
-      }
+        }
+      });
+    };
 
-      // 2.2 Decor Layer Tiles (Painted overlay tiles render on top of objects!)
+    // 1.5 Base Layer Objects (obj.layer === 'base' - Ground Overlay Objects like Stepping Stones, Rugs)
+    if (showBase && localMap.objects && localMap.objects.length > 0) {
+      drawObjectList(localMap.objects.filter(o => o.layer === 'base'));
+    }
+
+    // 2. Decor Layer & Objects
+    if (showDecor) {
+      // 2.1 Decor Layer Tiles (Painted wall/decor overlay tiles)
       for (let y = 0; y < localMap.height; y++) {
         for (let x = 0; x < localMap.width; x++) {
           const idx = localMap.decorLayer[y][x];
@@ -893,6 +850,11 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
             }
           }
         }
+      }
+
+      // 2.2 Decor Layer Objects (Decor objects like windows, paintings, lamps render ON TOP of decorLayer!)
+      if (localMap.objects && localMap.objects.length > 0) {
+        drawObjectList(localMap.objects.filter(o => o.layer !== 'base'));
       }
     }
 
@@ -1542,6 +1504,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
           if (curTx >= 0 && curTx < prev.width && curTy >= 0 && curTy < prev.height) {
             let tileVal = -1;
+            let fromExistingObj = false;
 
             // Check existing objects at (curTx, curTy) first
             if (nextObjects.length > 0) {
@@ -1553,6 +1516,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                   const val = getTileValueForCell(obj, relR, relC);
                   if (val !== -1) {
                     tileVal = val;
+                    fromExistingObj = true;
                     break;
                   }
                 }
@@ -1568,10 +1532,13 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
             rowTiles.push(tileVal);
 
-            // Erase vacated map layers at this cell
-            newDecor[curTy][curTx] = -1;
-            if (editLayer === "base") {
-              newBase[curTy][curTx] = -1;
+            // Erase vacated map layers ONLY if we sampled directly from decorLayer/baseLayer,
+            // NOT when sampling an existing object on top! This keeps background wall/floor tiles intact!
+            if (!fromExistingObj) {
+              newDecor[curTy][curTx] = -1;
+              if (editLayer === "base") {
+                newBase[curTy][curTx] = -1;
+              }
             }
             if (autoCollision) {
               newCollision[curTy][curTx] = tileVal !== -1;
