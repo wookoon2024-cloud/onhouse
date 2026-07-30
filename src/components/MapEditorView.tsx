@@ -1915,6 +1915,10 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
     if (tool === "select") {
       const isCtrlHeld = e.ctrlKey || e.metaKey || e.shiftKey;
+      const normLayers = getNormalizedLayers(localMap);
+      let targetIndex = normLayers.findIndex(l => l.id === activeLayerId);
+      if (targetIndex === -1) targetIndex = editLayer === 'base' ? 0 : 1;
+      const isBasePick = targetIndex === 0;
 
       // A. Check existing MapObjectInstance at (tx, ty)
       // Sort candidate objects at (tx, ty) in FRONT-TO-BACK order (highest zIndex / topmost rendered object first!)
@@ -1933,20 +1937,15 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         return (b.zIndex || 0) - (a.zIndex || 0);
       });
 
-      // 1) Try matching current editLayer first
+      // 1) Match active layer scope first!
       let clickedObj = candidateObjectsAtPos.find(o => {
-        if (editLayer === "base") return o.layer === "base";
-        if (editLayer === "decor") return o.layer !== "base";
-        return true;
+        if (isBasePick) return o.layer === "base";
+        return o.layer !== "base";
       });
 
-      // 2) Fallback: Search ANY object at (tx, ty) regardless of editLayer!
-      if (!clickedObj && candidateObjectsAtPos.length > 0) {
+      // 2) Fallback: Search other objects at (tx, ty) ONLY if Ctrl is held
+      if (!clickedObj && candidateObjectsAtPos.length > 0 && isCtrlHeld) {
         clickedObj = candidateObjectsAtPos[0];
-        if (clickedObj) {
-          // Auto-switch editLayer to match the clicked object's layer!
-          setEditLayer(clickedObj.layer === "base" ? "base" : "decor");
-        }
       }
 
       if (isCtrlHeld) {
@@ -1977,23 +1976,14 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         return;
       }
 
-      // B. Check 1x1 tile at (tx, ty) on decorLayer or baseLayer matching editLayer!
-      const dTile = localMap.decorLayer[ty] ? localMap.decorLayer[ty][tx] : -1;
-      const bTile = localMap.baseLayer[ty] ? localMap.baseLayer[ty][tx] : -1;
+      // B. Check 1x1 tile at (tx, ty) ONLY on current active layer!
+      const activeLayerObj = normLayers[targetIndex];
+      const activeGrid = activeLayerObj ? activeLayerObj.grid : (isBasePick ? localMap.baseLayer : localMap.decorLayer);
       const defaultBase = localMap.tileset === "interior" ? 1199 : 2000;
+      const rawTile = activeGrid[ty] ? activeGrid[ty][tx] : -1;
+      const targetTile = (isBasePick && rawTile === defaultBase) ? -1 : rawTile;
 
-      let isBasePick = false;
-      let targetTile = -1;
-
-      if (editLayer === "base") {
-        isBasePick = true;
-        targetTile = (bTile !== -1 && bTile !== defaultBase) ? bTile : -1;
-      } else if (editLayer === "decor") {
-        isBasePick = false;
-        targetTile = dTile;
-      }
-
-      if (targetTile !== -1 && targetTile !== 1199 && targetTile !== 2000) {
+      if (targetTile !== -1 && targetTile !== undefined && targetTile !== 1199 && targetTile !== 2000) {
         setHistory(prev => [...prev, localMap]);
         setRedoHistory([]);
 
@@ -2018,32 +2008,27 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         };
 
         setLocalMap(prev => {
-          const newDecor = prev.decorLayer.map(r => [...r]);
-          const newBase = prev.baseLayer.map(r => [...r]);
-
-          if (isBasePick) {
-            if (newBase[ty] && newBase[ty][tx] !== undefined) {
-              newBase[ty][tx] = -1;
+          const updatedLayers = normLayers.map((l, lIdx) => {
+            if (lIdx === targetIndex) {
+              const gridCopy = l.grid.map(r => [...r]);
+              if (gridCopy[ty] && gridCopy[ty][tx] !== undefined) {
+                gridCopy[ty][tx] = -1;
+              }
+              return { ...l, grid: gridCopy };
             }
-          } else {
-            if (newDecor[ty] && newDecor[ty][tx] !== undefined) {
-              newDecor[ty][tx] = -1;
-            }
-          }
+            return l;
+          });
 
           return {
             ...prev,
-            baseLayer: newBase,
-            decorLayer: newDecor,
+            baseLayer: updatedLayers[0]?.grid || prev.baseLayer,
+            decorLayer: updatedLayers[1]?.grid || prev.decorLayer,
+            layers: updatedLayers,
             objects: [...(prev.objects || []), newObj]
           };
         });
 
-        if (isCtrlHeld) {
-          setSelectedObjectIds(prev => [...prev, newObj.id]);
-        } else {
-          setSelectedObjectIds([newObj.id]);
-        }
+        setSelectedObjectIds([newObj.id]);
         setIsDraggingObject(true);
         setObjectDragStart({ originX: e.clientX, originY: e.clientY, startTx: tx, startTy: ty });
         return;
