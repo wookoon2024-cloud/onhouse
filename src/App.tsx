@@ -3101,6 +3101,7 @@ export default function App() {
         <MapEditorView
           activeMaps={activeMaps}
           availableMapIds={availableMapIds}
+          initialMapId={localPlayer.mapId}
           onAddMap={handleAddMap}
           onDeleteMap={handleDeleteMap}
           onRenameMap={handleRenameMap}
@@ -3162,13 +3163,21 @@ export default function App() {
               }
             });
 
-            // Broadcast to all devices in real-time!
+            // Broadcast to all devices in real-time via active channel!
             try {
-              supabase.channel(`house:${houseCode}`).send({
-                type: 'broadcast',
-                event: 'map_update',
-                payload: { mapId, mapData: updatedMap }
-              });
+              if (channelRef.current) {
+                channelRef.current.send({
+                  type: 'broadcast',
+                  event: 'map_update',
+                  payload: { mapId, mapData: updatedMap }
+                });
+              } else {
+                supabase.channel(`house:${houseCode}`).send({
+                  type: 'broadcast',
+                  event: 'map_update',
+                  payload: { mapId, mapData: updatedMap }
+                });
+              }
             } catch (e) {}
 
             // Broadcast full map update to other local tabs!

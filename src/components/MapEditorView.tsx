@@ -35,6 +35,7 @@ const getCustomMapTilesets = (): TilesetOption[] => {
 interface MapEditorViewProps {
   activeMaps: Record<string, MapDefinition>;
   availableMapIds: string[];
+  initialMapId?: string;
   onSaveMap: (mapId: string, updatedMap: MapDefinition) => void;
   onAddMap: (presetId?: string, customName?: string) => string;
   onDeleteMap: (mapId: string) => void;
@@ -46,6 +47,7 @@ interface MapEditorViewProps {
 export const MapEditorView: React.FC<MapEditorViewProps> = ({
   activeMaps,
   availableMapIds,
+  initialMapId,
   onSaveMap,
   onAddMap,
   onDeleteMap,
@@ -99,7 +101,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     setDraggedTabId(null);
     setDragOverTabId(null);
   };
-  const [selectedMapId, setSelectedMapId] = useState<string>(availableMapIds[0] || 'room');
+  const [selectedMapId, setSelectedMapId] = useState<string>(initialMapId && activeMaps[initialMapId] ? initialMapId : (availableMapIds[0] || 'room'));
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [customNameInput, setCustomNameInput] = useState<string>('');
   const [editLayer, setEditLayer] = useState<'base' | 'decor' | 'collision'>('base');
