@@ -66,6 +66,8 @@ export const Messenger: React.FC<MessengerProps> = ({
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const isUserScrolledUpRef = useRef(false);
 
   // Custom position state for dragging
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
@@ -76,6 +78,15 @@ export const Messenger: React.FC<MessengerProps> = ({
     initX: 0,
     initY: 0
   });
+
+  // Track user scroll position
+  const handleScroll = () => {
+    if (!messagesContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    // If user is more than 50px away from bottom, user is reading past messages
+    isUserScrolledUpRef.current = distanceFromBottom > 50;
+  };
 
   // Calculate default initial position
   const initialStyle = useMemo(() => {
@@ -147,7 +158,14 @@ export const Messenger: React.FC<MessengerProps> = ({
           (dm.fromId === localPlayer.id && dm.toId === activeTarget.id) ||
           (dm.fromId === activeTarget.id && dm.toId === localPlayer.id)
       );
-      setMessages(chatDMs);
+
+      setMessages((prev) => {
+        // Prevent state re-render if message list hasn't changed
+        if (JSON.stringify(prev) === JSON.stringify(chatDMs)) {
+          return prev;
+        }
+        return chatDMs;
+      });
       
       // Mark as read
       markDMsAsRead(activeTarget.id, localPlayer.id);
@@ -158,6 +176,7 @@ export const Messenger: React.FC<MessengerProps> = ({
   };
 
   useEffect(() => {
+    isUserScrolledUpRef.current = false;
     loadHistory();
     // Poll history every 500ms to instantly catch updates from other tabs
     const interval = setInterval(loadHistory, 500);
@@ -171,9 +190,11 @@ export const Messenger: React.FC<MessengerProps> = ({
     return () => window.removeEventListener('on_house_dm_read', handleReadEvent);
   }, []);
 
-  // Scroll to bottom when messages change
+  // Scroll to bottom ONLY if user is not actively scrolling up to read history
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!isUserScrolledUpRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
   const handleSend = () => {
@@ -196,7 +217,13 @@ export const Messenger: React.FC<MessengerProps> = ({
     onSendDM(activeTarget.id, inputText.trim());
 
     setInputText('');
+    
+    // Reset scrolled up state and force scroll to bottom on sending message
+    isUserScrolledUpRef.current = false;
     loadHistory();
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 50);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -277,11 +304,15 @@ export const Messenger: React.FC<MessengerProps> = ({
       </div>
 
       {/* Messages List */}
-      <div style={{
-        flex: 1, padding: '16px', overflowY: 'auto',
-        display: 'flex', flexDirection: 'column', gap: '2px',
-        background: 'rgba(0, 0, 0, 0.15)'
-      }}>
+      <div
+        ref={messagesContainerRef}
+        onScroll={handleScroll}
+        style={{
+          flex: 1, padding: '16px', overflowY: 'auto',
+          display: 'flex', flexDirection: 'column', gap: '2px',
+          background: 'rgba(0, 0, 0, 0.15)'
+        }}
+      >
         {messages.length === 0 ? (
           <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center',
