@@ -2144,6 +2144,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
   const getPrefixedIndex = (localIdx: number, tilesetKey: string) => {
     if (localIdx === -1) return -1;
+    // If localIdx is ALREADY a prefixed global index (>= 1000), return it directly to prevent double-prefixing!
+    if (localIdx >= 1000) return localIdx;
     const custom = customMapTilesets.find(ct => ct.id === tilesetKey);
     if (custom && custom.prefix) {
       return custom.prefix + localIdx;
