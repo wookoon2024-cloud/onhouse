@@ -724,7 +724,11 @@ export default function App() {
           }
           return {
             ...prev,
-            [payload.id]: payload
+            [payload.id]: {
+              ...payload,
+              isOnline: true,
+              lastActive: Date.now()
+            }
           };
         });
       })
@@ -1085,10 +1089,36 @@ export default function App() {
       }
     };
 
+    // Periodic Heartbeat Broadcast (every 3.5s) so mobile/desktop standing players stay online
+    const heartbeatTimer = setInterval(() => {
+      if (localPlayerRef.current) {
+        sendPlayerSync(localPlayerRef.current);
+      }
+    }, 3500);
+
+    // Auto-prune ghost players who haven't sent a heartbeat for > 10 seconds (e.g. mobile swipe-closed app)
+    const pruneTimer = setInterval(() => {
+      const now = Date.now();
+      setOtherPlayers((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        Object.entries(next).forEach(([id, player]) => {
+          const lastActive = player.lastActive || 0;
+          if (lastActive > 0 && now - lastActive > 10000) {
+            delete next[id];
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
+    }, 4000);
+
     window.addEventListener('beforeunload', handleUnload);
     window.addEventListener('pagehide', handleUnload);
 
     return () => {
+      clearInterval(heartbeatTimer);
+      clearInterval(pruneTimer);
       handleUnload();
       window.removeEventListener('beforeunload', handleUnload);
       window.removeEventListener('pagehide', handleUnload);
@@ -1820,14 +1850,40 @@ export default function App() {
     } catch (e) {}
   };
 
-  // Handle click on another player (opens Player Interaction Modal)
+  // Handle click on another player (opens Player Interaction Modal with online/offline status check)
   const handlePlayerClick = (p: PlayerState) => {
     if (p.id === deviceId.current) {
       // Clicked self: open customizer
       setIsCustomizing(true);
     } else {
-      // Clicked another player: open interaction popup modal with 4 options!
-      setInteractionTargetPlayer(p);
+      const now = Date.now();
+      const lastActive = p.lastActive || 0;
+      const isOnline = (lastActive > 0 ? (now - lastActive <= 10000) : true) && p.isOnline !== false;
+
+      if (!isOnline && lastActive > 0 && now - lastActive > 10000) {
+        // Player has disconnected or closed mobile app! Remove ghost character from map
+        setOtherPlayers((prev) => {
+          const next = { ...prev };
+          delete next[p.id];
+          return next;
+        });
+        setOfflinePlayers((prev) => ({
+          ...prev,
+          [p.id]: {
+            ...p,
+            isOnline: false,
+            statusMessage: '오프라인',
+            lastActive: p.lastActive || Date.now()
+          }
+        }));
+        showToast(`💡 [${p.nickname}] 님은 현재 오프라인 상태입니다. (접속 종료됨)`);
+        return;
+      }
+
+      setInteractionTargetPlayer({
+        ...p,
+        isOnline: true
+      });
     }
   };
 

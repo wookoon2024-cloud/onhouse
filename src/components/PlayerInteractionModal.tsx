@@ -62,10 +62,22 @@ export const PlayerInteractionModal: React.FC<PlayerInteractionModalProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{
               width: '10px', height: '10px', borderRadius: '50%',
-              background: targetPlayer.isOnline ? '#a6e3a1' : '#6c7086'
+              background: '#a6e3a1',
+              boxShadow: '0 0 8px #a6e3a1'
             }} />
             <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#cdd6f4' }}>
               {targetPlayer.nickname}
+            </span>
+            <span style={{
+              fontSize: '10px',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              background: 'rgba(166, 227, 161, 0.15)',
+              color: '#a6e3a1',
+              border: '1px solid rgba(166, 227, 161, 0.3)',
+              fontWeight: 'bold'
+            }}>
+              🟢 온라인
             </span>
           </div>
           <button
