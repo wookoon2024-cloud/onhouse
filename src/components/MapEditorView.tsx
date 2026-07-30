@@ -1393,27 +1393,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                   // Remove any accidental object at this tile when painting ground floor tiles
                   nextObjects = nextObjects.filter(o => !(ptx >= o.x && ptx < o.x + o.width && pty >= o.y && pty < o.y + o.height));
                 } else if (editLayer === 'decor') {
-                  // 🎨 Paint 1x1 decor tiles as 1x1 MapObjectInstance so each 1x1 tile is selectable & moveable!
-                  const tsKey = drawInfo?.tilesetKey || activeTileset;
-                  const singleTsInfo = getTilesetInfoLocal(tsKey) || getTilesetInfo(tsKey);
-                  const startCol = drawInfo && singleTsInfo ? (drawInfo.localIdx % singleTsInfo.cols) : 0;
-                  const startRow = drawInfo && singleTsInfo ? Math.floor(drawInfo.localIdx / singleTsInfo.cols) : 0;
-
-                  const new1x1Obj: MapObjectInstance = {
-                    id: `obj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}_${pty}_${ptx}`,
-                    tilesetKey: tsKey,
-                    startCol,
-                    startRow,
-                    width: 1,
-                    height: 1,
-                    x: ptx,
-                    y: pty,
-                    layer: 'decor',
-                    zIndex: Date.now(),
-                    tiles: [[tileToPaint]]
-                  };
-                  nextObjects = nextObjects.filter(o => !(o.x === ptx && o.y === pty && o.width === 1 && o.height === 1));
-                  nextObjects.push(new1x1Obj);
+                  newDecor[pty][ptx] = tileToPaint;
                   if (autoCollision) {
                     newCollision[pty][ptx] = tileToPaint !== -1;
                   }
