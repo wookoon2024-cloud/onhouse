@@ -527,6 +527,63 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     setTimeout(() => setPickedToast(null), 1500);
   };
 
+  // 🧹 Auto-Repair corrupted map data (fills punched -1 holes inside buildings/roofs and cleans floating tile fragments)
+  const handleAutoRepairMap = () => {
+    setHistory(prev => [...prev, localMap]);
+    setRedoHistory([]);
+
+    setLocalMap(prev => {
+      const newDecor = prev.decorLayer.map(r => [...r]);
+      const newBase = prev.baseLayer.map(r => [...r]);
+      let repairedHoles = 0;
+      let cleanedFloating = 0;
+
+      // 1. Fill punched -1 holes in decorLayer by sampling surrounding non-empty decor tiles
+      for (let y = 0; y < prev.height; y++) {
+        for (let x = 0; x < prev.width; x++) {
+          if (newDecor[y][x] === -1) {
+            const neighbors: number[] = [];
+            if (y > 0 && newDecor[y - 1][x] !== -1) neighbors.push(newDecor[y - 1][x]);
+            if (y < prev.height - 1 && newDecor[y + 1][x] !== -1) neighbors.push(newDecor[y + 1][x]);
+            if (x > 0 && newDecor[y][x - 1] !== -1) neighbors.push(newDecor[y][x - 1]);
+            if (x < prev.width - 1 && newDecor[y][x + 1] !== -1) neighbors.push(newDecor[y][x + 1]);
+
+            if (neighbors.length >= 2) {
+              newDecor[y][x] = neighbors[0];
+              repairedHoles++;
+            }
+          }
+        }
+      }
+
+      // 2. Remove floating 1x1 objects in empty space outside map structures
+      const currentObjs = prev.objects || [];
+      const remainingObjs = currentObjs.filter(obj => {
+        if (obj.width === 1 && obj.height === 1) {
+          const tx = obj.x;
+          const ty = obj.y;
+          const isBaseEmpty = !newBase[ty] || newBase[ty][tx] === -1 || newBase[ty][tx] === 2000;
+          const isDecorEmpty = !newDecor[ty] || newDecor[ty][tx] === -1;
+          if (isBaseEmpty && isDecorEmpty && ty < 12) {
+            cleanedFloating++;
+            return false;
+          }
+        }
+        return true;
+      });
+
+      setPickedToast(`🧹 맵 자동 복구 완료: 구멍 ${repairedHoles}개 메움, 잔상 조각 ${cleanedFloating}개 정리!`);
+      setTimeout(() => setPickedToast(null), 3500);
+
+      return {
+        ...prev,
+        decorLayer: newDecor,
+        baseLayer: newBase,
+        objects: remainingObjs
+      };
+    });
+  };
+
   // Keyboard Shortcuts: Space (Pan map), Ctrl+Z (Undo), Ctrl+Y (Redo), Alt, B, F, E, X, V, Delete, Ctrl+C, Ctrl+V
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -3021,6 +3078,22 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               onClick={() => setZoom(prev => Math.min(4.0, parseFloat((prev + 0.25).toFixed(2))))}
               style={{ padding: '4px 8px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-glass)', color: '#fff', borderRadius: '4px', cursor: 'pointer' }}
             >+</button>
+
+            <div style={{ width: '1px', height: '14px', background: 'var(--border-glass)' }} />
+
+            <button
+              onClick={handleAutoRepairMap}
+              style={{
+                padding: '4px 12px', fontSize: '11px', borderRadius: '4px',
+                background: 'linear-gradient(135deg, rgba(245,194,231,0.25), rgba(203,166,247,0.25))',
+                color: '#f5c2e7', border: '1px solid #f5c2e7', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap',
+                fontWeight: 'normal', transition: 'all 0.15s ease'
+              }}
+              title="이전 버그로 인해 뚫린 지붕 구멍을 자동으로 메우고 상단 잔상 조각을 깨끗이 정리합니다."
+            >
+              🧹 맵 구멍/잔상 자동 복구
+            </button>
           </div>
 
           {/* Floating Object Smart Edit Action Bar (Fixed on bottom center) */}
