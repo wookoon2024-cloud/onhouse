@@ -97,11 +97,27 @@ export function saveDM(dm: DirectMessage) {
   localStorage.setItem(DM_HISTORY_KEY, JSON.stringify(dms));
 }
 
+// Mark incoming messages from fromId to toId as read
 export function markDMsAsRead(fromId: string, toId: string) {
   const dms = getDMs();
   let updated = false;
   dms.forEach(dm => {
     if (dm.fromId === fromId && dm.toId === toId && !dm.read) {
+      dm.read = true;
+      updated = true;
+    }
+  });
+  if (updated) {
+    localStorage.setItem(DM_HISTORY_KEY, JSON.stringify(dms));
+  }
+}
+
+// Mark outgoing messages sent by myId to partnerId as read (when partner reads them)
+export function markMySentDMsAsRead(myId: string, partnerId: string) {
+  const dms = getDMs();
+  let updated = false;
+  dms.forEach(dm => {
+    if (dm.fromId === myId && dm.toId === partnerId && !dm.read) {
       dm.read = true;
       updated = true;
     }

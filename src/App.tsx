@@ -10,6 +10,8 @@ import {
   removeOfflineUser,
   getDMs,
   saveDM,
+  markDMsAsRead,
+  markMySentDMsAsRead,
   type DirectMessage
 } from './game/syncManager';
 import { Customizer } from './components/Customizer';
@@ -1084,7 +1086,7 @@ export default function App() {
       })
       .on('broadcast', { event: 'dm_read' }, ({ payload }) => {
         if (!payload || payload.toId !== deviceId.current) return;
-        markDMsAsRead(payload.fromId, payload.toId);
+        markMySentDMsAsRead(payload.toId, payload.fromId);
         window.dispatchEvent(new Event('on_house_dm_read'));
       })
       .on('broadcast', { event: 'reaction_anim' }, ({ payload }) => {
@@ -1162,6 +1164,8 @@ export default function App() {
           timestamp: payload.timestamp || Date.now(),
           read: false
         });
+        markMySentDMsAsRead(deviceId.current, payload.fromId);
+        window.dispatchEvent(new Event('on_house_dm_read'));
         updateUnreadCount();
       })
       .on('broadcast', { event: 'ping_check' }, ({ payload }) => {
