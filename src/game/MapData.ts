@@ -400,16 +400,8 @@ const buildForest = (): MapDefinition => {
 export const createCustomMap = (id: string, name: string, tileset: string = 'outdoor'): MapDefinition => {
   const w = 40;
   const h = 30;
-  let baseTile = 2000;
-  if (tileset === 'interior') baseTile = 1000;
-  else if (tileset === 'village') baseTile = 3000;
-  else if (tileset === 'wall') baseTile = 4000;
-  else if (tileset === 'house') baseTile = 5000;
-  else if (tileset === 'nature') baseTile = 6000;
-  else if (tileset === 'water') baseTile = 7000;
-  else if (tileset === 'field') baseTile = 8000;
-
-  const base = createGrid(w, h, baseTile);
+  // Initialize with -1 for 100% clean, black canvas (no auto-prefilled grass/floor tiles!)
+  const base = createGrid(w, h, -1);
   const decor = createGrid(w, h, -1);
   const coll = createBoolGrid(w, h, false);
   for (let x = 0; x < w; x++) { coll[0][x] = true; coll[h - 1][x] = true; }
@@ -421,6 +413,10 @@ export const createCustomMap = (id: string, name: string, tileset: string = 'out
     width: w, height: h,
     tileset,
     baseLayer: base, decorLayer: decor, collision: coll,
+    layers: [
+      { id: 'layer_base', name: '1단계(배경)', visible: true, grid: base, type: 'base' },
+      { id: 'layer_decor', name: '2단계(오브젝트)', visible: true, grid: decor, type: 'decor' }
+    ],
     spawnPoints: [{ x: 20, y: 15 }]
   };
 };
