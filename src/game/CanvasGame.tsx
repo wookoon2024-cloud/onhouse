@@ -77,9 +77,20 @@ export const getTileDrawInfo = (idx: number, defaultTileset: string) => {
   let localIdx = idx;
 
   const sortedCustoms = getCustomTilesetsCached();
+
+  // 1. Exact range match for custom tileset (prevents overlapping prefix conflicts!)
   for (const ct of sortedCustoms) {
     const p = ct.prefix || 9000;
-    if (idx >= p) {
+    const totalTiles = (ct.cols || 16) * (ct.rows || 16);
+    if (idx >= p && idx < p + totalTiles) {
+      return { tilesetKey: ct.id, localIdx: idx - p };
+    }
+  }
+
+  // 2. Fallback prefix match for custom tilesets
+  for (const ct of sortedCustoms) {
+    const p = ct.prefix || 9000;
+    if (idx >= p && idx < p + 1000) {
       return { tilesetKey: ct.id, localIdx: idx - p };
     }
   }
