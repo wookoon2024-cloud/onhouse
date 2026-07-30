@@ -67,9 +67,10 @@ export const Messenger: React.FC<MessengerProps> = ({
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const modalRef = useRef<HTMLDivElement | null>(null);
   const isUserScrolledUpRef = useRef(false);
 
-  // Absolute pixel position state to prevent CSS transform resize glitches
+  // Absolute initial pixel position state
   const [pos, setPos] = useState<{ x: number; y: number }>(() => {
     if (isMobile) {
       return {
@@ -84,7 +85,6 @@ export const Messenger: React.FC<MessengerProps> = ({
   });
 
   const isDraggingRef = useRef(false);
-  const rafIdRef = useRef<number | null>(null);
   const dragStartRef = useRef<{ startX: number; startY: number; initX: number; initY: number }>({
     startX: 0,
     startY: 0,
@@ -97,30 +97,30 @@ export const Messenger: React.FC<MessengerProps> = ({
     if (!messagesContainerRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
     const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-    // If user is more than 50px away from bottom, user is reading past messages
     isUserScrolledUpRef.current = distanceFromBottom > 50;
   };
 
-  // Smooth Drag Handlers with RequestAnimationFrame (60fps)
+  // Direct Hardware-Accelerated DOM Drag Engine (0ms Latency, Zero React Re-render Lag)
   const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
     isDraggingRef.current = true;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
 
-    const modalEl = (e.currentTarget as HTMLElement).parentElement;
-    const rect = modalEl?.getBoundingClientRect();
-
-    dragStartRef.current = {
-      startX: clientX,
-      startY: clientY,
-      initX: rect ? rect.left : pos.x,
-      initY: rect ? rect.top : pos.y
-    };
+    if (modalRef.current) {
+      const rect = modalRef.current.getBoundingClientRect();
+      dragStartRef.current = {
+        startX: clientX,
+        startY: clientY,
+        initX: rect.left,
+        initY: rect.top
+      };
+      modalRef.current.style.willChange = 'left, top, width, height';
+    }
   };
 
   useEffect(() => {
     const handleMove = (e: MouseEvent | TouchEvent) => {
-      if (!isDraggingRef.current) return;
+      if (!isDraggingRef.current || !modalRef.current) return;
       const clientX = 'touches' in e ? (e as TouchEvent).touches[0].clientX : (e as MouseEvent).clientX;
       const clientY = 'touches' in e ? (e as TouchEvent).touches[0].clientY : (e as MouseEvent).clientY;
 
@@ -130,20 +130,23 @@ export const Messenger: React.FC<MessengerProps> = ({
       const nextX = Math.max(10, Math.min(window.innerWidth - 100, dragStartRef.current.initX + dx));
       const nextY = Math.max(10, Math.min(window.innerHeight - 100, dragStartRef.current.initY + dy));
 
-      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
-      rafIdRef.current = requestAnimationFrame(() => {
-        setPos({ x: nextX, y: nextY });
-      });
+      // Direct DOM update bypasses React state lag during mouse drag!
+      modalRef.current.style.left = `${nextX}px`;
+      modalRef.current.style.top = `${nextY}px`;
     };
 
     const handleEnd = () => {
-      isDraggingRef.current = false;
-      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+      if (isDraggingRef.current && modalRef.current) {
+        isDraggingRef.current = false;
+        modalRef.current.style.willChange = 'auto';
+        const rect = modalRef.current.getBoundingClientRect();
+        setPos({ x: rect.left, y: rect.top });
+      }
     };
 
-    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mousemove', handleMove, { passive: true });
     window.addEventListener('mouseup', handleEnd);
-    window.addEventListener('touchmove', handleMove);
+    window.addEventListener('touchmove', handleMove, { passive: true });
     window.addEventListener('touchend', handleEnd);
 
     return () => {
@@ -151,9 +154,8 @@ export const Messenger: React.FC<MessengerProps> = ({
       window.removeEventListener('mouseup', handleEnd);
       window.removeEventListener('touchmove', handleMove);
       window.removeEventListener('touchend', handleEnd);
-      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
     };
-  }, [pos]);
+  }, []);
 
   // Load message history from localStorage
   const loadHistory = () => {
@@ -167,7 +169,6 @@ export const Messenger: React.FC<MessengerProps> = ({
       );
 
       setMessages((prev) => {
-        // Prevent state re-render if message list hasn't changed
         if (JSON.stringify(prev) === JSON.stringify(chatDMs)) {
           return prev;
         }
@@ -185,7 +186,6 @@ export const Messenger: React.FC<MessengerProps> = ({
   useEffect(() => {
     isUserScrolledUpRef.current = false;
     loadHistory();
-    // Poll history every 500ms to instantly catch updates from other tabs
     const interval = setInterval(loadHistory, 500);
     return () => clearInterval(interval);
   }, [activeTarget, localPlayer.id]);
@@ -217,15 +217,10 @@ export const Messenger: React.FC<MessengerProps> = ({
       read: false
     };
 
-    // Save locally
     saveDM(newDM);
-    
-    // Broadcast via BroadcastChannel (implemented in App.tsx)
     onSendDM(activeTarget.id, inputText.trim());
-
     setInputText('');
     
-    // Reset scrolled up state and force scroll to bottom on sending message
     isUserScrolledUpRef.current = false;
     loadHistory();
     setTimeout(() => {
@@ -243,7 +238,7 @@ export const Messenger: React.FC<MessengerProps> = ({
 
   return (
     <div
-      className="glass-panel"
+      ref={modalRef}
       style={{
         position: 'fixed',
         left: `${pos.x}px`,
@@ -260,6 +255,7 @@ export const Messenger: React.FC<MessengerProps> = ({
         display: 'flex',
         flexDirection: 'column',
         zIndex: 110,
+        background: 'rgba(20, 20, 32, 0.96)',
         border: '1px solid rgba(255, 255, 255, 0.2)',
         borderRadius: '14px',
         boxShadow: '0 16px 48px rgba(0, 0, 0, 0.65)',
