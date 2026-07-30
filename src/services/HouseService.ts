@@ -365,15 +365,30 @@ export const deleteHouseMapFromDB = async (
 // Fetch custom assets (map tilesets, character sprites, image overrides & action rows) for house code
 export const fetchHouseAssets = async (houseCode: string) => {
   try {
-    const res = await withTimeout(
+    // 1. Fetch map_tileset specifically (targeted & fast, ~0.5s)
+    const mapTilesetsPromise = withTimeout(
       supabase
         .from('house_assets')
         .select('asset_type, asset_data')
         .eq('house_code', houseCode)
+        .eq('asset_type', 'map_tileset'),
+      8000
+    ).catch(() => ({ data: [] }));
+
+    // 2. Fetch char_sprites, overrides, actions, deletes in parallel
+    const otherAssetsPromise = withTimeout(
+      supabase
+        .from('house_assets')
+        .select('asset_type, asset_data')
+        .eq('house_code', houseCode)
+        .in('asset_type', ['char_sprite', 'char_image_override', 'char_row_actions', 'char_delete'])
         .order('id', { ascending: false })
-        .limit(200),
+        .limit(300),
       12000
-    );
+    ).catch(() => ({ data: [] }));
+
+    const [mapRes, otherRes] = await Promise.all([mapTilesetsPromise, otherAssetsPromise]);
+    const combinedData = [...(mapRes.data || []), ...(otherRes.data || [])];
 
     const mapTilesets: any[] = [];
     const charSprites: any[] = [];
@@ -383,16 +398,16 @@ export const fetchHouseAssets = async (houseCode: string) => {
     const seenCharSpriteIds = new Set<string>();
     const seenMapTilesetIds = new Set<string>();
 
-    if (res.data) {
+    if (combinedData.length > 0) {
       // Pass 1: Collect all delete records first
-      res.data.forEach((row: any) => {
+      combinedData.forEach((row: any) => {
         if (row.asset_data && row.asset_type === 'char_delete' && row.asset_data.id) {
           deletedAssetIds.add(row.asset_data.id);
         }
       });
 
       // Pass 2: Filter active assets
-      res.data.forEach((row: any) => {
+      combinedData.forEach((row: any) => {
         if (!row.asset_data || !row.asset_data.id) return;
         const id = row.asset_data.id;
         if (deletedAssetIds.has(id)) return;
