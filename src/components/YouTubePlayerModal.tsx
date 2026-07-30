@@ -13,6 +13,9 @@ export const YouTubePlayerModal: React.FC<YouTubePlayerModalProps> = ({
 }) => {
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
+  // Active experimental embedding method tab (1~5)
+  const [activeMethod, setActiveMethod] = useState<1 | 2 | 3 | 4 | 5>(1);
+
   // Custom position state for dragging
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const isDraggingRef = useRef(false);
@@ -22,19 +25,6 @@ export const YouTubePlayerModal: React.FC<YouTubePlayerModalProps> = ({
     initX: 0,
     initY: 0
   });
-
-  // Open standalone mini popup window (bypasses YouTube iframe embed restrictions 100%!)
-  const openMiniPopupWindow = () => {
-    const width = 720;
-    const height = 440;
-    const left = (window.screen.width - width) / 2;
-    const top = (window.screen.height - height) / 2;
-    window.open(
-      `https://www.youtube.com/watch?v=${videoId}`,
-      'OnHouseYTPlayer',
-      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=no,status=no`
-    );
-  };
 
   // Calculate default initial position
   const initialStyle = useMemo(() => {
@@ -100,15 +90,67 @@ export const YouTubePlayerModal: React.FC<YouTubePlayerModalProps> = ({
     };
   }, []);
 
+  // Get iframe properties per method
+  const methodProps = useMemo(() => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const href = typeof window !== 'undefined' ? window.location.href : '';
+
+    switch (activeMethod) {
+      case 1:
+        return {
+          src: `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`,
+          referrerPolicy: 'strict-origin-when-cross-origin' as const,
+          label: '방식 1: 표준 Embed + ReferrerPolicy'
+        };
+      case 2:
+        return {
+          src: `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0`,
+          referrerPolicy: 'strict-origin-when-cross-origin' as const,
+          label: '방식 2: No-Cookie Embed'
+        };
+      case 3:
+        return {
+          src: `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1&origin=${encodeURIComponent(origin)}`,
+          referrerPolicy: 'origin-when-cross-origin' as const,
+          label: '방식 3: JS API + Origin 전달'
+        };
+      case 4:
+        return {
+          src: `https://www.youtube.com/embed/${videoId}`,
+          referrerPolicy: undefined,
+          label: '방식 4: Plain Embed (자동재생 없음)'
+        };
+      case 5:
+        return {
+          src: `https://www.youtube.com/embed/${videoId}?autoplay=1&widget_referrer=${encodeURIComponent(href)}`,
+          referrerPolicy: 'no-referrer-when-downgrade' as const,
+          label: '방식 5: Widget Referrer'
+        };
+    }
+  }, [activeMethod, videoId]);
+
+  const tabStyle = (isActive: boolean): React.CSSProperties => ({
+    background: isActive ? '#ef4444' : 'rgba(255, 255, 255, 0.08)',
+    color: '#ffffff',
+    border: isActive ? '1px solid #fca5a5' : '1px solid rgba(255, 255, 255, 0.15)',
+    borderRadius: '4px',
+    padding: '3px 8px',
+    fontSize: '10px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    outline: 'none'
+  });
+
   return (
     <div
       style={{
         position: 'fixed',
         ...initialStyle,
-        width: isMobile ? 'calc(100vw - 20px)' : '490px',
-        height: isMobile ? '300px' : '330px',
-        minWidth: '320px',
-        minHeight: '230px',
+        width: isMobile ? 'calc(100vw - 20px)' : '520px',
+        height: isMobile ? '320px' : '360px',
+        minWidth: '340px',
+        minHeight: '250px',
         maxWidth: '90vw',
         maxHeight: '85vh',
         resize: isMobile ? 'none' : 'both',
@@ -144,7 +186,7 @@ export const YouTubePlayerModal: React.FC<YouTubePlayerModalProps> = ({
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span style={{ color: '#ef4444', fontSize: '14px' }}>🎥</span>
-          <span>유튜브 동영상</span>
+          <span>유튜브 실험 플레이어</span>
           <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.45)', marginLeft: '2px' }}>
             (드래그 이동 / 크기 조절)
           </span>
@@ -153,32 +195,13 @@ export const YouTubePlayerModal: React.FC<YouTubePlayerModalProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
           <button
             type="button"
-            onClick={openMiniPopupWindow}
-            style={{
-              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-              border: '1px solid rgba(255, 255, 255, 0.4)',
-              color: '#ffffff',
-              borderRadius: '4px',
-              padding: '2px 8px',
-              fontSize: '10px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              boxShadow: '0 2px 6px rgba(239, 68, 68, 0.5)'
-            }}
-            title="소유자 퍼가기 제한 영상 무제한 재생 팝업"
-          >
-            ⚡ 미니 팝업 재생
-          </button>
-          <button
-            type="button"
             onClick={() => window.open(`https://www.youtube.com/watch?v=${videoId}`, '_blank')}
             style={{
               background: 'rgba(255, 255, 255, 0.1)',
               border: '1px solid rgba(255, 255, 255, 0.2)',
               color: '#a6adc8',
               borderRadius: '4px',
-              padding: '2px 6px',
+              padding: '2px 8px',
               fontSize: '10px',
               fontWeight: 'bold',
               cursor: 'pointer',
@@ -186,7 +209,7 @@ export const YouTubePlayerModal: React.FC<YouTubePlayerModalProps> = ({
             }}
             title="유튜브 본사이트에서 보기"
           >
-            🔗 원본
+            🔗 원본 탭
           </button>
           <button
             type="button"
@@ -207,50 +230,58 @@ export const YouTubePlayerModal: React.FC<YouTubePlayerModalProps> = ({
         </div>
       </div>
 
+      {/* Experimental Embed Method Selector Tabs */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
+        padding: '5px 8px',
+        background: 'rgba(0, 0, 0, 0.5)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+        overflowX: 'auto',
+        fontFamily: 'var(--font-pixel)',
+        fontSize: '10px',
+        flexShrink: 0
+      }}>
+        <span style={{ color: '#a6adc8', flexShrink: 0, fontWeight: 'bold' }}>방식 선택:</span>
+        <button type="button" onClick={() => setActiveMethod(1)} style={tabStyle(activeMethod === 1)}>1: ReferrerPolicy</button>
+        <button type="button" onClick={() => setActiveMethod(2)} style={tabStyle(activeMethod === 2)}>2: No-Cookie</button>
+        <button type="button" onClick={() => setActiveMethod(3)} style={tabStyle(activeMethod === 3)}>3: Origin</button>
+        <button type="button" onClick={() => setActiveMethod(4)} style={tabStyle(activeMethod === 4)}>4: Plain</button>
+        <button type="button" onClick={() => setActiveMethod(5)} style={tabStyle(activeMethod === 5)}>5: Widget Referrer</button>
+      </div>
+
+      {/* Active Method Status Bar */}
+      <div style={{
+        padding: '3px 8px',
+        background: 'rgba(239, 68, 68, 0.15)',
+        borderBottom: '1px solid rgba(239, 68, 68, 0.3)',
+        fontSize: '10px',
+        color: '#fca5a5',
+        fontFamily: 'var(--font-pixel)',
+        fontWeight: 'bold',
+        display: 'flex',
+        alignItems: 'center',
+        justify: 'space-between',
+        flexShrink: 0
+      }}>
+        <span>현재 테스트 중: {methodProps.label}</span>
+      </div>
+
       {/* Video Frame Container */}
-      <div style={{ flex: 1, width: '100%', height: 'calc(100% - 60px)', background: '#000', position: 'relative' }}>
+      <div style={{ flex: 1, width: '100%', background: '#000', position: 'relative' }}>
         <iframe
+          key={`yt_frame_${activeMethod}_${videoId}`}
           width="100%"
           height="100%"
-          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`}
+          src={methodProps.src}
+          referrerPolicy={methodProps.referrerPolicy}
           title="YouTube Video Player"
           frameBorder="0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
           style={{ display: 'block', width: '100%', height: '100%', border: 'none' }}
         />
-      </div>
-
-      {/* Bottom Tip Bar for Restricted Videos (NewJeans MV, VEVO, etc.) */}
-      <div style={{
-        padding: '4px 8px',
-        background: 'rgba(10, 10, 18, 0.95)',
-        borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-        fontSize: '10px',
-        color: '#a6adc8',
-        display: 'flex',
-        alignItems: 'center',
-        justify: 'space-between',
-        fontFamily: 'var(--font-pixel)'
-      }}>
-        <span style={{ color: 'rgba(255,255,255,0.6)' }}>
-          💡 기획사(HYBE/소속사)의 퍼가기 제한 영상은 상단 <strong style={{ color: '#ef4444' }}>[⚡ 미니 팝업 재생]</strong> 클릭 시 즉시 재생됩니다.
-        </span>
-        <button
-          type="button"
-          onClick={openMiniPopupWindow}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: '#89b4fa',
-            textDecoration: 'underline',
-            cursor: 'pointer',
-            fontSize: '10px',
-            padding: 0
-          }}
-        >
-          팝업 열기 ▶
-        </button>
       </div>
     </div>
   );
