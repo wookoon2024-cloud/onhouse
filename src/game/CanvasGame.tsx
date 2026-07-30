@@ -1569,7 +1569,22 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
           });
         }
 
-        // B. Render Standalone Layer 2 Decor Tiles for current row ty (Painted brush tiles on top of objects!)
+        // B. Render all players whose feet Y falls within or before current row ty
+        const rowBottomY = (ty + 1) * 16;
+        while (renderPlayerIdx < renderList.length && renderList[renderPlayerIdx].y < rowBottomY) {
+          renderPlayer(renderList[renderPlayerIdx]);
+          renderPlayerIdx++;
+        }
+      }
+
+      // Render any remaining players beyond bottom map boundary
+      while (renderPlayerIdx < renderList.length) {
+        renderPlayer(renderList[renderPlayerIdx]);
+        renderPlayerIdx++;
+      }
+
+      // C. Render Standalone Layer 2 Decor Tiles (Painted brush tiles on top of objects!)
+      for (let ty = 0; ty < map.height; ty++) {
         for (let tx = 0; tx < map.width; tx++) {
           const tileIdx = map.decorLayer[ty][tx];
           const drawInfo = getTileDrawInfo(tileIdx, map.tileset);
@@ -1591,19 +1606,6 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
             }
           }
         }
-
-        // C. Render all players whose feet Y falls within or before current row ty
-        const rowBottomY = (ty + 1) * 16;
-        while (renderPlayerIdx < renderList.length && renderList[renderPlayerIdx].y < rowBottomY) {
-          renderPlayer(renderList[renderPlayerIdx]);
-          renderPlayerIdx++;
-        }
-      }
-
-      // Render any remaining players beyond bottom map boundary
-      while (renderPlayerIdx < renderList.length) {
-        renderPlayer(renderList[renderPlayerIdx]);
-        renderPlayerIdx++;
       }
 
       // 3.5. Render Memos on Map Canvas
