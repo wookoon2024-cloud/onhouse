@@ -51,24 +51,26 @@ interface CanvasGameProps {
 }
 
 let cachedCustoms: any[] | null = null;
-let lastCustomsRaw: string | null = null;
 
-const getCustomTilesetsCached = () => {
+export const refreshCustomTilesetsCache = () => {
   try {
     const savedCustoms = localStorage.getItem('on_house_custom_map_tilesets');
-    if (savedCustoms !== lastCustomsRaw) {
-      lastCustomsRaw = savedCustoms;
-      if (savedCustoms) {
-        const customs: any[] = JSON.parse(savedCustoms);
-        cachedCustoms = [...customs].sort((a, b) => (b.prefix || 9000) - (a.prefix || 9000));
-      } else {
-        cachedCustoms = [];
-      }
+    if (savedCustoms) {
+      const customs: any[] = JSON.parse(savedCustoms);
+      cachedCustoms = [...customs].sort((a, b) => (b.prefix || 9000) - (a.prefix || 9000));
+    } else {
+      cachedCustoms = [];
     }
-    return cachedCustoms || [];
   } catch (e) {
-    return [];
+    cachedCustoms = [];
   }
+};
+
+const getCustomTilesetsCached = () => {
+  if (!cachedCustoms) {
+    refreshCustomTilesetsCache();
+  }
+  return cachedCustoms || [];
 };
 
 export const getTileDrawInfo = (idx: number, defaultTileset: string) => {
@@ -76,10 +78,20 @@ export const getTileDrawInfo = (idx: number, defaultTileset: string) => {
   let tilesetKey = defaultTileset;
   let localIdx = idx;
 
-  const sortedCustoms = getCustomTilesetsCached();
+  const customs = getCustomTilesetsCached();
 
-  // 1. Exact range match for custom tileset (prevents overlapping prefix conflicts!)
-  for (const ct of sortedCustoms) {
+  // 1. Direct custom tileset ID match (if defaultTileset is explicitly custom_map_...)
+  if (defaultTileset && defaultTileset.startsWith('custom_map_')) {
+    const found = customs.find(c => c.id === defaultTileset);
+    if (found) {
+      const p = found.prefix || 9000;
+      const calcIdx = idx >= p ? idx - p : idx;
+      return { tilesetKey: found.id, localIdx: calcIdx };
+    }
+  }
+
+  // 2. Exact range match for custom tilesets by index range (prevents overlapping prefix conflicts!)
+  for (const ct of customs) {
     const p = ct.prefix || 9000;
     const totalTiles = (ct.cols || 16) * (ct.rows || 16);
     if (idx >= p && idx < p + totalTiles) {
@@ -87,8 +99,8 @@ export const getTileDrawInfo = (idx: number, defaultTileset: string) => {
     }
   }
 
-  // 2. Fallback prefix match for custom tilesets
-  for (const ct of sortedCustoms) {
+  // 3. Fallback prefix match for custom tilesets
+  for (const ct of customs) {
     const p = ct.prefix || 9000;
     if (idx >= p && idx < p + 1000) {
       return { tilesetKey: ct.id, localIdx: idx - p };
@@ -354,6 +366,10 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
   // Active RPG movement click target markers
   const clickMarkersRef = useRef<Array<{ x: number; y: number; startTime: number; duration: number }>>([]);
 
+  // Offscreen canvas pre-rendering refs for 60 FPS buttery smooth background baking!
+  const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const offscreenKeyRef = useRef<string>('');
+
   useEffect(() => {
     const handleSpawnParticle = (e: Event) => {
       const detail = (e as CustomEvent).detail;
@@ -561,6 +577,7 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
   // Load assets once on mount & reload when sprite overrides change
   useEffect(() => {
     const loadAllAssets = () => {
+      refreshCustomTilesetsCache();
       let overrides: Record<string, { url: string }> = {};
       try {
         const saved = localStorage.getItem('on_house_char_image_overrides');
@@ -1056,52 +1073,79 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
       // Disable image smoothing for crisp pixel rendering (cross-browser)
       ctx.imageSmoothingEnabled = false;
 
-      // 1. Draw Base Floor Layer (with robust fallback for mobile & slow asset loading)
-      for (let ty = 0; ty < map.height; ty++) {
-        for (let tx = 0; tx < map.width; tx++) {
-          const tileIdx = map.baseLayer[ty][tx];
-          let drawn = false;
-          const drawInfo = getTileDrawInfo(tileIdx, map.tileset);
+      // 1. Draw Base Floor Layer (using Offscreen Baked Canvas Cache for 60 FPS smooth rendering!)
+      const offscreenKey = `${map.id}_${map.width}_${map.height}_${assetVersion}_${Object.keys(images).length}`;
+      if (!offscreenCanvasRef.current) {
+        offscreenCanvasRef.current = document.createElement('canvas');
+      }
 
-          if (drawInfo) {
-            const img = images[drawInfo.tilesetKey];
-            if (img && img.complete && img.naturalWidth > 0) {
-              const tsInfo = getTilesetInfo(drawInfo.tilesetKey);
-              const tileW = Math.max(1, Math.floor(img.width / tsInfo.cols));
-              const tileH = Math.max(1, Math.floor(img.height / tsInfo.rows));
-              const srcX = (drawInfo.localIdx % tsInfo.cols) * tileW;
-              const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * tileH;
+      const offCanvas = offscreenCanvasRef.current;
+      const targetW = map.width * 16;
+      const targetH = map.height * 16;
 
-              if (srcX >= 0 && srcX < img.width && srcY >= 0 && srcY < img.height) {
-                ctx.drawImage(
-                  img,
-                  srcX, srcY, tileW, tileH,
-                  tx * vSize, ty * vSize, vSize, vSize
-                );
-                drawn = true;
+      if (offCanvas.width !== targetW || offCanvas.height !== targetH || offscreenKeyRef.current !== offscreenKey) {
+        offCanvas.width = targetW;
+        offCanvas.height = targetH;
+        offscreenKeyRef.current = offscreenKey;
+        const offCtx = offCanvas.getContext('2d');
+        if (offCtx) {
+          offCtx.imageSmoothingEnabled = false;
+          offCtx.fillStyle = '#0f0f15';
+          offCtx.fillRect(0, 0, targetW, targetH);
+
+          for (let ty = 0; ty < map.height; ty++) {
+            for (let tx = 0; tx < map.width; tx++) {
+              const tileIdx = map.baseLayer[ty][tx];
+              let drawn = false;
+              const drawInfo = getTileDrawInfo(tileIdx, map.tileset);
+
+              if (drawInfo) {
+                const img = images[drawInfo.tilesetKey];
+                if (img && img.complete && img.naturalWidth > 0) {
+                  const tsInfo = getTilesetInfo(drawInfo.tilesetKey);
+                  const tileW = Math.max(1, Math.floor(img.width / tsInfo.cols));
+                  const tileH = Math.max(1, Math.floor(img.height / tsInfo.rows));
+                  const srcX = (drawInfo.localIdx % tsInfo.cols) * tileW;
+                  const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * tileH;
+
+                  if (srcX >= 0 && srcX < img.width && srcY >= 0 && srcY < img.height) {
+                    offCtx.drawImage(
+                      img,
+                      srcX, srcY, tileW, tileH,
+                      tx * 16, ty * 16, 16, 16
+                    );
+                    drawn = true;
+                  }
+                }
               }
-            }
-          }
 
-          // Fallback if custom tileset image is loading / missing or out-of-bounds
-          if (!drawn) {
-            const defaultImg = images['interior'] || images['outdoor'];
-            if (defaultImg && defaultImg.complete && defaultImg.naturalWidth > 0) {
-              const defTsInfo = getTilesetInfo('interior');
-              const defW = Math.max(1, Math.floor(defaultImg.width / defTsInfo.cols));
-              const defH = Math.max(1, Math.floor(defaultImg.height / defTsInfo.rows));
-              ctx.drawImage(
-                defaultImg,
-                0, 0, defW, defH,
-                tx * vSize, ty * vSize, vSize, vSize
-              );
-            } else {
-              ctx.fillStyle = '#1e1e2e';
-              ctx.fillRect(tx * vSize, ty * vSize, vSize, vSize);
+              if (!drawn) {
+                const defaultImg = images['interior'] || images['outdoor'];
+                if (defaultImg && defaultImg.complete && defaultImg.naturalWidth > 0) {
+                  const defTsInfo = getTilesetInfo('interior');
+                  const defW = Math.max(1, Math.floor(defaultImg.width / defTsInfo.cols));
+                  const defH = Math.max(1, Math.floor(defaultImg.height / defTsInfo.rows));
+                  offCtx.drawImage(
+                    defaultImg,
+                    0, 0, defW, defH,
+                    tx * 16, ty * 16, 16, 16
+                  );
+                } else {
+                  offCtx.fillStyle = '#1e1e2e';
+                  offCtx.fillRect(tx * 16, ty * 16, 16, 16);
+                }
+              }
             }
           }
         }
       }
+
+      // Draw pre-rendered baked background canvas in 1 single GPU draw call!
+      ctx.drawImage(
+        offCanvas,
+        0, 0, targetW, targetH,
+        0, 0, map.width * vSize, map.height * vSize
+      );
 
       // 2. Prepare Y-Sorted Characters List
       const renderList: PlayerState[] = [p];
