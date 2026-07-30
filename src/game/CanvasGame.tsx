@@ -1117,7 +1117,7 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
 
           for (let ty = 0; ty < map.height; ty++) {
             for (let tx = 0; tx < map.width; tx++) {
-              const tileIdx = baseGrid[ty] ? baseGrid[ty][tx] : 0;
+              const tileIdx = baseGrid[ty] && baseGrid[ty][tx] !== undefined ? baseGrid[ty][tx] : -1;
               let drawn = false;
               const drawInfo = getTileDrawInfo(tileIdx, map.tileset);
 

@@ -162,10 +162,33 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   const [widthInput, setWidthInput] = useState<string>('40');
   const [heightInput, setHeightInput] = useState<string>('30');
 
-  // Transactional Map States
+  const sanitizeMapIfEmptyCustom = (map: MapDefinition, mId: string): MapDefinition => {
+    if (!map) return map;
+    const isCustomMapId = mId.startsWith('custom_') || !['room','subway','park','apt','village','water','forest'].includes(mId);
+    const norm = getNormalizedLayers(map);
+    const baseGrid = norm[0]?.grid || map.baseLayer;
+    const isAllDefaultBase = baseGrid && baseGrid.every(row => row.every(tile => tile === 0 || tile === 2000 || tile === 1000 || tile === -1));
+    const hasNoDecorOrObjects = (!map.objects || map.objects.length === 0) && (!map.decorLayer || map.decorLayer.every(r => r.every(t => t === -1)));
+
+    if (isCustomMapId && isAllDefaultBase && hasNoDecorOrObjects) {
+      const cleanGrid = Array.from({ length: map.height }, () => Array(map.width).fill(-1));
+      return {
+        ...map,
+        baseLayer: cleanGrid,
+        decorLayer: cleanGrid,
+        layers: [
+          { id: 'layer_base', name: '1단계(배경)', visible: true, grid: cleanGrid, type: 'base' },
+          { id: 'layer_decor', name: '2단계(오브젝트)', visible: true, grid: cleanGrid, type: 'decor' }
+        ]
+      };
+    }
+    return map;
+  };
+
   const getInitialMap = (): MapDefinition => {
     const targetId = availableMapIds[0] || 'room';
-    return activeMaps[targetId] || activeMaps.room || Object.values(activeMaps)[0] || maps.room;
+    const rawMap = activeMaps[targetId] || activeMaps.room || Object.values(activeMaps)[0] || maps.room;
+    return sanitizeMapIfEmptyCustom(rawMap, targetId);
   };
 
   const [localMap, setLocalMap] = useState<MapDefinition>(getInitialMap);
@@ -844,8 +867,28 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   useEffect(() => {
     if (prevMapIdRef.current !== selectedMapId) {
       prevMapIdRef.current = selectedMapId;
-      const map = activeMaps[selectedMapId] || maps[selectedMapId];
+      let map = activeMaps[selectedMapId] || maps[selectedMapId];
       if (map) {
+        // Sanitize: If this is a custom map where baseLayer is filled with default 2000/0 tiles and decor/objects are empty, sanitize to -1 (black canvas)!
+        const isCustomMapId = selectedMapId.startsWith('custom_') || !['room','subway','park','apt','village','water','forest'].includes(selectedMapId);
+        const norm = getNormalizedLayers(map);
+        const baseGrid = norm[0]?.grid || map.baseLayer;
+        const isAllDefaultBase = baseGrid && baseGrid.every(row => row.every(tile => tile === 0 || tile === 2000 || tile === 1000 || tile === -1));
+        const hasNoDecorOrObjects = (!map.objects || map.objects.length === 0) && (!map.decorLayer || map.decorLayer.every(r => r.every(t => t === -1)));
+
+        if (isCustomMapId && isAllDefaultBase && hasNoDecorOrObjects) {
+          const cleanGrid = Array.from({ length: map.height }, () => Array(map.width).fill(-1));
+          map = {
+            ...map,
+            baseLayer: cleanGrid,
+            decorLayer: cleanGrid,
+            layers: [
+              { id: 'layer_base', name: '1단계(배경)', visible: true, grid: cleanGrid, type: 'base' },
+              { id: 'layer_decor', name: '2단계(오브젝트)', visible: true, grid: cleanGrid, type: 'decor' }
+            ]
+          };
+        }
+
         setLocalMap(map);
         setOriginalMap(map);
         setWidthInput(map.width.toString());
@@ -927,7 +970,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       const baseGrid = baseLayerObj.grid || localMap.baseLayer;
       for (let y = 0; y < localMap.height; y++) {
         for (let x = 0; x < localMap.width; x++) {
-          const idx = baseGrid[y] ? baseGrid[y][x] : 0;
+          const idx = baseGrid[y] && baseGrid[y][x] !== undefined ? baseGrid[y][x] : -1;
           const drawInfo = getTileDrawInfo(idx, localMap.tileset);
           if (drawInfo) {
             const img = images[drawInfo.tilesetKey];
