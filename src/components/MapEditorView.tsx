@@ -1038,7 +1038,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       if (!localMap.objects || localMap.objects.length === 0) return;
       const layerObjs = localMap.objects.filter(o => {
         if (o.layerId) return o.layerId === layerObj.id;
-        return isBase ? o.layer === 'base' : o.layer !== 'base';
+        return isBase ? o.layer === 'base' : (layerObj.id === normLayers[1]?.id || layerObj.id === 'layer_decor');
       });
       drawObjectList(layerObjs);
     };
@@ -1654,6 +1654,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           x: tx,
           y: ty,
           layer: targetIndex === 0 ? 'base' : 'decor',
+          layerId: activeLayerId,
           zIndex: Date.now()
         };
 
@@ -1813,6 +1814,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         x: startCol,
         y: startRow,
         layer: targetIndex === 0 ? 'base' : 'decor',
+        layerId: activeLayerId,
         zIndex: Date.now(),
         tiles: tilesGrid
       };
@@ -2043,6 +2045,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           x: tx,
           y: ty,
           layer: isBasePick ? 'base' : 'decor',
+          layerId: activeLayerId,
           zIndex: Date.now(),
           tiles: [[targetTile]]
         };
