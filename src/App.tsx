@@ -611,8 +611,14 @@ export default function App() {
       setIsHouseLoaded(true);
     });
 
-    // 3. Connect Supabase Realtime channel for multi-device cross-pc sync
-    const channel = supabase.channel(`house:${houseCode}`);
+    // 3. Connect Supabase Realtime channel with presence tracking
+    const channel = supabase.channel(`house:${houseCode}`, {
+      config: {
+        presence: {
+          key: deviceId.current
+        }
+      }
+    });
 
     channel
       .on('broadcast', { event: 'map_order_update' }, ({ payload }) => {
@@ -1066,6 +1072,13 @@ export default function App() {
           ]);
 
           channelRef.current = channel;
+          try {
+            channel.track({
+              id: deviceId.current,
+              nickname: localPlayerRef.current.nickname,
+              online_at: new Date().toISOString()
+            });
+          } catch (e) {}
 
           // Broadcast player_join to all clients
           channel.send({
@@ -1844,24 +1857,42 @@ export default function App() {
     } catch (e) {}
   };
 
-  // Fast On-Demand Online Verification (Pings target player only when clicked - ZERO background overhead!)
+  // 3-Tier AFK/Tab-Safe Online Verification (Instant 0ms for active/presence, 2.5s fallback ping)
   const checkPlayerOnline = (targetPlayer: PlayerState): Promise<boolean> => {
     return new Promise((resolve) => {
       const now = Date.now();
-      // If target player moved or sent packet within last 3 seconds, they are definitely online!
-      if (targetPlayer.lastActive && now - targetPlayer.lastActive < 3000) {
+
+      // Tier 1: Activity window (60 seconds) - if target was active within 60s, they are online!
+      if (targetPlayer.lastActive && (now - targetPlayer.lastActive < 60000)) {
         resolve(true);
         return;
       }
 
+      // Tier 2: Supabase Native Realtime Presence State (Server-maintained connection list)
+      if (channelRef.current) {
+        try {
+          const presenceState = channelRef.current.presenceState();
+          const isPresent = Object.values(presenceState).some((presences: any) => {
+            return Array.isArray(presences) && presences.some((p: any) =>
+              p.id === targetPlayer.id || p.nickname === targetPlayer.nickname || p.key === targetPlayer.id
+            );
+          });
+          if (isPresent) {
+            resolve(true);
+            return;
+          }
+        } catch (e) {}
+      }
+
+      // Tier 3: Ping-Pong Verification with 2.5s Timeout (accommodates background tab throttling & mobile latency)
       let resolved = false;
       const timer = setTimeout(() => {
         if (!resolved) {
           resolved = true;
           delete pendingPingCallbacksRef.current[targetPlayer.id];
-          resolve(false); // Timed out (500ms) - player is offline!
+          resolve(false); // Timed out (2.5s) - player has truly closed app/tab!
         }
-      }, 500);
+      }, 2500);
 
       pendingPingCallbacksRef.current[targetPlayer.id] = (online: boolean) => {
         if (!resolved) {
