@@ -2663,11 +2663,217 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           {/* Tab Body Scrollable Container */}
           <div style={{ flex: 1, padding: '14px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px' }}>
             
-            {/* Tab 1: ⚙️ 기본 (레이어, 도구, 브러시 크기 설정) */}
+            {/* Tab 1: ⚙️ 기본 (도구, 레이어, 브러시 크기 설정) */}
             {leftSidebarTab === 'basic' && (
               <>
-                {/* Section 1: 레이어들 (Photoshop-style Layers Panel) */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {/* Section 1: 그리기 도구 설정 (Top Position & 2-Column Photoshop Compact Style) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <h4 style={{ fontSize: '13px', color: 'var(--accent)', margin: '0 0 2px 0', borderBottom: '1px solid var(--border-glass)', paddingBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'normal' }}>
+                    <span style={{ fontSize: '10px', opacity: 0.7 }}>▪</span> 그리기 도구 설정
+                  </h4>
+                  
+                  {/* 2-Column Icon-Only Grid Layout (Photoshop Style - 2 per row) */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px' }}>
+                    {/* 1. 선택(V) */}
+                    <button
+                      type="button"
+                      onClick={() => setTool('select')}
+                      disabled={editLayer === 'collision'}
+                      style={{
+                        padding: '8px 4px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: tool === 'select' && editLayer !== 'collision' ? 'rgba(245, 194, 231, 0.3)' : 'rgba(255,255,255,0.04)',
+                        color: tool === 'select' && editLayer !== 'collision' ? '#f5c2e7' : '#fff',
+                        border: tool === 'select' && editLayer !== 'collision' ? '1px solid #f5c2e7' : '1px solid var(--border-glass)',
+                        cursor: editLayer === 'collision' ? 'not-allowed' : 'pointer',
+                        opacity: editLayer === 'collision' ? 0.4 : 1
+                      }}
+                      title="선택(V) - 오브젝트 스마트 선택 및 이동/그룹화"
+                    >
+                      <MousePointer size={18} />
+                    </button>
+
+                    {/* 2. 스포이드(E) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTool('eyedropper');
+                        if (selectedTile === -1) setSelectedTile(getPrefixedIndex(0, activeTileset));
+                      }}
+                      disabled={editLayer === 'collision'}
+                      style={{
+                        padding: '8px 4px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: (tool === 'eyedropper' || isAltPressed) && editLayer !== 'collision' ? 'rgba(137, 220, 235, 0.3)' : 'rgba(255,255,255,0.04)',
+                        color: (tool === 'eyedropper' || isAltPressed) && editLayer !== 'collision' ? '#89dceb' : '#fff',
+                        border: (tool === 'eyedropper' || isAltPressed) && editLayer !== 'collision' ? '1px solid #89dceb' : '1px solid var(--border-glass)',
+                        cursor: editLayer === 'collision' ? 'not-allowed' : 'pointer',
+                        opacity: editLayer === 'collision' ? 0.4 : 1
+                      }}
+                      title="스포이드(E) - 맵 타일 픽 (Alt + 클릭)"
+                    >
+                      <Pipette size={18} />
+                    </button>
+
+                    {/* 3. 브러시(B) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTool('brush');
+                        if (selectedTile === -1) setSelectedTile(getPrefixedIndex(0, activeTileset));
+                      }}
+                      disabled={editLayer === 'collision'}
+                      style={{
+                        padding: '8px 4px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: tool === 'brush' && selectedTile !== -1 && editLayer !== 'collision' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(255,255,255,0.04)',
+                        color: tool === 'brush' && selectedTile !== -1 && editLayer !== 'collision' ? 'var(--accent)' : '#fff',
+                        border: tool === 'brush' && selectedTile !== -1 && editLayer !== 'collision' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
+                        cursor: editLayer === 'collision' ? 'not-allowed' : 'pointer',
+                        opacity: editLayer === 'collision' ? 0.4 : 1
+                      }}
+                      title="브러시(B) - 타일 그리기"
+                    >
+                      <Paintbrush size={18} />
+                    </button>
+
+                    {/* 4. 채우기(F) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTool('bucket');
+                        if (selectedTile === -1) setSelectedTile(getPrefixedIndex(0, activeTileset));
+                      }}
+                      disabled={editLayer === 'collision'}
+                      style={{
+                        padding: '8px 4px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: tool === 'bucket' && selectedTile !== -1 && editLayer !== 'collision' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(255,255,255,0.04)',
+                        color: tool === 'bucket' && selectedTile !== -1 && editLayer !== 'collision' ? 'var(--accent)' : '#fff',
+                        border: tool === 'bucket' && selectedTile !== -1 && editLayer !== 'collision' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
+                        cursor: editLayer === 'collision' ? 'not-allowed' : 'pointer',
+                        opacity: editLayer === 'collision' ? 0.4 : 1
+                      }}
+                      title="채우기(F) - 영역 채우기"
+                    >
+                      <PaintBucket size={18} />
+                    </button>
+
+                    {/* 5. 오브젝트(O) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTool('object');
+                        if (selectedTile === -1) setSelectedTile(getPrefixedIndex(0, activeTileset));
+                      }}
+                      disabled={editLayer === 'collision'}
+                      style={{
+                        padding: '8px 4px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: tool === 'object' && editLayer !== 'collision' ? 'rgba(250, 179, 135, 0.3)' : 'rgba(255,255,255,0.04)',
+                        color: tool === 'object' && editLayer !== 'collision' ? '#fab387' : '#fff',
+                        border: tool === 'object' && editLayer !== 'collision' ? '1px solid #fab387' : '1px solid var(--border-glass)',
+                        cursor: editLayer === 'collision' ? 'not-allowed' : 'pointer',
+                        opacity: editLayer === 'collision' ? 0.4 : 1
+                      }}
+                      title="오브젝트(O) - 독립 오브젝트 스탬프 배치"
+                    >
+                      <Layers size={18} />
+                    </button>
+
+                    {/* 6. 지우개 모드(X) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedTile(-1);
+                        setTool('brush');
+                      }}
+                      disabled={editLayer === 'collision'}
+                      style={{
+                        padding: '8px 4px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: selectedTile === -1 && editLayer !== 'collision' ? 'var(--danger)' : 'rgba(255,255,255,0.04)',
+                        color: '#fff',
+                        border: selectedTile === -1 && editLayer !== 'collision' ? '1px solid var(--danger)' : '1px solid var(--border-glass)',
+                        cursor: editLayer === 'collision' ? 'not-allowed' : 'pointer',
+                        opacity: editLayer === 'collision' ? 0.4 : 1
+                      }}
+                      title="지우개(X) - 타일 및 오브젝트 지우기"
+                    >
+                      <Eraser size={18} />
+                    </button>
+                  </div>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#ccc', cursor: 'pointer', marginTop: '4px', fontWeight: 'normal' }}>
+                    <input
+                      type="checkbox"
+                      checked={autoCollision}
+                      onChange={(e) => setAutoCollision(e.target.checked)}
+                    />
+                    오브젝트 배치 시 이동 불가 설정
+                  </label>
+
+                  {/* Dedicated Collision Walls (이동 불가지역) Control Box */}
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                    marginTop: '2px',
+                    padding: '8px',
+                    background: editLayer === 'collision' ? 'rgba(243, 139, 168, 0.15)' : 'rgba(243, 139, 168, 0.06)',
+                    border: editLayer === 'collision' ? '1px solid #f38ba8' : '1px solid rgba(243, 139, 168, 0.2)',
+                    borderRadius: '6px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ fontSize: '11px', color: '#f38ba8', fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span>🛑</span> 이동 불가지역 (충돌 벽)
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowCollision(!showCollision)}
+                        style={{
+                          background: 'none', border: 'none', color: showCollision ? '#f38ba8' : '#777',
+                          cursor: 'pointer', fontSize: '11px', padding: '0 2px'
+                        }}
+                        title={showCollision ? "충돌 경계선 숨기기" : "충돌 경계선 보이기"}
+                      >
+                        {showCollision ? '👁️' : '🙈'}
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditLayer('collision');
+                          setSelectedTile(1);
+                        }}
+                        style={{
+                          padding: '5px 4px', fontSize: '11px', borderRadius: '4px',
+                          background: editLayer === 'collision' && selectedTile === 1 ? '#f38ba8' : 'rgba(255,255,255,0.04)',
+                          color: editLayer === 'collision' && selectedTile === 1 ? '#111' : '#f38ba8',
+                          border: '1px solid #f38ba8', cursor: 'pointer', fontWeight: editLayer === 'collision' && selectedTile === 1 ? 'bold' : 'normal'
+                        }}
+                        title="이동 불가지역 추가 (마우스 드래그 채우기 가능)"
+                      >
+                        🛑 벽 추가
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditLayer('collision');
+                          setSelectedTile(-1);
+                        }}
+                        style={{
+                          padding: '5px 4px', fontSize: '11px', borderRadius: '4px',
+                          background: editLayer === 'collision' && selectedTile === -1 ? '#f38ba8' : 'rgba(255,255,255,0.04)',
+                          color: editLayer === 'collision' && selectedTile === -1 ? '#111' : '#f38ba8',
+                          border: '1px solid #f38ba8', cursor: 'pointer', fontWeight: editLayer === 'collision' && selectedTile === -1 ? 'bold' : 'normal'
+                        }}
+                        title="이동 불가지역 지우기 (마우스 연속 지우개 지우기 가능)"
+                      >
+                        🧽 벽 삭제
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 2: 레이어들 (Photoshop-style Layers Panel - Bottom Position) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
                   <h4 style={{ fontSize: '13px', color: 'var(--accent)', margin: '0 0 4px 0', borderBottom: '1px solid var(--border-glass)', paddingBottom: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 'normal' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span style={{ fontSize: '10px', opacity: 0.7 }}>▪</span> 레이어들
@@ -2793,219 +2999,6 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                           borderRadius: '4px', color: '#f38ba8', cursor: 'pointer', padding: '3px 7px', fontSize: '11px'
                         }}
                       >🗑️</button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Section 2: 그리기 도구 설정 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
-                  <h4 style={{ fontSize: '13px', color: 'var(--accent)', margin: '0 0 2px 0', borderBottom: '1px solid var(--border-glass)', paddingBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'normal' }}>
-                    <span style={{ fontSize: '10px', opacity: 0.7 }}>▪</span> 그리기 도구 설정
-                  </h4>
-                  
-                  {/* Vertical Tool Switcher Column */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    {/* 1. 선택(V) */}
-                    <button
-                      onClick={() => setTool('select')}
-                      disabled={editLayer === 'collision'}
-                      style={{
-                        width: '100%', padding: '6px 10px', fontSize: '12px', borderRadius: '4px',
-                        background: tool === 'select' && editLayer !== 'collision' ? 'rgba(245, 194, 231, 0.3)' : 'rgba(255,255,255,0.03)',
-                        color: tool === 'select' && editLayer !== 'collision' ? '#f5c2e7' : '#fff',
-                        border: tool === 'select' && editLayer !== 'collision' ? '1px solid #f5c2e7' : '1px solid var(--border-glass)',
-                        display: 'flex', alignItems: 'center', gap: '6px', cursor: editLayer === 'collision' ? 'not-allowed' : 'pointer',
-                        fontWeight: 'normal',
-                        opacity: editLayer === 'collision' ? 0.4 : 1
-                      }}
-                      title="오브젝트 스마트 선택 & 이동/편집 (단축키: V)"
-                    >
-                      <MousePointer size={14} /> 선택(V)
-                    </button>
-
-                    {/* 2. 스포이드(E) */}
-                    <button
-                      onClick={() => {
-                        setTool('eyedropper');
-                        if (selectedTile === -1) setSelectedTile(getPrefixedIndex(0, activeTileset));
-                      }}
-                      disabled={editLayer === 'collision'}
-                      style={{
-                        width: '100%', padding: '6px 10px', fontSize: '12px', borderRadius: '4px',
-                        background: (tool === 'eyedropper' || isAltPressed) && editLayer !== 'collision' ? 'rgba(137, 220, 235, 0.3)' : 'rgba(255,255,255,0.03)',
-                        color: (tool === 'eyedropper' || isAltPressed) && editLayer !== 'collision' ? '#89dceb' : '#fff',
-                        border: (tool === 'eyedropper' || isAltPressed) && editLayer !== 'collision' ? '1px solid #89dceb' : '1px solid var(--border-glass)',
-                        display: 'flex', alignItems: 'center', gap: '6px', cursor: editLayer === 'collision' ? 'not-allowed' : 'pointer',
-                        fontWeight: 'normal',
-                        opacity: editLayer === 'collision' ? 0.4 : 1
-                      }}
-                      title="스포이드 (단축키: Alt + 클릭 / E)"
-                    >
-                      <Pipette size={14} /> 스포이드(E)
-                    </button>
-
-                    {/* 3. 브러시(B) */}
-                    <button
-                      onClick={() => {
-                        setTool('brush');
-                        if (selectedTile === -1) setSelectedTile(getPrefixedIndex(0, activeTileset));
-                      }}
-                      disabled={editLayer === 'collision'}
-                      style={{
-                        width: '100%', padding: '6px 10px', fontSize: '12px', borderRadius: '4px',
-                        background: tool === 'brush' && selectedTile !== -1 && editLayer !== 'collision' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(255,255,255,0.03)',
-                        color: tool === 'brush' && selectedTile !== -1 && editLayer !== 'collision' ? 'var(--accent)' : '#fff',
-                        border: tool === 'brush' && selectedTile !== -1 && editLayer !== 'collision' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
-                        display: 'flex', alignItems: 'center', gap: '6px', cursor: editLayer === 'collision' ? 'not-allowed' : 'pointer',
-                        fontWeight: 'normal',
-                        opacity: editLayer === 'collision' ? 0.4 : 1
-                      }}
-                      title="일반 브러시 타일 그리기 (단축키: B)"
-                    >
-                      <Paintbrush size={14} /> 브러시(B)
-                    </button>
-
-                    {/* 4. 채우기(F) */}
-                    <button
-                      onClick={() => {
-                        setTool('bucket');
-                        if (selectedTile === -1) setSelectedTile(getPrefixedIndex(0, activeTileset));
-                      }}
-                      disabled={editLayer === 'collision'}
-                      style={{
-                        width: '100%', padding: '6px 10px', fontSize: '12px', borderRadius: '4px',
-                        background: tool === 'bucket' && selectedTile !== -1 && editLayer !== 'collision' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(255,255,255,0.03)',
-                        color: tool === 'bucket' && selectedTile !== -1 && editLayer !== 'collision' ? 'var(--accent)' : '#fff',
-                        border: tool === 'bucket' && selectedTile !== -1 && editLayer !== 'collision' ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
-                        display: 'flex', alignItems: 'center', gap: '6px', cursor: editLayer === 'collision' ? 'not-allowed' : 'pointer',
-                        fontWeight: 'normal',
-                        opacity: editLayer === 'collision' ? 0.4 : 1
-                      }}
-                      title="영역 채우기 (단축키: F)"
-                    >
-                      <PaintBucket size={14} /> 채우기(F)
-                    </button>
-
-                    {/* 5. 오브젝트(O) */}
-                    <button
-                      onClick={() => {
-                        setTool('object');
-                        if (selectedTile === -1) setSelectedTile(getPrefixedIndex(0, activeTileset));
-                      }}
-                      disabled={editLayer === 'collision'}
-                      style={{
-                        width: '100%', padding: '6px 10px', fontSize: '12px', borderRadius: '4px',
-                        background: tool === 'object' && editLayer !== 'collision' ? 'rgba(250, 179, 135, 0.3)' : 'rgba(255,255,255,0.03)',
-                        color: tool === 'object' && editLayer !== 'collision' ? '#fab387' : '#fff',
-                        border: tool === 'object' && editLayer !== 'collision' ? '1px solid #fab387' : '1px solid var(--border-glass)',
-                        display: 'flex', alignItems: 'center', gap: '6px', cursor: editLayer === 'collision' ? 'not-allowed' : 'pointer',
-                        fontWeight: 'normal',
-                        opacity: editLayer === 'collision' ? 0.4 : 1
-                      }}
-                      title="독립 오브젝트 스탬프 배치 (단축키: O)"
-                    >
-                      <Layers size={14} /> 오브젝트(O)
-                    </button>
-
-                    {/* 6. 지우개 모드(X) */}
-                    <button
-                      onClick={() => {
-                        setSelectedTile(-1);
-                        setTool('brush');
-                      }}
-                      disabled={editLayer === 'collision'}
-                      style={{
-                        width: '100%', padding: '6px 10px', fontSize: '12px', borderRadius: '4px',
-                        background: selectedTile === -1 && editLayer !== 'collision' ? 'var(--danger)' : 'rgba(255,255,255,0.03)',
-                        color: '#fff', border: selectedTile === -1 && editLayer !== 'collision' ? '1px solid var(--danger)' : '1px solid var(--border-glass)',
-                        display: 'flex', alignItems: 'center', gap: '6px', cursor: editLayer === 'collision' ? 'not-allowed' : 'pointer',
-                        fontWeight: 'normal',
-                        opacity: editLayer === 'collision' ? 0.4 : 1
-                      }}
-                      title="지우개 (단축키: X)"
-                    >
-                      <Eraser size={14} /> 지우개 모드(X)
-                    </button>
-
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#ccc', cursor: 'pointer', marginTop: '4px', fontWeight: 'normal' }}>
-                      <input
-                        type="checkbox"
-                        checked={autoCollision}
-                        onChange={(e) => setAutoCollision(e.target.checked)}
-                      />
-                      오브젝트 배치 시 이동 불가 설정
-                    </label>
-
-                    {/* Dedicated Collision Walls (이동 불가지역) Control Box */}
-                    <div style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '6px',
-                      marginTop: '6px',
-                      padding: '8px',
-                      background: editLayer === 'collision' ? 'rgba(243, 139, 168, 0.15)' : 'rgba(243, 139, 168, 0.06)',
-                      border: editLayer === 'collision' ? '1px solid #f38ba8' : '1px solid rgba(243, 139, 168, 0.2)',
-                      borderRadius: '6px'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '12px', color: '#f38ba8', fontWeight: editLayer === 'collision' ? 'bold' : 'normal' }}>
-                          ⛔ 이동 불가지역 (충돌 벽)
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setShowCollision(!showCollision)}
-                          title={showCollision ? "충돌 벽 표시 끄기" : "충돌 벽 표시 켜기"}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', opacity: showCollision ? 1 : 0.3 }}
-                        >
-                          {showCollision ? '👁️' : '🙈'}
-                        </button>
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditLayer('collision');
-                            setSelectedTile(1);
-                            setSelectedObjectId(null);
-                            setPaletteSelection(null);
-                            setShowCollision(true);
-                          }}
-                          style={{
-                            flex: 1, padding: '6px 4px', fontSize: '11px', borderRadius: '4px',
-                            background: editLayer === 'collision' && selectedTile === 1 ? '#f38ba8' : 'rgba(255,255,255,0.04)',
-                            color: editLayer === 'collision' && selectedTile === 1 ? '#000' : '#fff',
-                            border: editLayer === 'collision' && selectedTile === 1 ? '1px solid #f38ba8' : '1px solid var(--border-glass)',
-                            fontWeight: editLayer === 'collision' && selectedTile === 1 ? 'bold' : 'normal',
-                            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
-                          }}
-                          title="벽 추가 (마우스로 칠해서 이동 불가지역 설정)"
-                        >
-                          🛑 벽 추가
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditLayer('collision');
-                            setSelectedTile(0);
-                            setSelectedObjectId(null);
-                            setPaletteSelection(null);
-                            setShowCollision(true);
-                          }}
-                          style={{
-                            flex: 1, padding: '6px 4px', fontSize: '11px', borderRadius: '4px',
-                            background: editLayer === 'collision' && selectedTile === 0 ? '#a6e3a1' : 'rgba(255,255,255,0.04)',
-                            color: editLayer === 'collision' && selectedTile === 0 ? '#000' : '#fff',
-                            border: editLayer === 'collision' && selectedTile === 0 ? '1px solid #a6e3a1' : '1px solid var(--border-glass)',
-                            fontWeight: editLayer === 'collision' && selectedTile === 0 ? 'bold' : 'normal',
-                            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
-                          }}
-                          title="벽 삭제 / 지우기 (마우스로 칠해서 이동 가능하게 해제)"
-                        >
-                          🧽 벽 삭제
-                        </button>
-                      </div>
                     </div>
                   </div>
                 </div>
