@@ -130,6 +130,23 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   const [mapBoxSelectStart, setMapBoxSelectStart] = useState<{ tx: number; ty: number } | null>(null);
   const [mapBoxSelection, setMapBoxSelection] = useState<{ startCol: number; startRow: number; cols: number; rows: number } | null>(null);
 
+  // Photoshop-Style Contextual Instruction Status Bar
+  const [hoverToolHint, setHoverToolHint] = useState<string | null>(null);
+
+  const getActiveToolInstruction = (): string => {
+    if (editLayer === 'collision') {
+      return selectedTile === 1
+        ? '🛑 이동 불가지역 벽 추가: 마우스 클릭 또는 드래그로 캐릭터 충돌 영역 칠하기'
+        : '🧽 이동 불가지역 벽 삭제: 마우스 지우개 연속 드래그로 충돌 영역 삭제';
+    }
+    if (tool === 'select') return '🖱️ 선택(V): 클릭하여 오브젝트/타일 선택 및 드래그 이동/그룹화';
+    if (tool === 'eyedropper') return '🧪 스포이드(E): 캔버스 타일을 클릭하여 브러시 타일로 픽 (Alt + 클릭 가능)';
+    if (tool === 'object') return '📦 오브젝트(O): 독립 스탬프 형태로 건물/가구 배치';
+    if (tool === 'bucket') return '🪣 채우기(F): 연결된 동일 타일 영역 전체를 채우기';
+    if (selectedTile === -1) return '🧽 지우개(X): 마우스 클릭 및 드래그로 타일 및 오브젝트 지우기';
+    return '🖌️ 브러시(B): 선택한 타일으로 캔버스 타일 그리기';
+  };
+
   // Eyedropper Toast Notification
   const [pickedToast, setPickedToast] = useState<string | null>(null);
   const [isAltPressed, setIsAltPressed] = useState<boolean>(false);
@@ -2622,6 +2639,26 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Photoshop-style Contextual Action Instruction Status Bar (Pixlr / Photoshop Top Instruction Bar) */}
+      <div style={{
+        background: 'rgba(20, 20, 30, 0.95)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.12)',
+        padding: '5px 16px',
+        fontSize: '12px',
+        color: '#e0e0e0',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        minHeight: '30px',
+        boxSizing: 'border-box'
+      }}>
+        <span style={{ fontSize: '13px', color: '#a78bfa' }}>ℹ️</span>
+        <span style={{ color: hoverToolHint ? '#f5c2e7' : '#e0e0e0', fontWeight: hoverToolHint ? 'bold' : 'normal', transition: 'all 0.15s ease' }}>
+          {hoverToolHint || getActiveToolInstruction()}
+        </span>
+      </div>
+
       {/* 2. Main Editor Workspace (3-column layout) */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         
@@ -2679,6 +2716,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                       type="button"
                       onClick={() => setTool('select')}
                       disabled={editLayer === 'collision'}
+                      onMouseEnter={() => setHoverToolHint('🖱️ 선택(V): 클릭하여 오브젝트/타일 선택 및 드래그 이동/그룹화')}
+                      onMouseLeave={() => setHoverToolHint(null)}
                       style={{
                         padding: '8px 4px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center',
                         background: tool === 'select' && editLayer !== 'collision' ? 'rgba(245, 194, 231, 0.3)' : 'rgba(255,255,255,0.04)',
@@ -2700,6 +2739,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                         if (selectedTile === -1) setSelectedTile(getPrefixedIndex(0, activeTileset));
                       }}
                       disabled={editLayer === 'collision'}
+                      onMouseEnter={() => setHoverToolHint('🧪 스포이드(E): 캔버스 타일을 클릭하여 스포이드로 즉시 픽 (Alt + 클릭)')}
+                      onMouseLeave={() => setHoverToolHint(null)}
                       style={{
                         padding: '8px 4px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center',
                         background: (tool === 'eyedropper' || isAltPressed) && editLayer !== 'collision' ? 'rgba(137, 220, 235, 0.3)' : 'rgba(255,255,255,0.04)',
@@ -2721,6 +2762,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                         if (selectedTile === -1) setSelectedTile(getPrefixedIndex(0, activeTileset));
                       }}
                       disabled={editLayer === 'collision'}
+                      onMouseEnter={() => setHoverToolHint('🖌️ 브러시(B): 선택한 타일으로 캔버스에 그리기')}
+                      onMouseLeave={() => setHoverToolHint(null)}
                       style={{
                         padding: '8px 4px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center',
                         background: tool === 'brush' && selectedTile !== -1 && editLayer !== 'collision' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(255,255,255,0.04)',
@@ -2742,6 +2785,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                         if (selectedTile === -1) setSelectedTile(getPrefixedIndex(0, activeTileset));
                       }}
                       disabled={editLayer === 'collision'}
+                      onMouseEnter={() => setHoverToolHint('🪣 채우기(F): 연결된 동일 타일 영역 전체를 채우기')}
+                      onMouseLeave={() => setHoverToolHint(null)}
                       style={{
                         padding: '8px 4px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center',
                         background: tool === 'bucket' && selectedTile !== -1 && editLayer !== 'collision' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(255,255,255,0.04)',
@@ -2763,6 +2808,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                         if (selectedTile === -1) setSelectedTile(getPrefixedIndex(0, activeTileset));
                       }}
                       disabled={editLayer === 'collision'}
+                      onMouseEnter={() => setHoverToolHint('📦 오브젝트(O): 독립 스탬프 형태로 건물/가구 배치')}
+                      onMouseLeave={() => setHoverToolHint(null)}
                       style={{
                         padding: '8px 4px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center',
                         background: tool === 'object' && editLayer !== 'collision' ? 'rgba(250, 179, 135, 0.3)' : 'rgba(255,255,255,0.04)',
@@ -2784,6 +2831,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                         setTool('brush');
                       }}
                       disabled={editLayer === 'collision'}
+                      onMouseEnter={() => setHoverToolHint('🧽 지우개(X): 마우스 클릭/드래그로 타일 및 오브젝트 지우기')}
+                      onMouseLeave={() => setHoverToolHint(null)}
                       style={{
                         padding: '8px 4px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center',
                         background: selectedTile === -1 && editLayer !== 'collision' ? 'var(--danger)' : 'rgba(255,255,255,0.04)',
@@ -2842,6 +2891,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                           setEditLayer('collision');
                           setSelectedTile(1);
                         }}
+                        onMouseEnter={() => setHoverToolHint('🛑 이동 불가지역 벽 추가: 마우스 클릭 및 칠하기 드래그로 충돌 벽 영역 설정')}
+                        onMouseLeave={() => setHoverToolHint(null)}
                         style={{
                           padding: '5px 4px', fontSize: '11px', borderRadius: '4px',
                           background: editLayer === 'collision' && selectedTile === 1 ? '#f38ba8' : 'rgba(255,255,255,0.04)',
@@ -2858,6 +2909,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                           setEditLayer('collision');
                           setSelectedTile(-1);
                         }}
+                        onMouseEnter={() => setHoverToolHint('🧽 이동 불가지역 벽 삭제: 마우스 연속 드래그 지우개로 충돌 벽 영역 삭제')}
+                        onMouseLeave={() => setHoverToolHint(null)}
                         style={{
                           padding: '5px 4px', fontSize: '11px', borderRadius: '4px',
                           background: editLayer === 'collision' && selectedTile === -1 ? '#f38ba8' : 'rgba(255,255,255,0.04)',
@@ -2872,11 +2925,11 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                   </div>
                 </div>
 
-                {/* Section 2: 레이어들 (Photoshop-style Layers Panel - Bottom Position) */}
+                {/* Section 2: 레이어 (Photoshop-style Layers Panel - Bottom Position) */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
                   <h4 style={{ fontSize: '13px', color: 'var(--accent)', margin: '0 0 4px 0', borderBottom: '1px solid var(--border-glass)', paddingBottom: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 'normal' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '10px', opacity: 0.7 }}>▪</span> 레이어들
+                      <span style={{ fontSize: '10px', opacity: 0.7 }}>▪</span> 레이어
                     </span>
                     <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)' }}>{currentLayers.length}개</span>
                   </h4>
@@ -3009,8 +3062,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                     <span style={{ fontSize: '10px', opacity: 0.7 }}>▪</span> 브러시 크기
                   </h4>
 
-                  {/* Preset 1x1, 2x2, 3x3, 4x4 Row */}
-                  <div style={{ display: 'flex', gap: '4px' }}>
+                  {/* Preset 1x1, 2x2 next row 3x3, 4x4 Grid */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px' }}>
                     {([1, 2, 3, 4] as const).map((sz) => {
                       const isSelected = !paletteSelection && brushSize === sz;
                       return (
@@ -3022,7 +3075,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                             setPaletteSelection(null);
                           }}
                           style={{
-                            flex: 1, padding: '5px 2px', fontSize: '11px', borderRadius: '4px',
+                            padding: '6px 4px', fontSize: '11px', borderRadius: '4px',
                             background: isSelected ? 'var(--accent)' : 'rgba(255,255,255,0.03)',
                             color: isSelected ? '#000' : '#fff',
                             border: isSelected ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
@@ -3101,7 +3154,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                   })()}
                 </div>
 
-                {/* Section 4: 현재 선택된 브러시 */}
+                {/* Section 4: 현재 브러시 */}
                 {(() => {
                   const selInfo = getTileDrawInfo(selectedTile, activeTileset);
                   const tsInfo = selInfo ? getTilesetInfoLocal(selInfo.tilesetKey) : null;
@@ -3114,7 +3167,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                   return (
                     <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "6px" }}>
                       <h4 style={{ fontSize: "13px", color: "var(--accent)", margin: "0 0 2px 0", borderBottom: "1px solid var(--border-glass)", paddingBottom: "4px", display: "flex", alignItems: "center", gap: "6px", fontWeight: "normal" }}>
-                        <span style={{ fontSize: "10px", opacity: 0.7 }}>▪</span> 현재 선택된 브러시
+                        <span style={{ fontSize: "10px", opacity: 0.7 }}>▪</span> 현재 브러시
                       </h4>
                       <div style={{
                         padding: "8px 10px", borderRadius: "6px",
