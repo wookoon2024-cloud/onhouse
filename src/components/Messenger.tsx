@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { type DirectMessage, type PlayerState, getDMs, saveDM, markDMsAsRead } from '../game/syncManager';
 import { Send, MessageSquare, ShieldAlert } from 'lucide-react';
 
@@ -62,9 +62,80 @@ export const Messenger: React.FC<MessengerProps> = ({
   activeYouTubeVideoId,
   activeWebUrl
 }) => {
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Custom position state for dragging
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const isDraggingRef = useRef(false);
+  const dragStartRef = useRef<{ startX: number; startY: number; initX: number; initY: number }>({
+    startX: 0,
+    startY: 0,
+    initX: 0,
+    initY: 0
+  });
+
+  // Calculate default initial position
+  const initialStyle = useMemo(() => {
+    if (pos) return { left: `${pos.x}px`, top: `${pos.y}px`, transform: 'none' };
+
+    if (isMobile) {
+      return { left: '50%', top: '50%', transform: 'translate(-50%, -50%)' };
+    }
+    // Default position centered horizontally, slightly left of Youtube/Web modals
+    return { left: 'calc(50% - 200px)', top: '50%', transform: 'translateY(-50%)' };
+  }, [pos, isMobile]);
+
+  // Drag Handlers
+  const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
+    isDraggingRef.current = true;
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+
+    const modalEl = (e.currentTarget as HTMLElement).parentElement;
+    const rect = modalEl?.getBoundingClientRect();
+
+    dragStartRef.current = {
+      startX: clientX,
+      startY: clientY,
+      initX: rect ? rect.left : window.innerWidth / 2 - 190,
+      initY: rect ? rect.top : window.innerHeight / 2 - 220
+    };
+  };
+
+  useEffect(() => {
+    const handleMove = (e: MouseEvent | TouchEvent) => {
+      if (!isDraggingRef.current) return;
+      const clientX = 'touches' in e ? (e as TouchEvent).touches[0].clientX : (e as MouseEvent).clientX;
+      const clientY = 'touches' in e ? (e as TouchEvent).touches[0].clientY : (e as MouseEvent).clientY;
+
+      const dx = clientX - dragStartRef.current.startX;
+      const dy = clientY - dragStartRef.current.startY;
+
+      const nextX = Math.max(10, Math.min(window.innerWidth - 100, dragStartRef.current.initX + dx));
+      const nextY = Math.max(10, Math.min(window.innerHeight - 100, dragStartRef.current.initY + dy));
+
+      setPos({ x: nextX, y: nextY });
+    };
+
+    const handleEnd = () => {
+      isDraggingRef.current = false;
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleEnd);
+    window.addEventListener('touchmove', handleMove);
+    window.addEventListener('touchend', handleEnd);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleEnd);
+      window.removeEventListener('touchmove', handleMove);
+      window.removeEventListener('touchend', handleEnd);
+    };
+  }, []);
 
   // Load message history from localStorage
   const loadHistory = () => {
@@ -137,24 +208,42 @@ export const Messenger: React.FC<MessengerProps> = ({
   if (!activeTarget) return null;
 
   return (
-    <div className="glass-panel" style={{
-      position: 'absolute', 
-      left: window.innerWidth < 768 ? '15px' : '50%',
-      right: window.innerWidth < 768 ? '15px' : 'auto',
-      top: '50%',
-      transform: window.innerWidth < 768 ? 'translateY(-50%)' : 'translate(-50%, -50%)',
-      width: window.innerWidth < 768 ? 'auto' : '380px',
-      height: window.innerWidth < 768 ? '80%' : '420px',
-      maxHeight: '90%',
-      display: 'flex', flexDirection: 'column', zIndex: 110,
-      border: '1px solid rgba(255, 255, 255, 0.15)', overflow: 'hidden'
-    }}>
-      {/* Header */}
-      <div style={{
-        padding: '16px', borderBottom: '1px solid var(--border-glass)',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        background: 'rgba(0,0,0,0.2)'
-      }}>
+    <div
+      className="glass-panel"
+      style={{
+        position: 'fixed',
+        ...initialStyle,
+        width: isMobile ? 'calc(100vw - 30px)' : '380px',
+        height: isMobile ? '75vh' : '440px',
+        minWidth: '300px',
+        minHeight: '260px',
+        maxWidth: '92vw',
+        maxHeight: '90vh',
+        resize: isMobile ? 'none' : 'both',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        zIndex: 110,
+        border: '1px solid rgba(255, 255, 255, 0.2)',
+        borderRadius: '14px',
+        boxShadow: '0 16px 48px rgba(0, 0, 0, 0.65)'
+      }}
+    >
+      {/* Draggable Header */}
+      <div
+        onMouseDown={handleDragStart}
+        onTouchStart={handleDragStart}
+        style={{
+          padding: '12px 16px',
+          borderBottom: '1px solid var(--border-glass)',
+          display: 'flex',
+          justify: 'space-between',
+          alignItems: 'center',
+          background: 'rgba(0, 0, 0, 0.35)',
+          cursor: 'grab',
+          userSelect: 'none'
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <MessageSquare size={18} style={{ color: 'var(--accent)' }} />
           <div>
@@ -167,10 +256,16 @@ export const Messenger: React.FC<MessengerProps> = ({
           </div>
         </div>
         <button
+          type="button"
           onClick={onClose}
           style={{
-            background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)',
-            padding: '4px 10px', borderRadius: '6px', fontSize: '12px'
+            background: 'rgba(255, 255, 255, 0.1)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            color: 'var(--text-secondary)',
+            padding: '4px 10px',
+            borderRadius: '6px',
+            fontSize: '11px',
+            cursor: 'pointer'
           }}
         >
           닫기
@@ -413,12 +508,14 @@ export const Messenger: React.FC<MessengerProps> = ({
           }}
         />
         <button
+          type="button"
           onClick={handleSend}
           style={{
             background: 'var(--primary)', color: '#fff',
             width: '38px', height: '38px', borderRadius: '8px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 2px 8px var(--primary-glow)'
+            boxShadow: '0 2px 8px var(--primary-glow)',
+            cursor: 'pointer'
           }}
         >
           <Send size={16} />
