@@ -261,10 +261,19 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       const currentLayers = getNormalizedLayers(prev);
       const updatedLayers = currentLayers.filter(l => l.id !== activeLayerId);
       const nextActiveId = updatedLayers[updatedLayers.length - 1]?.id || 'layer_base';
+
+      // Delete all objects that belonged to this activeLayerId!
+      const remainingObjects = (prev.objects || []).filter(o =>
+        o.layerId ? o.layerId !== activeLayerId : true
+      );
+
       setActiveLayerId(nextActiveId);
       return {
         ...prev,
-        layers: updatedLayers
+        baseLayer: updatedLayers[0]?.grid || prev.baseLayer,
+        decorLayer: updatedLayers[1]?.grid || prev.decorLayer,
+        layers: updatedLayers,
+        objects: remainingObjects
       };
     });
   };
@@ -964,31 +973,6 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
     const normLayers = getNormalizedLayers(localMap);
 
-    // 1. Base Floor Layer (Controlled by showBase toggle & layer 0 visibility!)
-    const baseLayerObj = normLayers[0];
-    if (showBase && baseLayerObj && baseLayerObj.visible !== false) {
-      const baseGrid = baseLayerObj.grid || localMap.baseLayer;
-      for (let y = 0; y < localMap.height; y++) {
-        for (let x = 0; x < localMap.width; x++) {
-          const idx = baseGrid[y] && baseGrid[y][x] !== undefined ? baseGrid[y][x] : -1;
-          const drawInfo = getTileDrawInfo(idx, localMap.tileset);
-          if (drawInfo) {
-            const img = images[drawInfo.tilesetKey];
-            if (img) {
-              const tsInfo = getTilesetInfoLocal(drawInfo.tilesetKey);
-              const srcX = (drawInfo.localIdx % tsInfo.cols) * 16;
-              const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * 16;
-              ctx.drawImage(
-                img,
-                srcX, srcY, 16, 16,
-                x * tileSize, y * tileSize, tileSize, tileSize
-              );
-            }
-          }
-        }
-      }
-    }
-
     // Helper to draw an object list
     const drawObjectList = (objsList: MapObjectInstance[]) => {
       if (objsList.length === 0) return;
@@ -1049,25 +1033,26 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       });
     };
 
-    // 1.5 Base Layer Objects (obj.layer === 'base' - Ground Overlay Objects like Stepping Stones, Rugs)
-    if (showBase && localMap.objects && localMap.objects.length > 0) {
-      drawObjectList(localMap.objects.filter(o => o.layer === 'base'));
-    }
+    // Helper to draw objects for a specific layer
+    const drawObjectsForLayer = (layerObj: CustomTileLayer, isBase: boolean) => {
+      if (!localMap.objects || localMap.objects.length === 0) return;
+      const layerObjs = localMap.objects.filter(o => {
+        if (o.layerId) return o.layerId === layerObj.id;
+        return isBase ? o.layer === 'base' : o.layer !== 'base';
+      });
+      drawObjectList(layerObjs);
+    };
 
-    // 2. Decor Layer & Upper Custom Layers
-    if (showDecor) {
-      // 2.1 Decor Layer Objects (Decor objects like grouped buildings, structures, furniture)
-      if (localMap.objects && localMap.objects.length > 0) {
-        drawObjectList(localMap.objects.filter(o => o.layer !== 'base'));
-      }
+    normLayers.forEach((layer, lIdx) => {
+      const isBase = lIdx === 0;
+      const isVisible = isBase ? (showBase && layer.visible !== false) : (showDecor && layer.visible !== false);
 
-      // 2.2 Upper Custom Layers (Layer 2, Layer 3, Layer 4... Painted tiles drawn ON TOP OF OBJECTS!)
-      const upperLayers = normLayers.slice(1);
-      upperLayers.forEach((layer) => {
-        if (layer.visible !== false && layer.grid) {
+      if (isVisible) {
+        // A. Draw layer tiles
+        if (layer.grid) {
           for (let y = 0; y < localMap.height; y++) {
             for (let x = 0; x < localMap.width; x++) {
-              const idx = layer.grid[y] ? layer.grid[y][x] : -1;
+              const idx = layer.grid[y] && layer.grid[y][x] !== undefined ? layer.grid[y][x] : -1;
               if (idx !== -1 && idx !== undefined && idx !== null) {
                 const drawInfo = getTileDrawInfo(idx, localMap.tileset);
                 if (drawInfo) {
@@ -1087,8 +1072,11 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
             }
           }
         }
-      });
-    }
+
+        // B. Draw objects bound to this layer!
+        drawObjectsForLayer(layer, isBase);
+      }
+    });
 
     // 3. Collision red borders (100% Vivid Red for clear distinction!)
     if (showCollision) {

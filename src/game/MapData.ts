@@ -8,6 +8,7 @@ export interface MapObjectInstance {
   x: number; // 맵 타일 X 좌표
   y: number; // 맵 타일 Y 좌표
   layer: 'base' | 'decor';
+  layerId?: string; // 바인딩된 고유 레이어 ID (Dynamic Multi-Layer 연동용)
   zIndex?: number; // 앞뒤 순서 제어용 z-index
   tiles?: number[][]; // 커스텀 묶음 오브젝트용 2D 타일 인덱스 배열
 }
