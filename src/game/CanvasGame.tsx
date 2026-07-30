@@ -1485,11 +1485,25 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
       if (map.objects && map.objects.length > 0) {
         const cleanedObjs = cleanDuplicateObjects(map.objects.filter(o => o.layer !== 'base'));
         cleanedObjs.forEach((obj) => {
-          const rootRow = Math.max(0, Math.min(map.height - 1, obj.y + obj.height - 1));
-          if (!objectRootRowMap[rootRow]) {
-            objectRootRowMap[rootRow] = [];
+          let effectiveRootRow = Math.max(0, Math.min(map.height - 1, obj.y + obj.height - 1));
+
+          // Check if this object overlaps with any object below it that has a lower/equal zIndex
+          cleanedObjs.forEach(other => {
+            if (other.id !== obj.id && (obj.zIndex || 0) >= (other.zIndex || 0)) {
+              const overlaps = !(obj.x + obj.width <= other.x || obj.x >= other.x + other.width || obj.y + obj.height <= other.y || obj.y >= other.y + other.height);
+              if (overlaps) {
+                const otherRoot = Math.max(0, Math.min(map.height - 1, other.y + other.height - 1));
+                if (otherRoot > effectiveRootRow) {
+                  effectiveRootRow = otherRoot;
+                }
+              }
+            }
+          });
+
+          if (!objectRootRowMap[effectiveRootRow]) {
+            objectRootRowMap[effectiveRootRow] = [];
           }
-          objectRootRowMap[rootRow].push(obj);
+          objectRootRowMap[effectiveRootRow].push(obj);
 
           // Track tile cells owned by this object
           for (let ody = 0; ody < obj.height; ody++) {
