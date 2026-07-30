@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface WebBrowserModalProps {
   url: string;
@@ -8,13 +8,12 @@ interface WebBrowserModalProps {
 
 export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
   url,
-  onClose,
-  isMessengerOpen
+  onClose
 }) => {
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
   // Extract domain for title
-  const domain = useMemo(() => {
+  const domain = React.useMemo(() => {
     try {
       return new URL(url).hostname;
     } catch {
@@ -22,9 +21,22 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
     }
   }, [url]);
 
-  // Custom position state for dragging
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  // Absolute pixel position state without CSS transform conflicts
+  const [pos, setPos] = useState<{ x: number; y: number }>(() => {
+    if (isMobile) {
+      return {
+        x: Math.max(10, Math.round((window.innerWidth - Math.min(540, window.innerWidth - 20)) / 2)),
+        y: Math.max(10, Math.round((window.innerHeight - 350) / 2))
+      };
+    }
+    return {
+      x: Math.max(10, Math.round(window.innerWidth / 2 + 15)),
+      y: Math.max(10, Math.round(window.innerHeight / 2 - 225))
+    };
+  });
+
   const isDraggingRef = useRef(false);
+  const rafIdRef = useRef<number | null>(null);
   const dragStartRef = useRef<{ startX: number; startY: number; initX: number; initY: number }>({
     startX: 0,
     startY: 0,
@@ -32,22 +44,7 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
     initY: 0
   });
 
-  // Calculate default initial position
-  const initialStyle = useMemo(() => {
-    if (pos) return { left: `${pos.x}px`, top: `${pos.y}px`, transform: 'none' };
-
-    if (isMobile) {
-      return { left: '50%', top: '50%', transform: 'translate(-50%, -50%)' };
-    }
-    if (isMessengerOpen) {
-      // Attached right next to 1:1 Messenger Window!
-      return { left: 'calc(50% + 205px)', top: '50%', transform: 'translateY(-50%)' };
-    }
-    // Default: Bottom right above chat bar
-    return { right: '20px', bottom: '140px', transform: 'none' };
-  }, [pos, isMobile, isMessengerOpen]);
-
-  // Drag Handlers
+  // Smooth Drag Handlers with RequestAnimationFrame (60fps)
   const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
     isDraggingRef.current = true;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
@@ -59,8 +56,8 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
     dragStartRef.current = {
       startX: clientX,
       startY: clientY,
-      initX: rect ? rect.left : window.innerWidth / 2,
-      initY: rect ? rect.top : window.innerHeight / 2
+      initX: rect ? rect.left : pos.x,
+      initY: rect ? rect.top : pos.y
     };
   };
 
@@ -76,11 +73,15 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
       const nextX = Math.max(10, Math.min(window.innerWidth - 100, dragStartRef.current.initX + dx));
       const nextY = Math.max(10, Math.min(window.innerHeight - 100, dragStartRef.current.initY + dy));
 
-      setPos({ x: nextX, y: nextY });
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = requestAnimationFrame(() => {
+        setPos({ x: nextX, y: nextY });
+      });
     };
 
     const handleEnd = () => {
       isDraggingRef.current = false;
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
     };
 
     window.addEventListener('mousemove', handleMove);
@@ -93,14 +94,17 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
       window.removeEventListener('mouseup', handleEnd);
       window.removeEventListener('touchmove', handleMove);
       window.removeEventListener('touchend', handleEnd);
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
     };
-  }, []);
+  }, [pos]);
 
   return (
     <div
       style={{
         position: 'fixed',
-        ...initialStyle,
+        left: `${pos.x}px`,
+        top: `${pos.y}px`,
+        transform: 'none',
         width: isMobile ? 'calc(100vw - 20px)' : '540px',
         height: isMobile ? '350px' : '450px',
         minWidth: '320px',

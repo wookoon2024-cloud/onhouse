@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { type DirectMessage, type PlayerState, getDMs, saveDM, markDMsAsRead } from '../game/syncManager';
 import { Send, MessageSquare, ShieldAlert, X } from 'lucide-react';
 
@@ -69,9 +69,22 @@ export const Messenger: React.FC<MessengerProps> = ({
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const isUserScrolledUpRef = useRef(false);
 
-  // Custom position state for dragging
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  // Absolute pixel position state to prevent CSS transform resize glitches
+  const [pos, setPos] = useState<{ x: number; y: number }>(() => {
+    if (isMobile) {
+      return {
+        x: Math.max(10, Math.round((window.innerWidth - Math.min(380, window.innerWidth - 30)) / 2)),
+        y: Math.max(10, Math.round((window.innerHeight - 440) / 2))
+      };
+    }
+    return {
+      x: Math.max(10, Math.round(window.innerWidth / 2 - 200)),
+      y: Math.max(10, Math.round(window.innerHeight / 2 - 220))
+    };
+  });
+
   const isDraggingRef = useRef(false);
+  const rafIdRef = useRef<number | null>(null);
   const dragStartRef = useRef<{ startX: number; startY: number; initX: number; initY: number }>({
     startX: 0,
     startY: 0,
@@ -88,18 +101,7 @@ export const Messenger: React.FC<MessengerProps> = ({
     isUserScrolledUpRef.current = distanceFromBottom > 50;
   };
 
-  // Calculate default initial position
-  const initialStyle = useMemo(() => {
-    if (pos) return { left: `${pos.x}px`, top: `${pos.y}px`, transform: 'none' };
-
-    if (isMobile) {
-      return { left: '50%', top: '50%', transform: 'translate(-50%, -50%)' };
-    }
-    // Default position centered horizontally, slightly left of Youtube/Web modals
-    return { left: 'calc(50% - 200px)', top: '50%', transform: 'translateY(-50%)' };
-  }, [pos, isMobile]);
-
-  // Drag Handlers
+  // Smooth Drag Handlers with RequestAnimationFrame (60fps)
   const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
     isDraggingRef.current = true;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
@@ -111,8 +113,8 @@ export const Messenger: React.FC<MessengerProps> = ({
     dragStartRef.current = {
       startX: clientX,
       startY: clientY,
-      initX: rect ? rect.left : window.innerWidth / 2 - 190,
-      initY: rect ? rect.top : window.innerHeight / 2 - 220
+      initX: rect ? rect.left : pos.x,
+      initY: rect ? rect.top : pos.y
     };
   };
 
@@ -128,11 +130,15 @@ export const Messenger: React.FC<MessengerProps> = ({
       const nextX = Math.max(10, Math.min(window.innerWidth - 100, dragStartRef.current.initX + dx));
       const nextY = Math.max(10, Math.min(window.innerHeight - 100, dragStartRef.current.initY + dy));
 
-      setPos({ x: nextX, y: nextY });
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = requestAnimationFrame(() => {
+        setPos({ x: nextX, y: nextY });
+      });
     };
 
     const handleEnd = () => {
       isDraggingRef.current = false;
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
     };
 
     window.addEventListener('mousemove', handleMove);
@@ -145,8 +151,9 @@ export const Messenger: React.FC<MessengerProps> = ({
       window.removeEventListener('mouseup', handleEnd);
       window.removeEventListener('touchmove', handleMove);
       window.removeEventListener('touchend', handleEnd);
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
     };
-  }, []);
+  }, [pos]);
 
   // Load message history from localStorage
   const loadHistory = () => {
@@ -239,7 +246,9 @@ export const Messenger: React.FC<MessengerProps> = ({
       className="glass-panel"
       style={{
         position: 'fixed',
-        ...initialStyle,
+        left: `${pos.x}px`,
+        top: `${pos.y}px`,
+        transform: 'none',
         width: isMobile ? 'calc(100vw - 30px)' : '380px',
         height: isMobile ? '75vh' : '440px',
         minWidth: '300px',
