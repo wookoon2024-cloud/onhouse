@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { type MapDefinition, type MapObjectInstance, cleanDuplicateObjects, getCharRowActions, getCharGridDimensions, getCharDisplaySize } from './MapData';
+import { type MapDefinition, type MapObjectInstance, cleanDuplicateObjects, getCharRowActions, getCharGridDimensions, getCharDisplaySize, getNormalizedLayers } from './MapData';
 import type { PlayerState } from './syncManager';
 import { getDyedSprite } from './spriteDyer';
 
@@ -1109,9 +1109,15 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
           offCtx.fillStyle = '#0f0f15';
           offCtx.fillRect(0, 0, targetW, targetH);
 
+          const normLayers = getNormalizedLayers(map);
+          const baseLayerObj = normLayers[0];
+          const baseGrid = (baseLayerObj && baseLayerObj.visible !== false && baseLayerObj.grid)
+            ? baseLayerObj.grid
+            : (map.baseLayer || []);
+
           for (let ty = 0; ty < map.height; ty++) {
             for (let tx = 0; tx < map.width; tx++) {
-              const tileIdx = map.baseLayer[ty][tx];
+              const tileIdx = baseGrid[ty] ? baseGrid[ty][tx] : 0;
               let drawn = false;
               const drawInfo = getTileDrawInfo(tileIdx, map.tileset);
 
@@ -1583,30 +1589,37 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         renderPlayerIdx++;
       }
 
-      // C. Render Standalone Layer 2 Decor Tiles (Painted brush tiles on top of objects!)
-      for (let ty = 0; ty < map.height; ty++) {
-        for (let tx = 0; tx < map.width; tx++) {
-          const tileIdx = map.decorLayer[ty][tx];
-          const drawInfo = getTileDrawInfo(tileIdx, map.tileset);
-          if (drawInfo) {
-            const img = images[drawInfo.tilesetKey];
-            if (img && img.complete && img.naturalWidth > 0) {
-              const tsInfo = getTilesetInfo(drawInfo.tilesetKey);
-              const tileW = Math.max(1, Math.floor(img.width / tsInfo.cols));
-              const tileH = Math.max(1, Math.floor(img.height / tsInfo.rows));
-              const srcX = (drawInfo.localIdx % tsInfo.cols) * tileW;
-              const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * tileH;
-              if (srcX >= 0 && srcX < img.width && srcY >= 0 && srcY < img.height) {
-                ctx.drawImage(
-                  img,
-                  srcX, srcY, tileW, tileH,
-                  tx * vSize, ty * vSize, vSize, vSize
-                );
+      // C. Render Upper Custom Layers (Layer 2, Layer 3, Layer 4... Painted brush tiles on top of objects!)
+      const upperLayers = normLayers.slice(1);
+      upperLayers.forEach((layer) => {
+        if (layer.visible !== false && layer.grid) {
+          for (let ty = 0; ty < map.height; ty++) {
+            for (let tx = 0; tx < map.width; tx++) {
+              const tileIdx = layer.grid[ty] ? layer.grid[ty][tx] : -1;
+              if (tileIdx !== -1 && tileIdx !== undefined && tileIdx !== null) {
+                const drawInfo = getTileDrawInfo(tileIdx, map.tileset);
+                if (drawInfo) {
+                  const img = images[drawInfo.tilesetKey];
+                  if (img && img.complete && img.naturalWidth > 0) {
+                    const tsInfo = getTilesetInfo(drawInfo.tilesetKey);
+                    const tileW = Math.max(1, Math.floor(img.width / tsInfo.cols));
+                    const tileH = Math.max(1, Math.floor(img.height / tsInfo.rows));
+                    const srcX = (drawInfo.localIdx % tsInfo.cols) * tileW;
+                    const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * tileH;
+                    if (srcX >= 0 && srcX < img.width && srcY >= 0 && srcY < img.height) {
+                      ctx.drawImage(
+                        img,
+                        srcX, srcY, tileW, tileH,
+                        tx * vSize, ty * vSize, vSize, vSize
+                      );
+                    }
+                  }
+                }
               }
             }
           }
         }
-      }
+      });
 
       // 3.5. Render Memos on Map Canvas
       if (memos && memos.length > 0) {

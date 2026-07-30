@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { type MapDefinition, type MapObjectInstance, cleanDuplicateObjects, maps, PRESET_MAP_TEMPLATES } from '../game/MapData';
+import { type MapDefinition, type MapObjectInstance, type CustomTileLayer, cleanDuplicateObjects, maps, PRESET_MAP_TEMPLATES, getNormalizedLayers } from '../game/MapData';
 import { Trash2, Save, X, Undo, Redo, Pipette, Paintbrush, PaintBucket, Eraser, Info, Sparkles, Plus, Download, Upload, Pencil, MousePointer, Copy, Layers, MoveUp, MoveDown } from 'lucide-react';
 import { getTileDrawInfo, getTilesetInfo } from '../game/CanvasGame';
 import { publishItemToMarket, getSavedHouseCode } from '../services/HouseService';
@@ -170,6 +170,117 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
   const [localMap, setLocalMap] = useState<MapDefinition>(getInitialMap);
   const [originalMap, setOriginalMap] = useState<MapDefinition>(getInitialMap);
+
+  // Dynamic Multi-Layer State & Helper Actions
+  const currentLayers = getNormalizedLayers(localMap);
+  const [activeLayerId, setActiveLayerId] = useState<string>(() => currentLayers[1]?.id || currentLayers[0]?.id || 'layer_decor');
+
+  const handleAddLayer = () => {
+    setHistory(prev => [...prev, localMap]);
+    setRedoHistory([]);
+    setLocalMap(prev => {
+      const currentLayers = getNormalizedLayers(prev);
+      const newLayerId = `layer_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const newLayer: CustomTileLayer = {
+        id: newLayerId,
+        name: `Layer ${currentLayers.length + 1}`,
+        visible: true,
+        grid: Array.from({ length: prev.height }, () => Array(prev.width).fill(-1))
+      };
+      const updatedLayers = [...currentLayers, newLayer];
+      setActiveLayerId(newLayerId);
+      return {
+        ...prev,
+        layers: updatedLayers
+      };
+    });
+  };
+
+  const handleDuplicateLayer = () => {
+    setHistory(prev => [...prev, localMap]);
+    setRedoHistory([]);
+    setLocalMap(prev => {
+      const currentLayers = getNormalizedLayers(prev);
+      const targetLayer = currentLayers.find(l => l.id === activeLayerId) || currentLayers[currentLayers.length - 1];
+      if (!targetLayer) return prev;
+
+      const newLayerId = `layer_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const clonedGrid = targetLayer.grid.map(r => [...r]);
+      const newLayer: CustomTileLayer = {
+        id: newLayerId,
+        name: `${targetLayer.name} 복사`,
+        visible: true,
+        grid: clonedGrid
+      };
+
+      const targetIdx = currentLayers.findIndex(l => l.id === targetLayer.id);
+      const updatedLayers = [...currentLayers];
+      updatedLayers.splice(targetIdx + 1, 0, newLayer);
+
+      setActiveLayerId(newLayerId);
+      return {
+        ...prev,
+        layers: updatedLayers
+      };
+    });
+  };
+
+  const handleDeleteLayer = () => {
+    const currentLayers = getNormalizedLayers(localMap);
+    if (currentLayers.length <= 1) {
+      alert('최소 1개의 레이어는 유지되어야 합니다.');
+      return;
+    }
+
+    setHistory(prev => [...prev, localMap]);
+    setRedoHistory([]);
+    setLocalMap(prev => {
+      const currentLayers = getNormalizedLayers(prev);
+      const updatedLayers = currentLayers.filter(l => l.id !== activeLayerId);
+      const nextActiveId = updatedLayers[updatedLayers.length - 1]?.id || 'layer_base';
+      setActiveLayerId(nextActiveId);
+      return {
+        ...prev,
+        layers: updatedLayers
+      };
+    });
+  };
+
+  const handleMoveLayer = (index: number, delta: number) => {
+    setHistory(prev => [...prev, localMap]);
+    setRedoHistory([]);
+    setLocalMap(prev => {
+      const currentLayers = getNormalizedLayers(prev);
+      const targetIndex = index + delta;
+      if (targetIndex < 0 || targetIndex >= currentLayers.length) return prev;
+
+      const updatedLayers = [...currentLayers];
+      const temp = updatedLayers[index];
+      updatedLayers[index] = updatedLayers[targetIndex];
+      updatedLayers[targetIndex] = temp;
+
+      return {
+        ...prev,
+        layers: updatedLayers
+      };
+    });
+  };
+
+  const handleToggleLayerVisibility = (layerId: string) => {
+    setLocalMap(prev => {
+      const currentLayers = getNormalizedLayers(prev);
+      const updatedLayers = currentLayers.map(l => {
+        if (l.id === layerId) {
+          return { ...l, visible: !l.visible };
+        }
+        return l;
+      });
+      return {
+        ...prev,
+        layers: updatedLayers
+      };
+    });
+  };
 
   // Undo / Redo stacks
   const [history, setHistory] = useState<MapDefinition[]>([]);
@@ -2482,163 +2593,169 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                     <span style={{ fontSize: '10px', opacity: 0.7 }}>▪</span> 레이어
                   </h4>
 
-                  {/* 1. 1단계(배경) + 노출 체크박스 */}
-                  <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
-                    <button
-                      onClick={() => {
-                        setEditLayer("base");
-                        if (selectedTile === 1 || selectedTile === 0 || selectedTile === -1) {
-                          setSelectedTile(getPrefixedIndex(0, activeTileset));
-                        }
-                      }}
-                      style={{
-                        flex: 1, padding: "7px 10px", fontSize: "12px", borderRadius: "4px",
-                        background: editLayer === "base" ? "rgba(139, 92, 246, 0.2)" : "rgba(255,255,255,0.03)",
-                        color: editLayer === "base" ? "var(--accent)" : "#fff",
-                        border: editLayer === "base" ? "1px solid var(--accent)" : "1px solid var(--border-glass)",
-                        textAlign: "left", cursor: "pointer", fontWeight: "normal"
-                      }}
-                    >
-                      1단계(배경)
-                    </button>
-                    <label
-                      style={{
-                        display: "flex", alignItems: "center", gap: "3px", padding: "6px 8px",
-                        fontSize: "12px", color: showBase ? "var(--accent)" : "#888",
-                        background: showBase ? "rgba(139, 92, 246, 0.1)" : "rgba(255,255,255,0.02)",
-                        border: showBase ? "1px solid var(--accent)" : "1px solid var(--border-glass)",
-                        borderRadius: "4px", cursor: "pointer", whiteSpace: "nowrap"
-                      }}
-                      title="1단계 레이어 노출/숨김"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={showBase}
-                        onChange={(e) => setShowBase(e.target.checked)}
-                        style={{ accentColor: "var(--accent)", cursor: "pointer" }}
-                      />
-                      👁️
-                    </label>
-                  </div>
+                {/* Section 1: 레이어들 (Photoshop-style Layers Panel) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <h4 style={{ fontSize: '13px', color: 'var(--accent)', margin: '0 0 4px 0', borderBottom: '1px solid var(--border-glass)', paddingBottom: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 'normal' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '10px', opacity: 0.7 }}>▪</span> 레이어들
+                    </span>
+                    <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)' }}>{currentLayers.length}개</span>
+                  </h4>
 
-                  {/* 2. 2단계(오브젝트) + 노출 체크박스 */}
-                  <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
-                    <button
-                      onClick={() => {
-                        setEditLayer("decor");
-                        if (selectedTile === 1 || selectedTile === 0 || selectedTile === -1) {
-                          setSelectedTile(getPrefixedIndex(0, activeTileset));
-                        }
-                      }}
-                      style={{
-                        flex: 1, padding: "7px 10px", fontSize: "12px", borderRadius: "4px",
-                        background: editLayer === "decor" ? "rgba(139, 92, 246, 0.2)" : "rgba(255,255,255,0.03)",
-                        color: editLayer === "decor" ? "var(--accent)" : "#fff",
-                        border: editLayer === "decor" ? "1px solid var(--accent)" : "1px solid var(--border-glass)",
-                        textAlign: "left", cursor: "pointer", fontWeight: "normal"
-                      }}
-                    >
-                      2단계(오브젝트)
-                    </button>
-                    <label
-                      style={{
-                        display: "flex", alignItems: "center", gap: "3px", padding: "6px 8px",
-                        fontSize: "12px", color: showDecor ? "var(--accent)" : "#888",
-                        background: showDecor ? "rgba(139, 92, 246, 0.1)" : "rgba(255,255,255,0.02)",
-                        border: showDecor ? "1px solid var(--accent)" : "1px solid var(--border-glass)",
-                        borderRadius: "4px", cursor: "pointer", whiteSpace: "nowrap"
-                      }}
-                      title="2단계 레이어 노출/숨김"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={showDecor}
-                        onChange={(e) => setShowDecor(e.target.checked)}
-                        style={{ accentColor: "var(--accent)", cursor: "pointer" }}
-                      />
-                      👁️
-                    </label>
-                  </div>
+                  {/* Layers Panel Box */}
+                  <div style={{
+                    background: 'rgba(12, 12, 20, 0.85)',
+                    border: '1px solid var(--border-glass)',
+                    borderRadius: '6px',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column'
+                  }}>
+                    {/* Layer Items List */}
+                    <div style={{ maxHeight: '160px', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                      {currentLayers.map((layer, idx) => {
+                        const isActive = editLayer !== 'collision' && layer.id === activeLayerId;
+                        return (
+                          <div
+                            key={layer.id}
+                            onClick={() => {
+                              setActiveLayerId(layer.id);
+                              if (editLayer === 'collision') setEditLayer('decor');
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '5px 8px',
+                              borderBottom: '1px solid rgba(255,255,255,0.04)',
+                              background: isActive ? 'rgba(139, 92, 246, 0.25)' : 'transparent',
+                              color: isActive ? '#fff' : 'rgba(255,255,255,0.7)',
+                              cursor: 'pointer',
+                              fontSize: '12px'
+                            }}
+                          >
+                            {/* Eye Toggle Icon */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleLayerVisibility(layer.id);
+                              }}
+                              title={layer.visible ? "레이어 숨기기" : "레이어 보이기"}
+                              style={{
+                                background: 'none', border: 'none', cursor: 'pointer',
+                                fontSize: '12px', opacity: layer.visible ? 1 : 0.25, padding: '0 2px'
+                              }}
+                            >
+                              {layer.visible ? '👁️' : '🙈'}
+                            </button>
 
-                  {/* 3. 이동 불가지역 Row with Eye Toggle, [추가], and [제거] buttons */}
-                  <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
-                    <button
-                      onClick={() => {
-                        setEditLayer('collision');
-                        setSelectedTile(1);
-                        setSelectedObjectId(null);
-                        setPaletteSelection(null);
-                        setShowCollision(true);
-                      }}
-                      style={{
-                        flex: 1, padding: '7px 8px', fontSize: '12px', borderRadius: '4px',
-                        background: editLayer === 'collision' ? 'rgba(243, 139, 168, 0.2)' : 'rgba(255,255,255,0.03)',
-                        color: editLayer === 'collision' ? '#f38ba8' : '#fff',
-                        border: editLayer === 'collision' ? '1px solid #f38ba8' : '1px solid var(--border-glass)',
-                        textAlign: 'left', cursor: 'pointer', fontWeight: 'normal', whiteSpace: 'nowrap'
-                      }}
-                    >
-                      이동 불가지역
-                    </button>
+                            {/* Layer Name */}
+                            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: isActive ? 'bold' : 'normal' }}>
+                              {layer.name}
+                            </span>
 
-                    <label
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '3px', padding: '6px 8px',
-                        fontSize: '12px', color: showCollision ? 'var(--accent)' : '#888',
-                        background: showCollision ? 'rgba(139, 92, 246, 0.1)' : 'rgba(255,255,255,0.02)',
-                        border: showCollision ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
-                        borderRadius: '4px', cursor: 'pointer', whiteSpace: 'nowrap'
-                      }}
-                      title="이동 불가지역 노출/숨김"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={showCollision}
-                        onChange={(e) => setShowCollision(e.target.checked)}
-                        style={{ accentColor: 'var(--accent)', cursor: 'pointer' }}
-                      />
-                      👁️
-                    </label>
+                            {/* Reorder Buttons (Compact ▲ ▼) */}
+                            <div style={{ display: 'flex', gap: '1px' }} onClick={e => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                disabled={idx === 0}
+                                onClick={() => handleMoveLayer(idx, -1)}
+                                style={{
+                                  background: 'none', border: 'none', color: idx === 0 ? '#444' : '#aaa',
+                                  cursor: idx === 0 ? 'default' : 'pointer', fontSize: '9px', padding: '0 1px'
+                                }}
+                                title="위로 이동"
+                              >▲</button>
+                              <button
+                                type="button"
+                                disabled={idx === currentLayers.length - 1}
+                                onClick={() => handleMoveLayer(idx, 1)}
+                                style={{
+                                  background: 'none', border: 'none', color: idx === currentLayers.length - 1 ? '#444' : '#aaa',
+                                  cursor: idx === currentLayers.length - 1 ? 'default' : 'pointer', fontSize: '9px', padding: '0 1px'
+                                }}
+                                title="아래로 이동"
+                              >▼</button>
+                            </div>
+                          </div>
+                        );
+                      })}
 
-                    <button
-                      onClick={() => {
-                        setEditLayer('collision');
-                        setSelectedTile(1);
-                        setSelectedObjectId(null);
-                        setPaletteSelection(null);
-                        setShowCollision(true);
-                      }}
-                      style={{
-                        padding: '7px 8px', fontSize: '11px', borderRadius: '4px',
-                        background: editLayer === 'collision' && selectedTile === 1 ? 'var(--danger)' : 'rgba(255,255,255,0.04)',
-                        color: editLayer === 'collision' && selectedTile === 1 ? '#fff' : 'rgba(255,255,255,0.7)',
-                        border: editLayer === 'collision' && selectedTile === 1 ? '1px solid var(--danger)' : '1px solid var(--border-glass)',
-                        fontWeight: 'normal', cursor: 'pointer', whiteSpace: 'nowrap'
-                      }}
-                      title="이동 불가지역 (충돌 벽) 추가"
-                    >
-                      추가
-                    </button>
+                      {/* Collision Layer Item */}
+                      <div
+                        onClick={() => {
+                          setEditLayer('collision');
+                          setSelectedTile(1);
+                          setSelectedObjectId(null);
+                          setPaletteSelection(null);
+                          setShowCollision(true);
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '5px 8px',
+                          background: editLayer === 'collision' ? 'rgba(243, 139, 168, 0.25)' : 'transparent',
+                          color: editLayer === 'collision' ? '#f38ba8' : 'rgba(255,255,255,0.5)',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          borderTop: '1px solid rgba(255,255,255,0.08)'
+                        }}
+                      >
+                        <span style={{ fontSize: '11px' }}>⛔</span>
+                        <span style={{ flex: 1, fontWeight: editLayer === 'collision' ? 'bold' : 'normal' }}>이동 불가지역 (충돌)</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowCollision(!showCollision);
+                          }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', opacity: showCollision ? 1 : 0.25 }}
+                        >
+                          {showCollision ? '👁️' : '🙈'}
+                        </button>
+                      </div>
+                    </div>
 
-                    <button
-                      onClick={() => {
-                        setEditLayer('collision');
-                        setSelectedTile(0);
-                        setSelectedObjectId(null);
-                        setPaletteSelection(null);
-                        setShowCollision(true);
-                      }}
-                      style={{
-                        padding: '7px 8px', fontSize: '11px', borderRadius: '4px',
-                        background: editLayer === 'collision' && selectedTile === 0 ? '#a6e3a1' : 'rgba(255,255,255,0.04)',
-                        color: editLayer === 'collision' && selectedTile === 0 ? '#000' : 'rgba(255,255,255,0.7)',
-                        border: editLayer === 'collision' && selectedTile === 0 ? '1px solid #a6e3a1' : '1px solid var(--border-glass)',
-                        fontWeight: 'normal', cursor: 'pointer', whiteSpace: 'nowrap'
-                      }}
-                      title="이동 불가지역 (충돌 벽) 제거"
-                    >
-                      제거
-                    </button>
+                    {/* Compact Icon-Only Bottom Action Toolbar (Photoshop style - No Wordy Text Labels!) */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'flex-end',
+                      gap: '4px',
+                      padding: '4px 6px',
+                      background: 'rgba(0, 0, 0, 0.4)',
+                      borderTop: '1px solid var(--border-glass)'
+                    }}>
+                      <button
+                        type="button"
+                        onClick={handleAddLayer}
+                        title="새 레이어 추가"
+                        style={{
+                          background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border-glass)',
+                          borderRadius: '4px', color: '#fff', cursor: 'pointer', padding: '3px 7px', fontSize: '11px'
+                        }}
+                      >➕</button>
+                      <button
+                        type="button"
+                        onClick={handleDuplicateLayer}
+                        title="선택 레이어 복제"
+                        style={{
+                          background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border-glass)',
+                          borderRadius: '4px', color: '#fff', cursor: 'pointer', padding: '3px 7px', fontSize: '11px'
+                        }}
+                      >📋</button>
+                      <button
+                        type="button"
+                        onClick={handleDeleteLayer}
+                        title="선택 레이어 삭제"
+                        style={{
+                          background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border-glass)',
+                          borderRadius: '4px', color: '#f38ba8', cursor: 'pointer', padding: '3px 7px', fontSize: '11px'
+                        }}
+                      >🗑️</button>
+                    </div>
                   </div>
                 </div>
 

@@ -33,18 +33,60 @@ export function cleanDuplicateObjects(objects?: MapObjectInstance[]): MapObjectI
   return result;
 }
 
+export interface CustomTileLayer {
+  id: string;
+  name: string;
+  visible: boolean;
+  grid: number[][];
+  type?: 'base' | 'decor' | 'top';
+}
+
 export interface MapDefinition {
   id: string;
   name: string;
   width: number;
   height: number;
   tileset: string;
-  baseLayer: number[][]; // 2D array of tile index
-  decorLayer: number[][]; // 2D array for decorations
+  baseLayer: number[][]; // 2D array of tile index (Layer 1)
+  decorLayer: number[][]; // 2D array for decorations (Layer 2)
+  layers?: CustomTileLayer[]; // Dynamic multi-layers (Layer 1, Layer 2, Layer 3, Layer 4...)
   collision: boolean[][]; // 2D array of colliders (true = solid)
   spawnPoints: { x: number; y: number }[];
   objects?: MapObjectInstance[];
   sortOrder?: number; // DB Tab display order
+}
+
+export function getNormalizedLayers(map: MapDefinition): CustomTileLayer[] {
+  if (map.layers && Array.isArray(map.layers) && map.layers.length > 0) {
+    return map.layers.map(l => ({
+      id: l.id || `layer_${Math.random().toString(36).substring(2, 7)}`,
+      name: l.name || '레이어',
+      visible: l.visible !== false,
+      grid: l.grid && Array.isArray(l.grid) && l.grid.length > 0
+        ? l.grid
+        : Array.from({ length: map.height }, () => Array(map.width).fill(-1))
+    }));
+  }
+
+  const baseGrid = map.baseLayer || Array.from({ length: map.height }, () => Array(map.width).fill(0));
+  const decorGrid = map.decorLayer || Array.from({ length: map.height }, () => Array(map.width).fill(-1));
+
+  return [
+    {
+      id: 'layer_base',
+      name: '1단계(배경)',
+      visible: true,
+      grid: baseGrid,
+      type: 'base'
+    },
+    {
+      id: 'layer_decor',
+      name: '2단계(오브젝트)',
+      visible: true,
+      grid: decorGrid,
+      type: 'decor'
+    }
+  ];
 }
 
 export const DEFAULT_CHAR_ROW_ACTIONS: Record<string, string[]> = {
