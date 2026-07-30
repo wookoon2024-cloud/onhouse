@@ -7,6 +7,12 @@ export default defineConfig({
   plugins: [react()],
   build: {
     emptyOutDir: true,
-    chunkSizeWarningLimit: 10000
+    chunkSizeWarningLimit: 10000,
+    rollupOptions: {
+      onwarn(warning, warn) {
+        if (warning.code === 'CIRCULAR_DEPENDENCY') return;
+        warn(warning);
+      }
+    }
   }
 })

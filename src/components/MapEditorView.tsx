@@ -2587,12 +2587,6 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
             {/* Tab 1: ⚙️ 기본 (레이어, 도구, 브러시 크기 설정) */}
             {leftSidebarTab === 'basic' && (
               <>
-                {/* Section 1: 레이어 (Layer Selector) */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <h4 style={{ fontSize: '13px', color: 'var(--accent)', margin: '0 0 2px 0', borderBottom: '1px solid var(--border-glass)', paddingBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'normal' }}>
-                    <span style={{ fontSize: '10px', opacity: 0.7 }}>▪</span> 레이어
-                  </h4>
-
                 {/* Section 1: 레이어들 (Photoshop-style Layers Panel) */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <h4 style={{ fontSize: '13px', color: 'var(--accent)', margin: '0 0 4px 0', borderBottom: '1px solid var(--border-glass)', paddingBottom: '4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 'normal' }}>
