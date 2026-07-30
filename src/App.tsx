@@ -1082,6 +1082,11 @@ export default function App() {
         updateUnreadCount();
         showToast(`[${payload.fromName}] 님이 1:1 놀기를 종료했습니다.`);
       })
+      .on('broadcast', { event: 'dm_read' }, ({ payload }) => {
+        if (!payload || payload.toId !== deviceId.current) return;
+        markDMsAsRead(payload.fromId, payload.toId);
+        window.dispatchEvent(new Event('on_house_dm_read'));
+      })
       .on('broadcast', { event: 'reaction_anim' }, ({ payload }) => {
         if (!payload) return;
         // Ignore echo broadcast originating from ourselves (already spawned locally)
@@ -1976,6 +1981,19 @@ export default function App() {
     } catch (e) {}
   };
 
+  const handleReadDM = (toId: string) => {
+    try {
+      supabase.channel(`house:${houseCode}`).send({
+        type: 'broadcast',
+        event: 'dm_read',
+        payload: {
+          fromId: localPlayer.id,
+          toId
+        }
+      });
+    } catch (e) {}
+  };
+
   // 3-Tier AFK/Tab-Safe Online Verification (Instant 0ms for active/presence, 2.5s fallback ping)
   const checkPlayerOnline = (targetPlayer: PlayerState): Promise<boolean> => {
     return new Promise((resolve) => {
@@ -2623,6 +2641,7 @@ export default function App() {
           activeTarget={activeDMTarget}
           onClose={handleCloseDMChat}
           onSendDM={handleSendDM}
+          onReadDM={handleReadDM}
           onWatchYouTube={(ytId) => setActiveYouTubeVideoId(ytId)}
           onOpenWebUrl={(url) => setActiveWebUrl(url)}
           partnerViewingState={partnerViewingState}

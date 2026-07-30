@@ -7,6 +7,7 @@ interface MessengerProps {
   activeTarget: PlayerState | null; // Selected user to DM
   onClose: () => void;
   onSendDM: (toId: string, text: string) => void;
+  onReadDM?: (toId: string) => void;
   onWatchYouTube?: (videoId: string) => void;
   onOpenWebUrl?: (url: string) => void;
   partnerViewingState?: { videoId?: string; webUrl?: string; syncEnabled?: boolean } | null;
@@ -36,11 +37,25 @@ const extractGeneralUrl = (text: string): string | null => {
   return null;
 };
 
+const isSameMinute = (t1: number, t2: number): boolean => {
+  if (!t1 || !t2) return false;
+  const d1 = new Date(t1);
+  const d2 = new Date(t2);
+  return (
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate() &&
+    d1.getHours() === d2.getHours() &&
+    d1.getMinutes() === d2.getMinutes()
+  );
+};
+
 export const Messenger: React.FC<MessengerProps> = ({
   localPlayer,
   activeTarget,
   onClose,
   onSendDM,
+  onReadDM,
   onWatchYouTube,
   onOpenWebUrl,
   partnerViewingState,
@@ -65,6 +80,9 @@ export const Messenger: React.FC<MessengerProps> = ({
       
       // Mark as read
       markDMsAsRead(activeTarget.id, localPlayer.id);
+      if (onReadDM) {
+        onReadDM(activeTarget.id);
+      }
     }
   };
 
@@ -74,6 +92,13 @@ export const Messenger: React.FC<MessengerProps> = ({
     const interval = setInterval(loadHistory, 500);
     return () => clearInterval(interval);
   }, [activeTarget, localPlayer.id]);
+
+  // Listen for realtime DM read events
+  useEffect(() => {
+    const handleReadEvent = () => loadHistory();
+    window.addEventListener('on_house_dm_read', handleReadEvent);
+    return () => window.removeEventListener('on_house_dm_read', handleReadEvent);
+  }, []);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -133,7 +158,7 @@ export const Messenger: React.FC<MessengerProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <MessageSquare size={18} style={{ color: 'var(--accent)' }} />
           <div>
-            <h4 className="pixel-text" style={{ fontSize: '13px', margin: 0 }}>
+            <h4 className="pixel-text" style={{ fontSize: '13px', margin: 0, fontWeight: 'normal' }}>
               {activeTarget.nickname}
             </h4>
             <span style={{ fontSize: '10px', color: activeTarget.isOnline ? 'var(--success)' : 'var(--text-muted)' }}>
@@ -155,7 +180,7 @@ export const Messenger: React.FC<MessengerProps> = ({
       {/* Messages List */}
       <div style={{
         flex: 1, padding: '16px', overflowY: 'auto',
-        display: 'flex', flexDirection: 'column', gap: '12px',
+        display: 'flex', flexDirection: 'column', gap: '2px',
         background: 'rgba(0, 0, 0, 0.15)'
       }}>
         {messages.length === 0 ? (
@@ -168,142 +193,189 @@ export const Messenger: React.FC<MessengerProps> = ({
             <p style={{ fontSize: '12px' }}>대화 내역이 없습니다.<br />첫 메시지를 보내보세요!</p>
           </div>
         ) : (
-          messages.map((msg) => {
+          messages.map((msg, index) => {
             const isMe = msg.fromId === localPlayer.id;
             const ytId = extractYouTubeId(msg.text);
             const webUrl = extractGeneralUrl(msg.text);
+
+            const prevMsg = messages[index - 1];
+            const nextMsg = messages[index + 1];
+
+            const isPrevSameGroup = prevMsg && prevMsg.fromId === msg.fromId && isSameMinute(msg.timestamp, prevMsg.timestamp);
+            const isNextSameGroup = nextMsg && nextMsg.fromId === msg.fromId && isSameMinute(msg.timestamp, nextMsg.timestamp);
+
+            const isFirstInGroup = !isPrevSameGroup;
+            const isLastInGroup = !isNextSameGroup;
+
             return (
               <div
                 key={msg.id}
                 style={{
                   alignSelf: isMe ? 'flex-end' : 'flex-start',
-                  maxWidth: '80%',
+                  maxWidth: '85%',
+                  display: 'flex',
+                  flexDirection: isMe ? 'row-reverse' : 'row',
+                  alignItems: 'flex-end',
+                  gap: '6px',
+                  marginTop: isFirstInGroup ? '10px' : '3px'
+                }}
+              >
+                {/* Message Bubble */}
+                <div style={{
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: isMe ? 'flex-end' : 'flex-start'
-                }}
-              >
+                }}>
+                  <div style={{
+                    padding: '8px 12px',
+                    borderRadius: '12px',
+                    fontSize: '13px',
+                    lineHeight: '1.4',
+                    background: isMe ? 'var(--primary)' : 'rgba(255, 255, 255, 0.08)',
+                    color: '#fff',
+                    boxShadow: isMe ? '0 2px 8px var(--primary-glow)' : 'none',
+                    border: isMe ? 'none' : '1px solid var(--border-glass)',
+                    wordBreak: 'break-word',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px'
+                  }}>
+                    <div>{msg.text}</div>
+                    {ytId && (() => {
+                      const isPartnerViewing = partnerViewingState?.videoId === ytId;
+                      const isMeViewing = activeYouTubeVideoId === ytId;
+                      return (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', alignSelf: isMe ? 'flex-end' : 'flex-start', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (onWatchYouTube) {
+                                onWatchYouTube(ytId);
+                              } else {
+                                window.dispatchEvent(new CustomEvent('on_house_watch_youtube', { detail: { videoId: ytId } }));
+                              }
+                            }}
+                            style={{
+                              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                              color: '#ffffff',
+                              border: '1px solid rgba(255, 255, 255, 0.4)',
+                              borderRadius: '4px',
+                              padding: '3px 8px',
+                              fontSize: '10px',
+                              fontFamily: 'var(--font-pixel)',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                              boxShadow: '0 2px 8px rgba(239, 68, 68, 0.4)',
+                              outline: 'none'
+                            }}
+                            title="유튜브 영상 팝업 재생하기"
+                          >
+                            ▶️ 보기
+                          </button>
+                          {isPartnerViewing && isMeViewing && (
+                            <span style={{ fontSize: '10px', color: '#f5c2e7', fontFamily: 'var(--font-pixel)', textShadow: '0 0 6px rgba(245, 194, 231, 0.8)' }}>
+                              👀🔥 함께 보는 중
+                            </span>
+                          )}
+                          {isPartnerViewing && !isMeViewing && (
+                            <span style={{ fontSize: '10px', color: '#fab387', fontFamily: 'var(--font-pixel)' }}>
+                              👀 상대 보는 중
+                            </span>
+                          )}
+                          {!isPartnerViewing && isMeViewing && (
+                            <span style={{ fontSize: '10px', color: '#a6e3a1', fontFamily: 'var(--font-pixel)' }}>
+                              👀 보는 중
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
+                    {webUrl && !ytId && (() => {
+                      const isPartnerViewing = partnerViewingState?.webUrl === webUrl;
+                      const isMeViewing = activeWebUrl === webUrl;
+                      return (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', alignSelf: isMe ? 'flex-end' : 'flex-start', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (onOpenWebUrl) {
+                                onOpenWebUrl(webUrl);
+                              } else {
+                                window.dispatchEvent(new CustomEvent('on_house_open_web_url', { detail: { url: webUrl } }));
+                              }
+                            }}
+                            style={{
+                              background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                              color: '#ffffff',
+                              border: '1px solid rgba(255, 255, 255, 0.4)',
+                              borderRadius: '4px',
+                              padding: '3px 8px',
+                              fontSize: '10px',
+                              fontFamily: 'var(--font-pixel)',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                              boxShadow: '0 2px 8px rgba(2, 132, 199, 0.4)',
+                              outline: 'none'
+                            }}
+                            title="웹사이트 팝업 열기"
+                          >
+                            🌐 열기
+                          </button>
+                          {isPartnerViewing && isMeViewing && (
+                            <span style={{ fontSize: '10px', color: '#f5c2e7', fontFamily: 'var(--font-pixel)', textShadow: '0 0 6px rgba(245, 194, 231, 0.8)' }}>
+                              👀🔥 함께 보는 중
+                            </span>
+                          )}
+                          {isPartnerViewing && !isMeViewing && (
+                            <span style={{ fontSize: '10px', color: '#fab387', fontFamily: 'var(--font-pixel)' }}>
+                              👀 상대 보는 중
+                            </span>
+                          )}
+                          {!isPartnerViewing && isMeViewing && (
+                            <span style={{ fontSize: '10px', color: '#a6e3a1', fontFamily: 'var(--font-pixel)' }}>
+                              👀 보는 중
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* KakaoTalk Side Meta: Unread '1' & Group Time */}
                 <div style={{
-                  padding: '8px 12px',
-                  borderRadius: '12px',
-                  fontSize: '13px',
-                  lineHeight: '1.4',
-                  background: isMe ? 'var(--primary)' : 'rgba(255, 255, 255, 0.08)',
-                  color: '#fff',
-                  boxShadow: isMe ? '0 2px 8px var(--primary-glow)' : 'none',
-                  border: isMe ? 'none' : '1px solid var(--border-glass)',
-                  wordBreak: 'break-word',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '6px'
+                  alignItems: isMe ? 'flex-end' : 'flex-start',
+                  fontSize: '9px',
+                  color: 'var(--text-muted)',
+                  lineHeight: '1.2',
+                  flexShrink: 0,
+                  marginBottom: '2px'
                 }}>
-                  <div>{msg.text}</div>
-                  {ytId && (() => {
-                    const isPartnerViewing = partnerViewingState?.videoId === ytId;
-                    const isMeViewing = activeYouTubeVideoId === ytId;
-                    return (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', alignSelf: isMe ? 'flex-end' : 'flex-start', flexWrap: 'wrap' }}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (onWatchYouTube) {
-                              onWatchYouTube(ytId);
-                            } else {
-                              window.dispatchEvent(new CustomEvent('on_house_watch_youtube', { detail: { videoId: ytId } }));
-                            }
-                          }}
-                          style={{
-                            background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                            color: '#ffffff',
-                            border: '1px solid rgba(255, 255, 255, 0.4)',
-                            borderRadius: '4px',
-                            padding: '3px 8px',
-                            fontSize: '10px',
-                            fontFamily: 'var(--font-pixel)',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '3px',
-                            boxShadow: '0 2px 8px rgba(239, 68, 68, 0.4)',
-                            outline: 'none'
-                          }}
-                          title="유튜브 영상 팝업 재생하기"
-                        >
-                          ▶️ 보기
-                        </button>
-                        {isPartnerViewing && isMeViewing && (
-                          <span style={{ fontSize: '10px', color: '#f5c2e7', fontFamily: 'var(--font-pixel)', textShadow: '0 0 6px rgba(245, 194, 231, 0.8)' }}>
-                            👀🔥 함께 보는 중
-                          </span>
-                        )}
-                        {isPartnerViewing && !isMeViewing && (
-                          <span style={{ fontSize: '10px', color: '#fab387', fontFamily: 'var(--font-pixel)' }}>
-                            👀 상대 보는 중
-                          </span>
-                        )}
-                        {!isPartnerViewing && isMeViewing && (
-                          <span style={{ fontSize: '10px', color: '#a6e3a1', fontFamily: 'var(--font-pixel)' }}>
-                            👀 보는 중
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })()}
-                  {webUrl && !ytId && (() => {
-                    const isPartnerViewing = partnerViewingState?.webUrl === webUrl;
-                    const isMeViewing = activeWebUrl === webUrl;
-                    return (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', alignSelf: isMe ? 'flex-end' : 'flex-start', flexWrap: 'wrap' }}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (onOpenWebUrl) {
-                              onOpenWebUrl(webUrl);
-                            } else {
-                              window.dispatchEvent(new CustomEvent('on_house_open_web_url', { detail: { url: webUrl } }));
-                            }
-                          }}
-                          style={{
-                            background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                            color: '#ffffff',
-                            border: '1px solid rgba(255, 255, 255, 0.4)',
-                            borderRadius: '4px',
-                            padding: '3px 8px',
-                            fontSize: '10px',
-                            fontFamily: 'var(--font-pixel)',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '3px',
-                            boxShadow: '0 2px 8px rgba(2, 132, 199, 0.4)',
-                            outline: 'none'
-                          }}
-                          title="웹사이트 팝업 열기"
-                        >
-                          🌐 열기
-                        </button>
-                        {isPartnerViewing && isMeViewing && (
-                          <span style={{ fontSize: '10px', color: '#f5c2e7', fontFamily: 'var(--font-pixel)', textShadow: '0 0 6px rgba(245, 194, 231, 0.8)' }}>
-                            👀🔥 함께 보는 중
-                          </span>
-                        )}
-                        {isPartnerViewing && !isMeViewing && (
-                          <span style={{ fontSize: '10px', color: '#fab387', fontFamily: 'var(--font-pixel)' }}>
-                            👀 상대 보는 중
-                          </span>
-                        )}
-                        {!isPartnerViewing && isMeViewing && (
-                          <span style={{ fontSize: '10px', color: '#a6e3a1', fontFamily: 'var(--font-pixel)' }}>
-                            👀 보는 중
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })()}
+                  {/* Unread '1' Badge for My Sent Messages */}
+                  {isMe && !msg.read && (
+                    <span style={{
+                      color: '#f6c177',
+                      fontSize: '10px',
+                      fontFamily: 'var(--font-pixel)',
+                      marginBottom: isLastInGroup ? '2px' : '0px'
+                    }}>
+                      1
+                    </span>
+                  )}
+
+                  {/* Time Badge (Displayed ONLY on the LAST message of the consecutive minute group) */}
+                  {isLastInGroup && (
+                    <span style={{ fontSize: '9px', color: 'rgba(255, 255, 255, 0.45)', whiteSpace: 'nowrap' }}>
+                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
                 </div>
-                <span style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
               </div>
             );
           })
@@ -330,24 +402,26 @@ export const Messenger: React.FC<MessengerProps> = ({
       }}>
         <input
           type="text"
+          placeholder="메시지를 입력하세요..."
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           onKeyDown={handleKeyPress}
-          placeholder="메시지를 입력하세요..."
-          style={{ flex: 1, padding: '10px 14px', fontSize: '12px' }}
+          style={{
+            flex: 1, padding: '10px 14px', borderRadius: '8px',
+            background: 'rgba(255, 255, 255, 0.05)', border: '1px solid var(--border-glass)',
+            color: '#fff', fontSize: '13px', outline: 'none'
+          }}
         />
         <button
           onClick={handleSend}
-          disabled={!inputText.trim()}
           style={{
-            background: inputText.trim() ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
-            color: inputText.trim() ? '#fff' : 'var(--text-muted)',
-            width: '36px', height: '36px', borderRadius: '50%',
+            background: 'var(--primary)', color: '#fff',
+            width: '38px', height: '38px', borderRadius: '8px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: inputText.trim() ? '0 0 10px var(--primary-glow)' : 'none'
+            boxShadow: '0 2px 8px var(--primary-glow)'
           }}
         >
-          <Send size={14} />
+          <Send size={16} />
         </button>
       </div>
     </div>
