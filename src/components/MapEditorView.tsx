@@ -428,7 +428,12 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                 if (isBase) {
                   newBase[tileY][tileX] = tileVal;
                 } else {
-                  newDecor[tileY][tileX] = tileVal;
+                  // If decorLayer cell ALREADY contains a user's brush-painted tile on top, PRESERVE IT!
+                  if (newDecor[tileY][tileX] !== -1) {
+                    newBase[tileY][tileX] = tileVal;
+                  } else {
+                    newDecor[tileY][tileX] = tileVal;
+                  }
                 }
                 restoredCount++;
               }
