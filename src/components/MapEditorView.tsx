@@ -1805,10 +1805,27 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           tiles: [[targetTile]]
         };
 
-        setLocalMap(prev => ({
-          ...prev,
-          objects: [...(prev.objects || []), newObj]
-        }));
+        setLocalMap(prev => {
+          const newDecor = prev.decorLayer.map(r => [...r]);
+          const newBase = prev.baseLayer.map(r => [...r]);
+
+          if (isBasePick) {
+            if (newBase[ty] && newBase[ty][tx] !== undefined) {
+              newBase[ty][tx] = -1;
+            }
+          } else {
+            if (newDecor[ty] && newDecor[ty][tx] !== undefined) {
+              newDecor[ty][tx] = -1;
+            }
+          }
+
+          return {
+            ...prev,
+            baseLayer: newBase,
+            decorLayer: newDecor,
+            objects: [...(prev.objects || []), newObj]
+          };
+        });
 
         if (isCtrlHeld) {
           setSelectedObjectIds(prev => [...prev, newObj.id]);
