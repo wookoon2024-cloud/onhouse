@@ -1090,6 +1090,7 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
       ctx.imageSmoothingEnabled = false;
 
       // 1. Draw Base Floor Layer (using Offscreen Baked Canvas Cache for 60 FPS smooth rendering!)
+      const normLayers = getNormalizedLayers(map);
       const offscreenKey = `${map.id}_${map.width}_${map.height}_${assetVersion}_${Object.keys(images).length}`;
       if (!offscreenCanvasRef.current) {
         offscreenCanvasRef.current = document.createElement('canvas');
@@ -1109,7 +1110,6 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
           offCtx.fillStyle = '#0f0f15';
           offCtx.fillRect(0, 0, targetW, targetH);
 
-          const normLayers = getNormalizedLayers(map);
           const baseLayerObj = normLayers[0];
           const baseGrid = (baseLayerObj && baseLayerObj.visible !== false && baseLayerObj.grid)
             ? baseLayerObj.grid
@@ -1590,7 +1590,17 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
       }
 
       // C. Render Upper Custom Layers (Layer 2, Layer 3, Layer 4... Painted brush tiles on top of objects!)
-      const upperLayers = normLayers.slice(1);
+      const upperLayers = [...normLayers.slice(1)];
+      const hasUpperTiles = upperLayers.some(l => l.grid && l.grid.some(r => r && r.some(t => t !== -1)));
+      if (!hasUpperTiles && map.decorLayer) {
+        upperLayers.unshift({
+          id: 'layer_decor_fallback',
+          name: '2단계(오브젝트)',
+          visible: true,
+          grid: map.decorLayer
+        });
+      }
+
       upperLayers.forEach((layer) => {
         if (layer.visible !== false && layer.grid) {
           for (let ty = 0; ty < map.height; ty++) {
