@@ -1524,8 +1524,23 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     if (tx < 0 || tx >= localMap.width || ty < 0 || ty >= localMap.height) return;
 
     setLocalMap(prev => {
-      const newBase = prev.baseLayer.map(r => [...r]);
-      const newDecor = prev.decorLayer.map(r => [...r]);
+      const normLayers = getNormalizedLayers(prev);
+      let targetIndex = normLayers.findIndex(l => l.id === activeLayerId);
+      if (targetIndex === -1) {
+        targetIndex = editLayer === 'base' ? 0 : 1;
+      }
+
+      const updatedLayers = normLayers.map((l, lIdx) => {
+        if (lIdx === targetIndex) {
+          return {
+            ...l,
+            grid: l.grid.map(r => [...r])
+          };
+        }
+        return l;
+      });
+
+      const activeGrid = updatedLayers[targetIndex].grid;
       const newCollision = prev.collision.map(r => [...r]);
       let nextObjects = prev.objects ? [...prev.objects] : [];
 
@@ -1558,13 +1573,14 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
             if (editLayer === 'collision') {
               newCollision[pty][ptx] = selectedTile === 1;
             } else if (selectedTile === -1) {
-              if (editLayer === 'base') {
-                newBase[pty][ptx] = -1;
-              } else if (editLayer === 'decor') {
-                newDecor[pty][ptx] = -1;
-                if (autoCollision) newCollision[pty][ptx] = false;
+              // Erase tile ONLY from active selected layer!
+              if (activeGrid[pty]) {
+                activeGrid[pty][ptx] = -1;
               }
-              // Erase 1x1 standalone objects at eraser position (preserve multi-tile building structures!)
+              if (targetIndex !== 0 && autoCollision) {
+                newCollision[pty][ptx] = false;
+              }
+              // Erase 1x1 standalone objects at eraser position
               nextObjects = nextObjects.filter(o => {
                 const isOverlapped = ptx >= o.x && ptx < o.x + o.width && pty >= o.y && pty < o.y + o.height;
                 if (!isOverlapped) return true;
@@ -1579,17 +1595,16 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                 tileToPaint = getOffsetTile(selectedTile, activeTileset, dx, dy);
               }
 
-              // Multi-tile objects go into objects layer without overwriting base/decor background!
               if (!isMultiTileObject) {
-                if (editLayer === 'base') {
-                  newBase[pty][ptx] = tileToPaint;
-                  // Remove any accidental object at this tile when painting ground floor tiles
+                // Paint tile ONLY into active selected layer!
+                if (activeGrid[pty]) {
+                  activeGrid[pty][ptx] = tileToPaint;
+                }
+                if (targetIndex === 0) {
+                  // Remove accidental object at this tile when painting ground floor tiles
                   nextObjects = nextObjects.filter(o => !(ptx >= o.x && ptx < o.x + o.width && pty >= o.y && pty < o.y + o.height));
-                } else if (editLayer === 'decor') {
-                  newDecor[pty][ptx] = tileToPaint;
-                  if (autoCollision) {
-                    newCollision[pty][ptx] = tileToPaint !== -1;
-                  }
+                } else if (autoCollision) {
+                  newCollision[pty][ptx] = tileToPaint !== -1;
                 }
               } else if (autoCollision) {
                 newCollision[pty][ptx] = true;
@@ -1609,7 +1624,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           height: rows,
           x: tx,
           y: ty,
-          layer: editLayer === 'collision' ? 'decor' : editLayer,
+          layer: targetIndex === 0 ? 'base' : 'decor',
           zIndex: Date.now()
         };
 
@@ -1621,8 +1636,9 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
       return {
         ...prev,
-        baseLayer: newBase,
-        decorLayer: newDecor,
+        baseLayer: updatedLayers[0]?.grid || prev.baseLayer,
+        decorLayer: updatedLayers[1]?.grid || prev.decorLayer,
+        layers: updatedLayers,
         collision: newCollision,
         objects: nextObjects
       };

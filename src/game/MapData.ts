@@ -58,13 +58,17 @@ export interface MapDefinition {
 
 export function getNormalizedLayers(map: MapDefinition): CustomTileLayer[] {
   if (map.layers && Array.isArray(map.layers) && map.layers.length > 0) {
-    return map.layers.map(l => ({
-      id: l.id || `layer_${Math.random().toString(36).substring(2, 7)}`,
-      name: l.name || '레이어',
+    return map.layers.map((l, index) => ({
+      id: l.id || (index === 0 ? 'layer_base' : index === 1 ? 'layer_decor' : `layer_${index + 1}`),
+      name: l.name || (index === 0 ? '1단계(배경)' : index === 1 ? '2단계(오브젝트)' : `Layer ${index + 1}`),
       visible: l.visible !== false,
       grid: l.grid && Array.isArray(l.grid) && l.grid.length > 0
         ? l.grid
-        : Array.from({ length: map.height }, () => Array(map.width).fill(-1))
+        : (index === 0
+            ? (map.baseLayer || Array.from({ length: map.height }, () => Array(map.width).fill(0)))
+            : (index === 1
+                ? (map.decorLayer || Array.from({ length: map.height }, () => Array(map.width).fill(-1)))
+                : Array.from({ length: map.height }, () => Array(map.width).fill(-1))))
     }));
   }
 
