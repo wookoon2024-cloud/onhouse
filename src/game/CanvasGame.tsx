@@ -670,6 +670,16 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
   // State for Map Right-Click Context Menu
   const [mapContextMenu, setMapContextMenu] = useState<{ clientX: number; clientY: number; worldX: number; worldY: number } | null>(null);
 
+  // Dynamic Floating Touch Joystick State (spawns right under thumb anywhere on screen!)
+  const [floatingJoystick, setFloatingJoystick] = useState<{
+    active: boolean;
+    originX: number;
+    originY: number;
+    currX: number;
+    currY: number;
+    activeDir: 'up' | 'down' | 'left' | 'right' | null;
+  } | null>(null);
+
   // Global dismiss listener for context menu on ANY click anywhere on screen
   useEffect(() => {
     if (!mapContextMenu) return;
@@ -2030,14 +2040,86 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
           isPanning.current = false;
         }}
         onTouchStart={(e) => {
-          // On mobile, simple single touch is painting
-          isPainting.current = true;
-          handlePaintAtCoords(e);
+          if (isEditMode) {
+            isPainting.current = true;
+            handlePaintAtCoords(e);
+          } else if (e.touches && e.touches.length > 0) {
+            const touch = e.touches[0];
+            autoWalkPathRef.current = null;
+            setFloatingJoystick({
+              active: true,
+              originX: touch.clientX,
+              originY: touch.clientY,
+              currX: touch.clientX,
+              currY: touch.clientY,
+              activeDir: null
+            });
+          }
         }}
         onTouchMove={(e) => {
-          if (isPainting.current) handlePaintAtCoords(e);
+          if (isEditMode) {
+            if (isPainting.current) handlePaintAtCoords(e);
+          } else if (floatingJoystick?.active && e.touches && e.touches.length > 0) {
+            const touch = e.touches[0];
+            const dx = touch.clientX - floatingJoystick.originX;
+            const dy = touch.clientY - floatingJoystick.originY;
+            const dist = Math.hypot(dx, dy);
+
+            const maxRadius = 40;
+            const clampedDist = Math.min(dist, maxRadius);
+            const angle = Math.atan2(dy, dx);
+            const currX = floatingJoystick.originX + Math.cos(angle) * clampedDist;
+            const currY = floatingJoystick.originY + Math.sin(angle) * clampedDist;
+
+            let newDir: 'up' | 'down' | 'left' | 'right' | null = null;
+            if (dist > 10) {
+              if (Math.abs(dx) > Math.abs(dy)) {
+                newDir = dx > 0 ? 'right' : 'left';
+                keysPressed.current['d'] = dx > 0;
+                keysPressed.current['a'] = dx < 0;
+                keysPressed.current['w'] = false;
+                keysPressed.current['s'] = false;
+              } else {
+                newDir = dy > 0 ? 'down' : 'up';
+                keysPressed.current['s'] = dy > 0;
+                keysPressed.current['w'] = dy < 0;
+                keysPressed.current['a'] = false;
+                keysPressed.current['d'] = false;
+              }
+            } else {
+              keysPressed.current['w'] = false;
+              keysPressed.current['a'] = false;
+              keysPressed.current['s'] = false;
+              keysPressed.current['d'] = false;
+            }
+
+            setFloatingJoystick({
+              ...floatingJoystick,
+              currX,
+              currY,
+              activeDir: newDir
+            });
+          }
         }}
-        onTouchEnd={() => { isPainting.current = false; }}
+        onTouchEnd={() => {
+          if (isEditMode) {
+            isPainting.current = false;
+          } else {
+            keysPressed.current['w'] = false;
+            keysPressed.current['a'] = false;
+            keysPressed.current['s'] = false;
+            keysPressed.current['d'] = false;
+            setFloatingJoystick(null);
+          }
+        }}
+        onTouchCancel={() => {
+          isPainting.current = false;
+          keysPressed.current['w'] = false;
+          keysPressed.current['a'] = false;
+          keysPressed.current['s'] = false;
+          keysPressed.current['d'] = false;
+          setFloatingJoystick(null);
+        }}
         className="pixelated"
         style={{ display: 'block', cursor: isEditMode ? (isPanning.current ? 'grabbing' : 'crosshair') : 'pointer', width: '100%', height: '100%' }}
       />
@@ -2116,6 +2198,56 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
             ▼
           </button>
           <div />
+        </div>
+      )}
+
+      {/* Dynamic Floating Touch Joystick UI Overlay (Spawns right under thumb anywhere on screen!) */}
+      {floatingJoystick && floatingJoystick.active && (
+        <div style={{
+          position: 'fixed',
+          left: `${floatingJoystick.originX}px`,
+          top: `${floatingJoystick.originY}px`,
+          transform: 'translate(-50%, -50%)',
+          width: '94px',
+          height: '94px',
+          borderRadius: '50%',
+          background: 'rgba(15, 15, 26, 0.65)',
+          backdropFilter: 'blur(10px)',
+          border: '2px solid rgba(167, 139, 250, 0.7)',
+          boxShadow: '0 0 25px rgba(167, 139, 250, 0.5), inset 0 0 15px rgba(255, 255, 255, 0.15)',
+          pointerEvents: 'none',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          {/* Directional Arrows Glow */}
+          <div style={{ position: 'absolute', top: '6px', color: floatingJoystick.activeDir === 'up' ? '#f5c2e7' : 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: 'bold' }}>▲</div>
+          <div style={{ position: 'absolute', bottom: '6px', color: floatingJoystick.activeDir === 'down' ? '#f5c2e7' : 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: 'bold' }}>▼</div>
+          <div style={{ position: 'absolute', left: '6px', color: floatingJoystick.activeDir === 'left' ? '#f5c2e7' : 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: 'bold' }}>◀</div>
+          <div style={{ position: 'absolute', right: '6px', color: floatingJoystick.activeDir === 'right' ? '#f5c2e7' : 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: 'bold' }}>▶</div>
+
+          {/* Floating Thumb Stick Handle */}
+          <div style={{
+            position: 'fixed',
+            left: `${floatingJoystick.currX}px`,
+            top: `${floatingJoystick.currY}px`,
+            transform: 'translate(-50%, -50%)',
+            width: '44px',
+            height: '44px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #a78bfa 0%, #c084fc 100%)',
+            border: '2px solid #ffffff',
+            boxShadow: '0 0 15px rgba(192, 132, 252, 0.9), inset 0 2px 4px rgba(255, 255, 255, 0.6)',
+            pointerEvents: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '14px',
+            color: '#fff'
+          }}>
+            🎯
+          </div>
         </div>
       )}
 
