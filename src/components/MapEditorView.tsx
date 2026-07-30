@@ -293,10 +293,11 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
   // Helper function to extract exact tile value at (r, c) for any MapObjectInstance
   const getTileValueForCell = (obj: MapObjectInstance, r: number, c: number): number => {
-    if (obj.tiles && obj.tiles[r] && obj.tiles[r][c] !== undefined && obj.tiles[r][c] !== -1) {
-      return obj.tiles[r][c];
-    }
     const effTsKey = obj.tilesetKey || activeTileset;
+    if (obj.tiles && obj.tiles[r] && obj.tiles[r][c] !== undefined && obj.tiles[r][c] !== -1) {
+      const rawVal = obj.tiles[r][c];
+      return getPrefixedIndex(rawVal, effTsKey);
+    }
     const tsInfo = getTilesetInfoLocal(effTsKey) || getTilesetInfo(effTsKey);
     if (tsInfo) {
       const localIdx = (obj.startRow + r) * tsInfo.cols + (obj.startCol + c);
