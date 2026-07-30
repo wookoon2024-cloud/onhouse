@@ -312,14 +312,14 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
 
       {/* Sync Tip Notice Bar */}
       <div style={{
-        padding: '3px 8px',
+        padding: '4px 10px',
         background: 'rgba(10, 10, 18, 0.95)',
         borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
         fontSize: '10px',
         color: '#a6adc8',
         fontFamily: 'var(--font-pixel)'
       }}>
-        💡 새 페이지 이동 시 주소창 입력 후 <span style={{ color: '#38bdf8' }}>[이동/공유]</span>를 누르거나 탭 내 링크 탐색 시 주소가 자동 갱신 및 실시간 동기화됩니다.
+        💡 브라우저 보안(CORS) 규격상 타사 사이트의 내부 클릭 주소는 차단됩니다. 세부 주소 입력 후 <span style={{ color: '#38bdf8' }}>[이동/공유]</span>를 누르면 상대방 화면도 똑같이 동기화됩니다.
       </div>
 
       {/* Web View Iframe Container */}
