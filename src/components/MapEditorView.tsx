@@ -384,7 +384,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     });
   };
 
-  // 💥 Explode / Un-group selected object(s) into individual 1x1 objects!
+  // 💥 Explode / Dissolve selected object(s) into background grid tiles!
   const handleExplodeSelectedObjects = () => {
     if (selectedObjectIds.length === 0) return;
 
@@ -396,52 +396,49 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       const targetObjs = currentObjs.filter(o => selectedObjectIds.includes(o.id));
       if (targetObjs.length === 0) return prev;
 
-      const new1x1Objects: MapObjectInstance[] = [];
-      let counter = 0;
+      const newDecor = prev.decorLayer.map(r => [...r]);
+      const newBase = prev.baseLayer.map(r => [...r]);
+      let restoredCount = 0;
 
       targetObjs.forEach(obj => {
+        const isBase = obj.layer === "base";
         for (let r = 0; r < obj.height; r++) {
           for (let c = 0; c < obj.width; c++) {
             const tileX = obj.x + c;
             const tileY = obj.y + r;
-            const tileVal = getTileValueForCell(obj, r, c);
-
-            if (tileVal !== -1) {
-              counter++;
-              const drawInfo = getTileDrawInfo(tileVal, obj.tilesetKey || activeTileset);
-              const tsKey = drawInfo?.tilesetKey || obj.tilesetKey || activeTileset;
-              const singleTsInfo = getTilesetInfoLocal(tsKey) || getTilesetInfo(tsKey);
-              const startCol = drawInfo && singleTsInfo ? (drawInfo.localIdx % singleTsInfo.cols) : 0;
-              const startRow = drawInfo && singleTsInfo ? Math.floor(drawInfo.localIdx / singleTsInfo.cols) : 0;
-
-              new1x1Objects.push({
-                id: `obj_${Date.now()}_${counter}_${Math.random().toString(36).substring(2, 6)}`,
-                tilesetKey: tsKey,
-                startCol,
-                startRow,
-                width: 1,
-                height: 1,
-                x: tileX,
-                y: tileY,
-                layer: obj.layer || (editLayer === "base" ? "base" : "decor"),
-                zIndex: (obj.zIndex || Date.now()) + r * 10 + c,
-                tiles: [[tileVal]]
-              });
+            if (tileX >= 0 && tileX < prev.width && tileY >= 0 && tileY < prev.height) {
+              const tileVal = getTileValueForCell(obj, r, c);
+              if (tileVal !== -1) {
+                if (isBase) {
+                  // Only write if cell is empty, so brush painted tiles on top are NEVER overwritten!
+                  if (newBase[tileY][tileX] === -1 || newBase[tileY][tileX] === 2000) {
+                    newBase[tileY][tileX] = tileVal;
+                  }
+                } else {
+                  // Decor layer: Only write to decorLayer if cell is empty (-1).
+                  // If a Brush tile was painted on top of this object, newDecor[tileY][tileX] is NOT -1, so the painted brush tile stays on top!
+                  if (newDecor[tileY][tileX] === -1) {
+                    newDecor[tileY][tileX] = tileVal;
+                  }
+                }
+                restoredCount++;
+              }
             }
           }
         }
       });
 
       const remainingObjs = currentObjs.filter(o => !selectedObjectIds.includes(o.id));
-      const finalObjs = [...remainingObjs, ...new1x1Objects];
 
       setSelectedObjectIds([]);
-      setPickedToast(`💥 ${targetObjs.length}개 오브젝트가 ${new1x1Objects.length}개의 1x1 개별 오브젝트로 해체 분리되었습니다!`);
+      setPickedToast(`💥 ${targetObjs.length}개 오브젝트가 해제되어 배경 타일로 전환되었습니다!`);
       setTimeout(() => setPickedToast(null), 2500);
 
       return {
         ...prev,
-        objects: finalObjs
+        baseLayer: newBase,
+        decorLayer: newDecor,
+        objects: remainingObjs
       };
     });
   };
