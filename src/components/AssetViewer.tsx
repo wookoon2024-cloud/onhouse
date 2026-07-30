@@ -1599,6 +1599,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
 
       const newId = (uploadCategory === 'map' ? 'custom_map_' : 'custom_char_') + Date.now();
 
+      const maxPrefix = customMapTilesets.reduce((max, item) => Math.max(max, item.prefix || 8000), 8000);
+      const nextPrefix = maxPrefix >= 9000 ? maxPrefix + 1000 : 9000;
+
       const newOption: TilesetOption = {
         id: newId,
         name,
@@ -1606,7 +1609,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
         cols,
         rows,
         size: tSize,
-        prefix: uploadCategory === 'map' ? 9000 + customMapTilesets.length * 1000 : undefined,
+        prefix: uploadCategory === 'map' ? nextPrefix : undefined,
         isCustom: true
       };
 

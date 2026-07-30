@@ -57,7 +57,13 @@ export const refreshCustomTilesetsCache = () => {
     const savedCustoms = localStorage.getItem('on_house_custom_map_tilesets');
     if (savedCustoms) {
       const customs: any[] = JSON.parse(savedCustoms);
-      cachedCustoms = [...customs].sort((a, b) => (b.prefix || 9000) - (a.prefix || 9000));
+      cachedCustoms = [...customs].sort((a, b) => {
+        const pDiff = (b.prefix || 9000) - (a.prefix || 9000);
+        if (pDiff !== 0) return pDiff;
+        const sizeA = (a.cols || 16) * (a.rows || 16);
+        const sizeB = (b.cols || 16) * (b.rows || 16);
+        return sizeB - sizeA; // Larger tilesets take priority over small duplicate prefixes
+      });
     } else {
       cachedCustoms = [];
     }
