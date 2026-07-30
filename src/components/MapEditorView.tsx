@@ -1151,76 +1151,79 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     if (tx < 0 || tx >= localMap.width || ty < 0 || ty >= localMap.height) return;
 
     let pickedIdx = -1;
-    let pickedObj: MapObjectInstance | null = null;
+    let pickedTsKey = localMap.tileset;
 
     if (editLayer === 'collision') {
       pickedIdx = localMap.collision[ty][tx] ? 1 : 0;
-    } else if (editLayer === 'base') {
-      // 1층 바닥 레이어 선택 상태 -> 1층 바닥 타일 또는 1층 바닥 오브젝트 우선 추출!
-      const baseObj = localMap.objects?.find(o => o.layer === 'base' && tx >= o.x && tx < o.x + o.width && ty >= o.y && ty < o.y + o.height);
-      if (baseObj) {
-        pickedObj = baseObj;
-        const tsInfo = getTilesetInfoLocal(baseObj.tilesetKey);
-        if (tsInfo) {
-          const lIdx = baseObj.startRow * tsInfo.cols + baseObj.startCol;
-          pickedIdx = getPrefixedIndex(lIdx, baseObj.tilesetKey);
-        }
-      } else if (localMap.baseLayer && localMap.baseLayer[ty]) {
-        pickedIdx = localMap.baseLayer[ty][tx];
-      }
     } else if (editLayer === 'decor') {
-      // 2층 가구/장식 레이어 선택 상태 -> 2층 가구 오브젝트 또는 2층 장식 타일 우선 추출!
-      const decorObj = localMap.objects?.find(o => o.layer !== 'base' && tx >= o.x && tx < o.x + o.width && ty >= o.y && ty < o.y + o.height);
-      if (decorObj) {
-        pickedObj = decorObj;
-        const tsInfo = getTilesetInfoLocal(decorObj.tilesetKey);
-        if (tsInfo) {
-          const lIdx = decorObj.startRow * tsInfo.cols + decorObj.startCol;
-          pickedIdx = getPrefixedIndex(lIdx, decorObj.tilesetKey);
-        }
-      } else if (localMap.decorLayer && localMap.decorLayer[ty] && localMap.decorLayer[ty][tx] !== undefined && localMap.decorLayer[ty][tx] !== -1) {
+      // 1. Check decorLayer painted tile at (tx, ty) first!
+      if (localMap.decorLayer && localMap.decorLayer[ty] && localMap.decorLayer[ty][tx] !== undefined && localMap.decorLayer[ty][tx] !== -1) {
         pickedIdx = localMap.decorLayer[ty][tx];
-      } else if (localMap.baseLayer && localMap.baseLayer[ty]) {
-        // Fallback to base tile if decor layer is empty
+      } else {
+        // 2. Check decor objects at (tx, ty)
+        const decorObj = (localMap.objects || []).slice().reverse().find(o => o.layer !== 'base' && tx >= o.x && tx < o.x + o.width && ty >= o.y && ty < o.y + o.height);
+        if (decorObj) {
+          pickedTsKey = decorObj.tilesetKey;
+          const relR = ty - decorObj.y;
+          const relC = tx - decorObj.x;
+          if (decorObj.tiles && decorObj.tiles[relR] && decorObj.tiles[relR][relC] !== undefined && decorObj.tiles[relR][relC] !== -1) {
+            pickedIdx = decorObj.tiles[relR][relC];
+          } else {
+            const tsInfo = getTilesetInfoLocal(decorObj.tilesetKey);
+            if (tsInfo) {
+              const lIdx = (decorObj.startRow + relR) * tsInfo.cols + (decorObj.startCol + relC);
+              pickedIdx = getPrefixedIndex(lIdx, decorObj.tilesetKey);
+            }
+          }
+        } else if (localMap.baseLayer && localMap.baseLayer[ty] && localMap.baseLayer[ty][tx] !== undefined && localMap.baseLayer[ty][tx] !== -1) {
+          // 3. Fallback to baseLayer tile
+          pickedIdx = localMap.baseLayer[ty][tx];
+        }
+      }
+    } else if (editLayer === 'base') {
+      // 1. Check baseLayer painted tile at (tx, ty) first!
+      if (localMap.baseLayer && localMap.baseLayer[ty] && localMap.baseLayer[ty][tx] !== undefined && localMap.baseLayer[ty][tx] !== -1) {
         pickedIdx = localMap.baseLayer[ty][tx];
+      } else {
+        // 2. Check base objects at (tx, ty)
+        const baseObj = (localMap.objects || []).slice().reverse().find(o => o.layer === 'base' && tx >= o.x && tx < o.x + o.width && ty >= o.y && ty < o.y + o.height);
+        if (baseObj) {
+          pickedTsKey = baseObj.tilesetKey;
+          const relR = ty - baseObj.y;
+          const relC = tx - baseObj.x;
+          if (baseObj.tiles && baseObj.tiles[relR] && baseObj.tiles[relR][relC] !== undefined && baseObj.tiles[relR][relC] !== -1) {
+            pickedIdx = baseObj.tiles[relR][relC];
+          } else {
+            const tsInfo = getTilesetInfoLocal(baseObj.tilesetKey);
+            if (tsInfo) {
+              const lIdx = (baseObj.startRow + relR) * tsInfo.cols + (baseObj.startCol + relC);
+              pickedIdx = getPrefixedIndex(lIdx, baseObj.tilesetKey);
+            }
+          }
+        }
       }
     }
 
     if (pickedIdx !== -1) {
       setSelectedTile(pickedIdx);
 
-      if (pickedObj) {
-        // If an object was picked, set palette selection box matching the object dimensions!
-        setActiveTileset(pickedObj.tilesetKey);
-        setPaletteSelection({
-          startCol: pickedObj.startCol,
-          startRow: pickedObj.startRow,
-          cols: pickedObj.width,
-          rows: pickedObj.height,
-          tilesetKey: pickedObj.tilesetKey
-        });
-        setBrushSize(Math.max(pickedObj.width, pickedObj.height));
-      } else {
-        // If a tile was picked, auto-switch active tileset category
-        const info = getTileDrawInfo(pickedIdx, localMap.tileset);
-        if (info && info.tilesetKey) {
-          setActiveTileset(info.tilesetKey);
-          setPaletteSelection(null);
-          setBrushSize(1);
-        }
+      // Auto-switch active tileset category and reset palette selection box!
+      const info = getTileDrawInfo(pickedIdx, pickedTsKey);
+      if (info && info.tilesetKey) {
+        setActiveTileset(info.tilesetKey);
+        setPaletteSelection(null);
+        setBrushSize(1);
       }
 
-      const info = getTileDrawInfo(pickedIdx, localMap.tileset);
-      const tsInfo = info ? getTilesetInfoLocal(info.tilesetKey) : null;
+      const infoDraw = getTileDrawInfo(pickedIdx, pickedTsKey);
+      const tsInfo = infoDraw ? getTilesetInfoLocal(infoDraw.tilesetKey) : null;
       const layerName = editLayer === 'base' ? '1층 바닥' : editLayer === 'decor' ? '2층 가구' : '통행';
-      const label = pickedObj
-        ? `${tsInfo?.label || '오브젝트'} [${pickedObj.width}x${pickedObj.height} 가구]`
-        : tsInfo ? `${tsInfo.label} (ID: ${info?.localIdx})` : `타일 (ID: ${pickedIdx})`;
+      const label = tsInfo ? `${tsInfo.label} (ID: ${infoDraw?.localIdx})` : `타일 (ID: ${pickedIdx})`;
 
       setPickedToast(`🧪 [${layerName}] 스포이드 추출: ${label}`);
       setTimeout(() => setPickedToast(null), 2500);
 
-      // Auto-return to brush tool for smooth painting workflow!
+      // Auto-return to brush tool for smooth single-tile painting workflow!
       setTool('brush');
     }
   };
