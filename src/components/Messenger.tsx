@@ -8,6 +8,7 @@ interface MessengerProps {
   onClose: () => void;
   onSendDM: (toId: string, text: string) => void;
   onWatchYouTube?: (videoId: string) => void;
+  onOpenWebUrl?: (url: string) => void;
 }
 
 const extractYouTubeId = (text: string): string | null => {
@@ -17,12 +18,28 @@ const extractYouTubeId = (text: string): string | null => {
   return match ? match[1] : null;
 };
 
+const extractGeneralUrl = (text: string): string | null => {
+  if (!text) return null;
+  const regex = /(https?:\/\/[^\s]+)/gi;
+  const matches = text.match(regex);
+  if (!matches) return null;
+
+  const ytRegex = /(?:youtube\.com|youtu\.be)/i;
+  for (const url of matches) {
+    if (!ytRegex.test(url)) {
+      return url;
+    }
+  }
+  return null;
+};
+
 export const Messenger: React.FC<MessengerProps> = ({
   localPlayer,
   activeTarget,
   onClose,
   onSendDM,
-  onWatchYouTube
+  onWatchYouTube,
+  onOpenWebUrl
 }) => {
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -148,6 +165,7 @@ export const Messenger: React.FC<MessengerProps> = ({
           messages.map((msg) => {
             const isMe = msg.fromId === localPlayer.id;
             const ytId = extractYouTubeId(msg.text);
+            const webUrl = extractGeneralUrl(msg.text);
             return (
               <div
                 key={msg.id}
@@ -204,6 +222,38 @@ export const Messenger: React.FC<MessengerProps> = ({
                       title="유튜브 영상 팝업 재생하기"
                     >
                       ▶️ 보기
+                    </button>
+                  )}
+                  {webUrl && !ytId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onOpenWebUrl) {
+                          onOpenWebUrl(webUrl);
+                        } else {
+                          window.dispatchEvent(new CustomEvent('on_house_open_web_url', { detail: { url: webUrl } }));
+                        }
+                      }}
+                      style={{
+                        background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                        color: '#ffffff',
+                        border: '1px solid rgba(255, 255, 255, 0.4)',
+                        borderRadius: '4px',
+                        padding: '3px 8px',
+                        fontSize: '10px',
+                        fontFamily: 'var(--font-pixel)',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        boxShadow: '0 2px 8px rgba(2, 132, 199, 0.4)',
+                        alignSelf: isMe ? 'flex-end' : 'flex-start',
+                        outline: 'none'
+                      }}
+                      title="웹사이트 팝업 열기"
+                    >
+                      🌐 열기
                     </button>
                   )}
                 </div>

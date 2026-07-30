@@ -33,6 +33,7 @@ import { ViewMemoModal } from './components/ViewMemoModal';
 import { InventoryModal } from './components/InventoryModal';
 import { CustomAlertModal } from './components/CustomAlertModal';
 import { YouTubePlayerModal } from './components/YouTubePlayerModal';
+import { WebBrowserModal } from './components/WebBrowserModal';
 import { Briefcase } from 'lucide-react';
 
 interface ChatLogMessage {
@@ -50,6 +51,22 @@ const extractYouTubeId = (text: string): string | null => {
   const regex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
   const match = text.match(regex);
   return match ? match[1] : null;
+};
+
+// Helper function to extract non-YouTube Web URLs
+const extractGeneralUrl = (text: string): string | null => {
+  if (!text) return null;
+  const regex = /(https?:\/\/[^\s]+)/gi;
+  const matches = text.match(regex);
+  if (!matches) return null;
+
+  const ytRegex = /(?:youtube\.com|youtu\.be)/i;
+  for (const url of matches) {
+    if (!ytRegex.test(url)) {
+      return url;
+    }
+  }
+  return null;
 };
 
 export default function App() {
@@ -224,8 +241,9 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isChatLogCollapsed, setIsChatLogCollapsed] = useState<boolean>(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const [activeYouTubeVideoId, setActiveYouTubeVideoId] = useState<string | null>(null);
+  const [activeWebUrl, setActiveWebUrl] = useState<string | null>(null);
 
-  // Listen for YouTube Watch custom event from any component
+  // Listen for YouTube Watch & Web URL custom events from any component
   useEffect(() => {
     const handleWatchYT = (e: Event) => {
       const detail = (e as CustomEvent).detail;
@@ -233,8 +251,18 @@ export default function App() {
         setActiveYouTubeVideoId(detail.videoId);
       }
     };
+    const handleOpenWebUrl = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail && detail.url) {
+        setActiveWebUrl(detail.url);
+      }
+    };
     window.addEventListener('on_house_watch_youtube', handleWatchYT);
-    return () => window.removeEventListener('on_house_watch_youtube', handleWatchYT);
+    window.addEventListener('on_house_open_web_url', handleOpenWebUrl);
+    return () => {
+      window.removeEventListener('on_house_watch_youtube', handleWatchYT);
+      window.removeEventListener('on_house_open_web_url', handleOpenWebUrl);
+    };
   }, []);
 
   const handleMarketItemImported = (item: MarketItem, resultId?: string) => {
@@ -2527,6 +2555,7 @@ export default function App() {
           onClose={handleCloseDMChat}
           onSendDM={handleSendDM}
           onWatchYouTube={(ytId) => setActiveYouTubeVideoId(ytId)}
+          onOpenWebUrl={(url) => setActiveWebUrl(url)}
         />
       )}
 
@@ -2547,6 +2576,15 @@ export default function App() {
         <YouTubePlayerModal
           videoId={activeYouTubeVideoId}
           onClose={() => setActiveYouTubeVideoId(null)}
+          isMessengerOpen={!!activeDMTarget}
+        />
+      )}
+
+      {/* 6.8. Draggable & Resizable In-Game Web View Browser Modal */}
+      {activeWebUrl && (
+        <WebBrowserModal
+          url={activeWebUrl}
+          onClose={() => setActiveWebUrl(null)}
           isMessengerOpen={!!activeDMTarget}
         />
       )}
@@ -2593,6 +2631,7 @@ export default function App() {
             ) : (
               chatLogs.map((log) => {
                 const ytId = extractYouTubeId(log.text);
+                const webUrl = extractGeneralUrl(log.text);
                 return (
                   <div
                     key={log.id}
@@ -2639,6 +2678,33 @@ export default function App() {
                         title="유튜브 영상 팝업 재생하기"
                       >
                         ▶️ 보기
+                      </button>
+                    )}
+                    {webUrl && !ytId && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveWebUrl(webUrl)}
+                        style={{
+                          background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                          color: '#ffffff',
+                          border: '1px solid rgba(255, 255, 255, 0.4)',
+                          borderRadius: '4px',
+                          padding: '2px 8px',
+                          fontSize: '10px',
+                          fontFamily: 'var(--font-pixel)',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          boxShadow: '0 2px 8px rgba(2, 132, 199, 0.4)',
+                          flexShrink: 0,
+                          outline: 'none',
+                          lineHeight: '1.2'
+                        }}
+                        title="웹사이트 팝업 열기"
+                      >
+                        🌐 열기
                       </button>
                     )}
                   </div>
