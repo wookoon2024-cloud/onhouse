@@ -2223,7 +2223,13 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
           setFloatingJoystick(null);
         }}
         className="pixelated"
-        style={{ display: 'block', cursor: isEditMode ? (isPanning.current ? 'grabbing' : 'crosshair') : 'pointer', width: '100%', height: '100%' }}
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'block',
+          touchAction: 'none',
+          cursor: isEditMode ? (isPanning.current ? 'grabbing' : 'crosshair') : 'pointer'
+        }}
       />
 
       {/* Dynamic Floating Touch Joystick UI Overlay (Spawns right under thumb anywhere on screen!) */}
