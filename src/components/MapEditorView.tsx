@@ -134,15 +134,15 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   const getActiveToolInstruction = (): string => {
     if (tool === 'collision' || editLayer === 'collision') {
       return collisionSubMode === 'add'
-        ? '🛑 벽 추가 모드: 캔버스를 마우스로 클릭/드래그하여 이동 불가 벽(빨간 격자)을 칠합니다.'
-        : '🧽 벽 삭제 모드: 캔버스를 마우스로 클릭/드래그하여 이동 불가 벽(빨간 격자)을 삭제합니다.';
+        ? '추가 모드: 캔버스를 클릭하거나 드래그하여 이동 불가 벽을 설치합니다.'
+        : '삭제 모드: 캔버스를 클릭하거나 드래그하여 이동 불가 벽을 지웁니다.';
     }
-    if (tool === 'select') return '🖱️ 선택(V): 클릭하여 오브젝트/타일 선택 및 드래그 이동/그룹화';
-    if (tool === 'eyedropper') return '🧪 스포이드(E): 캔버스 타일을 클릭하여 브러시 타일로 픽 (Alt + 클릭 가능)';
-    if (tool === 'object') return '📦 오브젝트(O): 독립 스탬프 형태로 건물/가구 배치';
-    if (tool === 'bucket') return '🪣 채우기(F): 연결된 동일 타일 영역 전체를 채우기';
-    if (selectedTile === -1) return '🧽 지우개(X): 마우스 클릭 및 드래그로 타일 및 오브젝트 지우기';
-    return '🖌️ 브러시(B): 선택한 타일으로 캔버스 타일 그리기';
+    if (tool === 'select') return '선택(V): 클릭하여 오브젝트/타일 선택 및 드래그 이동/그룹화';
+    if (tool === 'eyedropper') return '스포이드(E): 캔버스 타일을 클릭하여 스포이드로 픽 (Alt + 클릭)';
+    if (tool === 'object') return '오브젝트(O): 독립 스탬프 형태로 건물/가구 배치';
+    if (tool === 'bucket') return '채우기(F): 연결된 동일 타일 영역 전체 채우기';
+    if (selectedTile === -1) return '지우개(X): 마우스 클릭 및 드래그로 타일 및 오브젝트 지우기';
+    return '브러시(B): 선택한 타일으로 캔버스 타일 그리기';
   };
 
   // Eyedropper Toast Notification
@@ -2718,26 +2718,25 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         </div>
       </div>
 
-      {/* Photoshop-style Contextual Action Instruction Status Bar (Pixlr / Photoshop Top Instruction Bar) */}
+      {/* Contextual Action Instruction Status Bar */}
       <div style={{
         background: 'rgba(20, 20, 30, 0.95)',
         borderBottom: '1px solid rgba(255, 255, 255, 0.12)',
         padding: '5px 16px',
         fontSize: '12px',
-        color: '#e0e0e0',
+        color: '#ccc',
+        fontWeight: 'normal',
         display: 'flex',
         alignItems: 'center',
         gap: '12px',
         minHeight: '34px',
         boxSizing: 'border-box'
       }}>
-        <span style={{ fontSize: '13px', color: '#a78bfa', display: 'flex', alignItems: 'center', gap: '4px' }}>
-          ℹ️ {tool === 'collision' || editLayer === 'collision' ? '이동 불가 벽 설정:' : ''}
-        </span>
-
-        {/* Collision Sub-mode Switcher inside Top Bar */}
         {(tool === 'collision' || editLayer === 'collision') && (
           <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+            <span style={{ fontSize: '12px', color: '#f38ba8', marginRight: '2px', fontWeight: 'normal' }}>
+              이동 불가 벽 설정:
+            </span>
             <button
               type="button"
               onClick={() => {
@@ -2745,15 +2744,14 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                 setSelectedTile(-1);
               }}
               style={{
-                padding: '3px 10px', fontSize: '11px', borderRadius: '4px',
+                padding: '3px 12px', fontSize: '11px', borderRadius: '4px',
                 background: collisionSubMode === 'delete' ? '#f38ba8' : 'rgba(255,255,255,0.06)',
                 color: collisionSubMode === 'delete' ? '#111' : '#f38ba8',
-                border: '1px solid #f38ba8', cursor: 'pointer', fontWeight: collisionSubMode === 'delete' ? 'bold' : 'normal',
-                display: 'flex', alignItems: 'center', gap: '4px'
+                border: '1px solid #f38ba8', cursor: 'pointer', fontWeight: 'normal'
               }}
-              title="이동 불가 벽 삭제 (마우스 드래그로 연속 지우기 가능)"
+              title="이동 불가 벽 삭제 (마우스 드래그 가능)"
             >
-              🧽 벽 삭제 {collisionSubMode === 'delete' ? '(기본)' : ''}
+              삭제
             </button>
             <button
               type="button"
@@ -2762,20 +2760,19 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                 setSelectedTile(1);
               }}
               style={{
-                padding: '3px 10px', fontSize: '11px', borderRadius: '4px',
+                padding: '3px 12px', fontSize: '11px', borderRadius: '4px',
                 background: collisionSubMode === 'add' ? '#f38ba8' : 'rgba(255,255,255,0.06)',
                 color: collisionSubMode === 'add' ? '#111' : '#f38ba8',
-                border: '1px solid #f38ba8', cursor: 'pointer', fontWeight: collisionSubMode === 'add' ? 'bold' : 'normal',
-                display: 'flex', alignItems: 'center', gap: '4px'
+                border: '1px solid #f38ba8', cursor: 'pointer', fontWeight: 'normal'
               }}
-              title="이동 불가 벽 추가 (마우스 드래그로 연속 칠하기 가능)"
+              title="이동 불가 벽 추가 (마우스 드래그 가능)"
             >
-              🛑 벽 추가
+              추가
             </button>
           </div>
         )}
 
-        <span style={{ color: '#e0e0e0', fontWeight: 'normal' }}>
+        <span style={{ color: '#ccc', fontWeight: 'normal' }}>
           {getActiveToolInstruction()}
         </span>
       </div>
