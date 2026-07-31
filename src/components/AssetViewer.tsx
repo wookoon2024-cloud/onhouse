@@ -931,8 +931,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
         setCropImgWidth(img.width);
         setCropImgHeight(img.height);
         
-        // Default crop box size matches active editorGridRes (16, 32, or 64)!
-        const defaultSize = Math.min(img.width, img.height, editorGridRes);
+        // Default crop box size matches active editorGridResW!
+        const defaultSize = Math.min(img.width, img.height, editorGridResW);
         const centerX = Math.max(0, Math.floor((img.width - defaultSize) / 2));
         const centerY = Math.max(0, Math.floor((img.height - defaultSize) / 2));
 
@@ -2004,7 +2004,6 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   const currentCharRowActions = charRowActions[currentSelectedId] || getCharRowActions(currentSelectedId);
   const baseBoardSize = 256;
   const boardSize = Math.round(baseBoardSize * editorZoom);
-  const cellSizePx = boardSize / editorGridRes;
 
   return (
     <div style={{
