@@ -201,9 +201,10 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
 
   // Pixel Art Editor Modal State
   const [editingTile, setEditingTile] = useState<{ charId: string; col: number; row: number } | null>(null);
-  const [editorGridRes, setEditorGridRes] = useState<number>(16); // 16, 32, or 64
+  const [editorGridResW, setEditorGridResW] = useState<number>(32);
+  const [editorGridResH, setEditorGridResH] = useState<number>(32);
   const [editorZoom, setEditorZoom] = useState<number>(1.0); // Board zoom scale (1x, 1.5x, 2x, 3x, 4x)
-  const [pixelGrid, setPixelGrid] = useState<string[][]>(Array.from({ length: 16 }, () => Array(16).fill('transparent')));
+  const [pixelGrid, setPixelGrid] = useState<string[][]>(Array.from({ length: 32 }, () => Array(32).fill('transparent')));
   const [selectedColor, setSelectedColor] = useState<string>('#ff0000');
   const [drawTool, setDrawTool] = useState<'pencil' | 'eraser'>('pencil');
   const [isMouseDown, setIsMouseDown] = useState<boolean>(false);
@@ -829,30 +830,30 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     img.src = currentOption.url;
   };
 
-  // Helper to load/resample pixel grid at resolution (16, 32, 64)
-  const loadPixelGridForRes = (res: number, col: number, row: number, imageUrl: string) => {
+  // Helper to load/resample pixel grid at resolution (resW, resH)
+  const loadPixelGridForRes = (resW: number, resH: number, col: number, row: number, imageUrl: string) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      canvas.width = res;
-      canvas.height = res;
+      canvas.width = resW;
+      canvas.height = resH;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      ctx.clearRect(0, 0, res, res);
+      ctx.clearRect(0, 0, resW, resH);
       // Sample source frame region dynamically using exact image dimensions
-      const tileW = Math.max(16, Math.floor(img.width / currentOption.cols));
-      const tileH = Math.max(16, Math.floor(img.height / currentOption.rows));
+      const tileW = Math.max(1, Math.floor(img.width / currentOption.cols));
+      const tileH = Math.max(1, Math.floor(img.height / currentOption.rows));
 
-      ctx.drawImage(img, col * tileW, row * tileH, tileW, tileH, 0, 0, res, res);
+      ctx.drawImage(img, col * tileW, row * tileH, tileW, tileH, 0, 0, resW, resH);
 
-      const imgData = ctx.getImageData(0, 0, res, res);
-      const grid: string[][] = Array.from({ length: res }, () => Array(res).fill('transparent'));
+      const imgData = ctx.getImageData(0, 0, resW, resH);
+      const grid: string[][] = Array.from({ length: resH }, () => Array(resW).fill('transparent'));
 
-      for (let y = 0; y < res; y++) {
-        for (let x = 0; x < res; x++) {
-          const idx = (y * res + x) * 4;
+      for (let y = 0; y < resH; y++) {
+        for (let x = 0; x < resW; x++) {
+          const idx = (y * resW + x) * 4;
           const r = imgData.data[idx];
           const g = imgData.data[idx + 1];
           const b = imgData.data[idx + 2];
@@ -879,24 +880,41 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     const frameResKey = `on_house_char_frame_res_${currentSelectedId}_${row}_${col}`;
     const savedRes = localStorage.getItem(frameResKey);
 
-    // Default to character option size (e.g. 64) if no explicit per-frame override exists!
-    const defaultRes = currentOption.size || 16;
-    const initialRes = savedRes ? parseInt(savedRes, 10) : defaultRes;
+    let defaultW = effFrameW || currentOption.frameWidth || currentOption.size || 32;
+    let defaultH = effFrameH || currentOption.frameHeight || currentOption.size || 32;
 
-    setEditorGridRes(initialRes);
-    loadPixelGridForRes(initialRes, col, row, currentOption.url);
+    if (savedRes && savedRes.includes('x')) {
+      const parts = savedRes.split('x');
+      const w = parseInt(parts[0], 10);
+      const h = parseInt(parts[1], 10);
+      if (!isNaN(w) && !isNaN(h)) {
+        defaultW = w;
+        defaultH = h;
+      }
+    } else if (savedRes) {
+      const sq = parseInt(savedRes, 10);
+      if (!isNaN(sq)) {
+        defaultW = sq;
+        defaultH = sq;
+      }
+    }
+
+    setEditorGridResW(defaultW);
+    setEditorGridResH(defaultH);
+    loadPixelGridForRes(defaultW, defaultH, col, row, currentOption.url);
     setEditingTile({ charId: currentSelectedId, col, row });
   };
 
-  // Switch Resolution in Pixel Editor (16, 32, 64) & persist!
-  const handleChangeGridRes = (newRes: number) => {
+  // Switch Resolution in Pixel Editor & persist!
+  const handleChangeGridRes = (newW: number, newH: number) => {
     if (!editingTile) return;
-    setEditorGridRes(newRes);
+    setEditorGridResW(newW);
+    setEditorGridResH(newH);
 
     const frameResKey = `on_house_char_frame_res_${editingTile.charId}_${editingTile.row}_${editingTile.col}`;
-    localStorage.setItem(frameResKey, newRes.toString());
+    localStorage.setItem(frameResKey, `${newW}x${newH}`);
 
-    loadPixelGridForRes(newRes, editingTile.col, editingTile.row, currentOption.url);
+    loadPixelGridForRes(newW, newH, editingTile.col, editingTile.row, currentOption.url);
   };
 
   // Step 1: Select image file -> Open Interactive Image Crop Modal (Default centered crop box matching active grid res!)
@@ -964,27 +982,28 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
-      const res = editorGridRes; // 16, 32, or 64
+      const resW = editorGridResW;
+      const resH = editorGridResH;
       const canvas = document.createElement('canvas');
-      canvas.width = res;
-      canvas.height = res;
+      canvas.width = resW;
+      canvas.height = resH;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      ctx.clearRect(0, 0, res, res);
-      // Draw selected cropped sub-rectangle scaled onto res x res canvas
+      ctx.clearRect(0, 0, resW, resH);
+      // Draw selected cropped sub-rectangle scaled onto resW x resH canvas
       ctx.drawImage(
         img,
         cropRect.x, cropRect.y, cropRect.w, cropRect.h,
-        0, 0, res, res
+        0, 0, resW, resH
       );
 
-      const imgData = ctx.getImageData(0, 0, res, res);
-      const grid: string[][] = Array.from({ length: res }, () => Array(res).fill('transparent'));
+      const imgData = ctx.getImageData(0, 0, resW, resH);
+      const grid: string[][] = Array.from({ length: resH }, () => Array(resW).fill('transparent'));
 
-      for (let y = 0; y < res; y++) {
-        for (let x = 0; x < res; x++) {
-          const idx = (y * res + x) * 4;
+      for (let y = 0; y < resH; y++) {
+        for (let x = 0; x < resW; x++) {
+          const idx = (y * resW + x) * 4;
           const r = imgData.data[idx];
           const g = imgData.data[idx + 1];
           const b = imgData.data[idx + 2];
@@ -1007,19 +1026,16 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     img.src = cropModalImage;
   };
 
-  // Save painted frame back onto spritesheet canvas with exact chosen resolution (16, 32, 64)!
+  // Save painted frame back onto spritesheet canvas with exact chosen resolution!
   const handleSavePixelEditor = () => {
     if (!editingTile) return;
     const { charId, col, row } = editingTile;
-    const res = editorGridRes; // 16, 32, or 64
-
-    // Use exact resolution chosen by user so 64x64 HD details are NEVER crushed or distorted!
-    const currentFrameSize = currentOption.size || 16;
-    const tileSize = Math.max(currentFrameSize, res);
+    const resW = editorGridResW;
+    const resH = editorGridResH;
 
     // Save frame resolution preference
     const frameResKey = `on_house_char_frame_res_${charId}_${row}_${col}`;
-    localStorage.setItem(frameResKey, res.toString());
+    localStorage.setItem(frameResKey, `${resW}x${resH}`);
 
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -1028,13 +1044,13 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       const rows = currentOption.rows;
 
       const canvas = document.createElement('canvas');
-      canvas.width = cols * tileSize;
-      canvas.height = rows * tileSize;
+      canvas.width = cols * resW;
+      canvas.height = rows * resH;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
       ctx.imageSmoothingEnabled = false;
 
-      // Resample existing tiles to new tileSize
+      // Resample existing tiles to new frame dimensions (resW x resH)
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           const srcTileW = img.width / cols;
@@ -1042,24 +1058,24 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
           ctx.drawImage(
             img,
             c * srcTileW, r * srcTileH, srcTileW, srcTileH,
-            c * tileSize, r * tileSize, tileSize, tileSize
+            c * resW, r * resH, resW, resH
           );
         }
       }
 
       // Clear specified (col, row) tile region
-      ctx.clearRect(col * tileSize, row * tileSize, tileSize, tileSize);
+      ctx.clearRect(col * resW, row * resH, resW, resH);
 
-      // Render pixelGrid (res x res) onto temp canvas then draw 1:1 crisp to main canvas frame slot
+      // Render pixelGrid (resH x resW) onto temp canvas then draw 1:1 crisp to main canvas frame slot
       const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = res;
-      tempCanvas.height = res;
+      tempCanvas.width = resW;
+      tempCanvas.height = resH;
       const tempCtx = tempCanvas.getContext('2d');
       if (tempCtx) {
         tempCtx.imageSmoothingEnabled = false;
-        for (let y = 0; y < res; y++) {
-          for (let x = 0; x < res; x++) {
-            const color = pixelGrid[y][x];
+        for (let y = 0; y < resH; y++) {
+          for (let x = 0; x < resW; x++) {
+            const color = pixelGrid[y]?.[x];
             if (color && color !== 'transparent') {
               tempCtx.fillStyle = color;
               tempCtx.fillRect(x, y, 1, 1);
@@ -1067,7 +1083,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
           }
         }
         // Draw 1:1 crisp to main canvas frame slot without downsampling loss!
-        ctx.drawImage(tempCanvas, 0, 0, res, res, col * tileSize, row * tileSize, tileSize, tileSize);
+        ctx.drawImage(tempCanvas, 0, 0, resW, resH, col * resW, row * resH, resW, resH);
       }
 
       const updatedUrl = canvas.toDataURL();
@@ -1078,8 +1094,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
           rows: currentOption.rows,
           cols: currentOption.cols,
           size: currentOption.size || 32,
-          frameWidth: currentOption.frameWidth,
-          frameHeight: currentOption.frameHeight
+          frameWidth: resW,
+          frameHeight: resH
         }
       }));
 
@@ -2843,22 +2859,37 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                     ))}
                   </div>
 
-                  {/* Grid Resolution Selector (16x16, 32x32, 64x64) */}
+                  {/* Grid Resolution Selector (Custom Original, 16x16, 32x32, 64x64) */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '2px', background: 'rgba(0,0,0,0.4)', padding: '2px 4px', borderRadius: '4px', border: '1px solid var(--border-glass)' }}>
                     <Grid size={11} style={{ color: 'var(--accent)', marginRight: '2px' }} />
-                    {([16, 32, 64] as const).map((res) => (
-                      <button
-                        key={res}
-                        onClick={() => handleChangeGridRes(res)}
-                        style={{
-                          padding: '2px 6px', fontSize: '9px', borderRadius: '3px', border: 'none',
-                          background: editorGridRes === res ? 'var(--accent)' : 'transparent',
-                          color: editorGridRes === res ? '#000' : '#ccc', cursor: 'pointer', fontWeight: 'bold'
-                        }}
-                      >
-                        {res}x{res}
-                      </button>
-                    ))}
+                    {(() => {
+                      const rawW = effFrameW || currentOption.frameWidth || 32;
+                      const rawH = effFrameH || currentOption.frameHeight || 32;
+                      const options: { label: string; w: number; h: number }[] = [];
+
+                      options.push({ label: `원본 (${rawW}x${rawH})`, w: rawW, h: rawH });
+
+                      if (rawW !== 16 || rawH !== 16) options.push({ label: '16x16', w: 16, h: 16 });
+                      if (rawW !== 32 || rawH !== 32) options.push({ label: '32x32', w: 32, h: 32 });
+                      if (rawW !== 64 || rawH !== 64) options.push({ label: '64x64', w: 64, h: 64 });
+
+                      return options.map((opt) => {
+                        const isSelected = editorGridResW === opt.w && editorGridResH === opt.h;
+                        return (
+                          <button
+                            key={`${opt.w}x${opt.h}`}
+                            onClick={() => handleChangeGridRes(opt.w, opt.h)}
+                            style={{
+                              padding: '2px 6px', fontSize: '9px', borderRadius: '3px', border: 'none',
+                              background: isSelected ? 'var(--accent)' : 'transparent',
+                              color: isSelected ? '#000' : '#ccc', cursor: 'pointer', fontWeight: 'bold'
+                            }}
+                          >
+                            {opt.label}
+                          </button>
+                        );
+                      });
+                    })()}
                   </div>
                 </div>
               </div>
@@ -2901,7 +2932,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                     <FlipHorizontal size={11} /> ↔️ 반전
                   </button>
                   <button
-                    onClick={() => setPixelGrid(Array.from({ length: editorGridRes }, () => Array(editorGridRes).fill('transparent')))}
+                    onClick={() => setPixelGrid(Array.from({ length: editorGridResH }, () => Array(editorGridResW).fill('transparent')))}
                     style={{
                       padding: '4px 8px', fontSize: '10px', borderRadius: '4px',
                       background: 'rgba(239, 68, 68, 0.2)', color: '#ff6b6b', border: '1px solid var(--danger)',
@@ -2927,7 +2958,6 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                     <button
                       onClick={() => {
                         setPixelGrid(prevGrid => {
-                          const res = prevGrid.length;
                           return prevGrid.map((row) => [...row.slice(1), 'transparent']);
                         });
                       }}
@@ -2943,9 +2973,10 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                     <button
                       onClick={() => {
                         setPixelGrid(prevGrid => {
-                          const res = prevGrid.length;
-                          const newGrid = Array.from({ length: res }, () => Array(res).fill('transparent'));
-                          for (let r = 0; r < res - 1; r++) {
+                          const resH = prevGrid.length;
+                          const resW = prevGrid[0]?.length || 32;
+                          const newGrid = Array.from({ length: resH }, () => Array(resW).fill('transparent'));
+                          for (let r = 0; r < resH - 1; r++) {
                             newGrid[r] = [...prevGrid[r + 1]];
                           }
                           return newGrid;
@@ -2963,9 +2994,10 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                     <button
                       onClick={() => {
                         setPixelGrid(prevGrid => {
-                          const res = prevGrid.length;
-                          const newGrid = Array.from({ length: res }, () => Array(res).fill('transparent'));
-                          for (let r = 1; r < res; r++) {
+                          const resH = prevGrid.length;
+                          const resW = prevGrid[0]?.length || 32;
+                          const newGrid = Array.from({ length: resH }, () => Array(resW).fill('transparent'));
+                          for (let r = 1; r < resH; r++) {
                             newGrid[r] = [...prevGrid[r - 1]];
                           }
                           return newGrid;
@@ -2999,60 +3031,73 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 </div>
 
                 <div style={{ fontSize: '9px', color: '#aaa' }}>
-                  <strong style={{ color: 'var(--accent)' }}>{editorGridRes}x{editorGridRes}</strong> ({cellSizePx.toFixed(1)}px/셀 | {editorZoom}x)
+                  <strong style={{ color: 'var(--accent)' }}>{editorGridResW}x{editorGridResH}</strong> ({editorZoom}x)
                 </div>
               </div>
 
               {/* Zoomable & Scrollable Cell Grid Container */}
-              <div style={{
-                maxWidth: '320px', maxHeight: '320px', overflow: 'auto',
-                background: '#0a0a0f', borderRadius: '8px', border: '1px solid var(--border-glass)',
-                padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.8)', margin: '0 auto'
-              }}>
-                <div
-                  onMouseDown={() => setIsMouseDown(true)}
-                  onMouseLeave={() => setIsMouseDown(false)}
-                  style={{
-                    width: `${boardSize}px`, height: `${boardSize}px`,
-                    display: 'grid',
-                    gridTemplateColumns: `repeat(${editorGridRes}, ${cellSizePx}px)`,
-                    gridTemplateRows: `repeat(${editorGridRes}, ${cellSizePx}px)`,
-                    background: '#222', border: '2px solid var(--accent)',
-                    borderRadius: '4px', boxShadow: '0 8px 24px rgba(0,0,0,0.6)', cursor: 'crosshair',
-                    overflow: 'hidden', flexShrink: 0
-                  }}
-                >
-                  {pixelGrid.map((row, y) =>
-                    row.map((color, x) => (
-                      <div
-                        key={`${y}-${x}`}
-                        onMouseDown={() => {
-                          const newGrid = pixelGrid.map((r, ry) =>
-                            r.map((c, cx) => (ry === y && cx === x ? (drawTool === 'pencil' ? selectedColor : 'transparent') : c))
-                          );
-                          setPixelGrid(newGrid);
-                        }}
-                        onMouseEnter={() => {
-                          if (isMouseDown) {
-                            const newGrid = pixelGrid.map((r, ry) =>
-                              r.map((c, cx) => (ry === y && cx === x ? (drawTool === 'pencil' ? selectedColor : 'transparent') : c))
-                            );
-                            setPixelGrid(newGrid);
-                          }
-                        }}
-                        style={{
-                          width: `${cellSizePx}px`, height: `${cellSizePx}px`,
-                          background: color === 'transparent' ? '#0d0d14' : color,
-                          boxSizing: 'border-box',
-                          borderRight: '1px solid rgba(255,255,255,0.12)',
-                          borderBottom: '1px solid rgba(255,255,255,0.12)'
-                        }}
-                      />
-                    ))
-                  )}
-                </div>
-              </div>
+              {(() => {
+                const maxW = 320;
+                const maxH = 320;
+                const scaleW = maxW / editorGridResW;
+                const scaleH = maxH / editorGridResH;
+                const baseScale = Math.min(scaleW, scaleH);
+                const cellSizePx = Math.max(1, baseScale * editorZoom);
+                const boardW = editorGridResW * cellSizePx;
+                const boardH = editorGridResH * cellSizePx;
+
+                return (
+                  <div style={{
+                    maxWidth: '320px', maxHeight: '320px', overflow: 'auto',
+                    background: '#0a0a0f', borderRadius: '8px', border: '1px solid var(--border-glass)',
+                    padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.8)', margin: '0 auto'
+                  }}>
+                    <div
+                      onMouseDown={() => setIsMouseDown(true)}
+                      onMouseLeave={() => setIsMouseDown(false)}
+                      style={{
+                        width: `${boardW}px`, height: `${boardH}px`,
+                        display: 'grid',
+                        gridTemplateColumns: `repeat(${editorGridResW}, ${cellSizePx}px)`,
+                        gridTemplateRows: `repeat(${editorGridResH}, ${cellSizePx}px)`,
+                        background: '#222', border: '2px solid var(--accent)',
+                        borderRadius: '4px', boxShadow: '0 8px 24px rgba(0,0,0,0.6)', cursor: 'crosshair',
+                        overflow: 'hidden', flexShrink: 0
+                      }}
+                    >
+                      {pixelGrid.map((row, y) =>
+                        row.map((color, x) => (
+                          <div
+                            key={`${y}-${x}`}
+                            onMouseDown={() => {
+                              const newGrid = pixelGrid.map((r, ry) =>
+                                r.map((c, cx) => (ry === y && cx === x ? (drawTool === 'pencil' ? selectedColor : 'transparent') : c))
+                              );
+                              setPixelGrid(newGrid);
+                            }}
+                            onMouseEnter={() => {
+                              if (isMouseDown) {
+                                const newGrid = pixelGrid.map((r, ry) =>
+                                  r.map((c, cx) => (ry === y && cx === x ? (drawTool === 'pencil' ? selectedColor : 'transparent') : c))
+                                );
+                                setPixelGrid(newGrid);
+                              }
+                            }}
+                            style={{
+                              width: `${cellSizePx}px`, height: `${cellSizePx}px`,
+                              background: color === 'transparent' ? '#0d0d14' : color,
+                              boxSizing: 'border-box',
+                              borderRight: '1px solid rgba(255,255,255,0.08)',
+                              borderBottom: '1px solid rgba(255,255,255,0.08)'
+                            }}
+                          />
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Right: Color Palette & Actions */}
@@ -3103,21 +3148,30 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
               {/* Live Preview */}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', borderTop: '1px solid var(--border-glass)', paddingTop: '8px' }}>
                 <span style={{ fontSize: '10px', color: '#aaa' }}>실시간 미리보기</span>
-                <div
-                  style={{
-                    width: '48px', height: '48px', border: '2px solid var(--accent)', borderRadius: '4px',
-                    display: 'grid',
-                    gridTemplateColumns: `repeat(${editorGridRes}, ${48 / editorGridRes}px)`,
-                    gridTemplateRows: `repeat(${editorGridRes}, ${48 / editorGridRes}px)`,
-                    background: '#111', overflow: 'hidden'
-                  }}
-                >
-                  {pixelGrid.map((row, y) =>
-                    row.map((color, x) => (
-                      <div key={`p-${y}-${x}`} style={{ background: color === 'transparent' ? 'transparent' : color }} />
-                    ))
-                  )}
-                </div>
+                {(() => {
+                  const previewW = Math.max(16, Math.round(52 * (editorGridResW / editorGridResH)));
+                  const previewH = 52;
+                  const cellW = previewW / editorGridResW;
+                  const cellH = previewH / editorGridResH;
+
+                  return (
+                    <div
+                      style={{
+                        width: `${previewW}px`, height: `${previewH}px`, border: '2px solid var(--accent)', borderRadius: '4px',
+                        display: 'grid',
+                        gridTemplateColumns: `repeat(${editorGridResW}, ${cellW}px)`,
+                        gridTemplateRows: `repeat(${editorGridResH}, ${cellH}px)`,
+                        background: '#111', overflow: 'hidden'
+                      }}
+                    >
+                      {pixelGrid.map((row, y) =>
+                        row.map((color, x) => (
+                          <div key={`p-${y}-${x}`} style={{ background: color === 'transparent' ? 'transparent' : color }} />
+                        ))
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Save / Cancel buttons */}
