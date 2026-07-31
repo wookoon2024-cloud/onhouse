@@ -434,14 +434,15 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   }
 
   // Frame aspect ratio (height / width)
-  const frameAspectRatio = (effFrameW && effFrameH && effFrameW > 0) ? (effFrameH / effFrameW) : 1.0;
+  const rawRatio = (effFrameW && effFrameH && effFrameW > 0) ? (effFrameH / effFrameW) : 1.0;
+  const frameAspectRatio = (isNaN(rawRatio) || !isFinite(rawRatio) || rawRatio <= 0) ? 1.0 : rawRatio;
 
   // Base Cell Dimensions (Character tiles use 32px base width for clean editing view, preserving frame aspect ratio)
   const mapOutputW = activeTab === 'character' ? 32 : (currentOption?.size || 16);
-  const mapOutputH = activeTab === 'character' ? Math.round(32 * frameAspectRatio) : (currentOption?.size || 16);
+  const mapOutputH = activeTab === 'character' ? Math.max(16, Math.round(32 * frameAspectRatio)) : (currentOption?.size || 16);
 
-  const visualCellWidth = Math.round(mapOutputW * gridZoom);
-  const visualCellHeight = Math.round(mapOutputH * gridZoom);
+  const visualCellWidth = Math.max(1, Math.round(mapOutputW * gridZoom));
+  const visualCellHeight = Math.max(1, Math.round(mapOutputH * gridZoom));
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -2280,8 +2281,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
           <div style={{
             position: 'relative',
             margin: 'auto',
-            width: `${currentOption.cols * visualCellWidth}px`,
-            height: `${currentOption.rows * visualCellHeight}px`,
+            width: `${(currentOption?.cols || 1) * visualCellWidth}px`,
+            height: `${(currentOption?.rows || 1) * visualCellHeight}px`,
             marginBottom: activeTab === 'character' ? '48px' : 0
           }}>
             {/* 1. Delete (-) Button on Left of Each Row */}
