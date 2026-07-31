@@ -1379,15 +1379,16 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     cols: number,
     rows: number,
     frameW: number,
-    frameH: number
+    frameH: number,
+    spacing: number = 0
   ): Promise<string> => {
     return new Promise((resolve) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        canvas.width = cols * frameW;
-        canvas.height = rows * frameH;
+        canvas.width = Math.max(1, cols * frameW);
+        canvas.height = Math.max(1, rows * frameH);
         const ctx = canvas.getContext('2d');
         if (!ctx) {
           resolve(sourceUrl);
@@ -1395,17 +1396,27 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
         }
         ctx.imageSmoothingEnabled = false;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(
-          img,
-          offX,
-          offY,
-          cols * frameW,
-          rows * frameH,
-          0,
-          0,
-          cols * frameW,
-          rows * frameH
-        );
+
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const sx = offX + c * (frameW + spacing);
+            const sy = offY + r * (frameH + spacing);
+            const dx = c * frameW;
+            const dy = r * frameH;
+
+            ctx.drawImage(
+              img,
+              sx,
+              sy,
+              frameW,
+              frameH,
+              dx,
+              dy,
+              frameW,
+              frameH
+            );
+          }
+        }
         resolve(canvas.toDataURL('image/png'));
       };
       img.onerror = () => resolve(sourceUrl);
@@ -1695,7 +1706,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
             cols,
             rows,
             frameW,
-            frameH
+            frameH,
+            customSpacingInput || 0
           );
           offX = 0;
           offY = 0;
