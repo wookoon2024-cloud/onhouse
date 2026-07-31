@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Layers, User, X, Sparkles, ZoomIn, Plus, Trash2, Upload, Download,
   Pin, Pencil, Eraser, Palette, Save, RotateCcw, Grid, Minus,
-  Copy, Clipboard, Trash, Crop, Check, Move, FlipHorizontal, Loader2, Scissors
+  Copy, Clipboard, Trash, Crop, Check, Move, FlipHorizontal, Loader2, Scissors,
+  ArrowUp, ArrowDown, ArrowLeft, ArrowRight
 } from 'lucide-react';
 import { DEFAULT_CHAR_ROW_ACTIONS, getCharRowActions } from '../game/MapData';
 import { saveHouseAssetToDB, deleteHouseAssetFromDB, getSavedHouseCode, publishItemToMarket } from '../services/HouseService';
@@ -431,17 +432,15 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     effFrameH = Math.round(spriteNaturalSize.height / currentOption.rows);
   }
 
-  // Base Cell Dimensions (Character tiles use exact frameWidth and frameHeight, scaled by gridZoom)
-  const baseW = effFrameW || currentOption?.size || 32;
-  const baseH = effFrameH || currentOption?.size || 32;
+  // Frame aspect ratio (height / width)
+  const frameAspectRatio = (effFrameW && effFrameH && effFrameW > 0) ? (effFrameH / effFrameW) : 1.0;
 
-  const visualCellWidth = activeTab === 'character'
-    ? Math.round(baseW * gridZoom)
-    : Math.round((currentOption?.size || 16) * gridZoom);
+  // Base Cell Dimensions (Character tiles scale base width by 맵 출력 크기, preserving natural frame aspect ratio)
+  const mapOutputW = currentOption?.size || (activeTab === 'character' ? 32 : 16);
+  const mapOutputH = activeTab === 'character' ? Math.round(mapOutputW * frameAspectRatio) : (currentOption?.size || 16);
 
-  const visualCellHeight = activeTab === 'character'
-    ? Math.round(baseH * gridZoom)
-    : Math.round((currentOption?.size || 16) * gridZoom);
+  const visualCellWidth = Math.round(mapOutputW * gridZoom);
+  const visualCellHeight = Math.round(mapOutputH * gridZoom);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -2908,6 +2907,81 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                   >
                     <Upload size={11} /> 📁 불러오기
                   </button>
+
+                  {/* 픽셀 전체 이동 화살표 버튼 4개 (좌, 위, 아래, 우) */}
+                  <div style={{ display: 'flex', gap: '2px', marginLeft: '2px' }}>
+                    <button
+                      onClick={() => {
+                        setPixelGrid(prevGrid => {
+                          const res = prevGrid.length;
+                          return prevGrid.map((row) => [...row.slice(1), 'transparent']);
+                        });
+                      }}
+                      title="전체 픽셀 왼쪽으로 1px 이동"
+                      style={{
+                        padding: '4px 6px', fontSize: '10px', borderRadius: '4px',
+                        background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid var(--border-glass)',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}
+                    >
+                      <ArrowLeft size={11} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPixelGrid(prevGrid => {
+                          const res = prevGrid.length;
+                          const newGrid = Array.from({ length: res }, () => Array(res).fill('transparent'));
+                          for (let r = 0; r < res - 1; r++) {
+                            newGrid[r] = [...prevGrid[r + 1]];
+                          }
+                          return newGrid;
+                        });
+                      }}
+                      title="전체 픽셀 위로 1px 이동"
+                      style={{
+                        padding: '4px 6px', fontSize: '10px', borderRadius: '4px',
+                        background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid var(--border-glass)',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}
+                    >
+                      <ArrowUp size={11} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPixelGrid(prevGrid => {
+                          const res = prevGrid.length;
+                          const newGrid = Array.from({ length: res }, () => Array(res).fill('transparent'));
+                          for (let r = 1; r < res; r++) {
+                            newGrid[r] = [...prevGrid[r - 1]];
+                          }
+                          return newGrid;
+                        });
+                      }}
+                      title="전체 픽셀 아래로 1px 이동"
+                      style={{
+                        padding: '4px 6px', fontSize: '10px', borderRadius: '4px',
+                        background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid var(--border-glass)',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}
+                    >
+                      <ArrowDown size={11} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPixelGrid(prevGrid => {
+                          return prevGrid.map((row) => ['transparent', ...row.slice(0, row.length - 1)]);
+                        });
+                      }}
+                      title="전체 픽셀 오른쪽으로 1px 이동"
+                      style={{
+                        padding: '4px 6px', fontSize: '10px', borderRadius: '4px',
+                        background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid var(--border-glass)',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}
+                    >
+                      <ArrowRight size={11} />
+                    </button>
+                  </div>
                 </div>
 
                 <div style={{ fontSize: '9px', color: '#aaa' }}>
