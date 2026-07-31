@@ -881,12 +881,14 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
           const naturalW = img.naturalWidth || img.width || (cols * resW);
           const naturalH = img.naturalHeight || img.height || (rows * resH);
 
-          // Divide actual loaded image dimensions by grid cols & rows to get exact per-frame dimensions!
           const tileW = Math.max(1, Math.floor(naturalW / cols));
           const tileH = Math.max(1, Math.floor(naturalH / rows));
 
-          const offX = (currentOption?.offsetX || 0) + col * (tileW + (currentOption?.spacingX || 0));
-          const offY = (currentOption?.offsetY || 0) + row * (tileH + (currentOption?.spacingY || 0));
+          const curOverride = charImageOverrides[currentSelectedId];
+          const hasOverride = !!(curOverride && curOverride.url);
+
+          const offX = hasOverride ? (col * tileW) : ((currentOption?.offsetX || 0) + col * (tileW + (currentOption?.spacingX || 0)));
+          const offY = hasOverride ? (row * tileH) : ((currentOption?.offsetY || 0) + row * (tileH + (currentOption?.spacingY || 0)));
 
           ctx.drawImage(
             img,
@@ -1116,15 +1118,20 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       if (!ctx) throw new Error('Canvas 2D context unavailable');
       ctx.imageSmoothingEnabled = false;
 
-      const srcTileW = (img.width || (cols * resW)) / cols;
-      const srcTileH = (img.height || (rows * resH)) / rows;
+      const tileW = Math.max(1, Math.floor((img.naturalWidth || img.width || (cols * resW)) / cols));
+      const tileH = Math.max(1, Math.floor((img.naturalHeight || img.height || (rows * resH)) / rows));
 
-      // Resample existing tiles to new frame dimensions (resW x resH)
+      const curOverride = charImageOverrides[charId];
+      const hasOverride = !!(curOverride && curOverride.url);
+
+      // Resample existing tiles to new frame dimensions (resW x resH) with original offset calculation
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
+          const srcOffX = hasOverride ? (c * tileW) : ((currentOption?.offsetX || 0) + c * (tileW + (currentOption?.spacingX || 0)));
+          const srcOffY = hasOverride ? (r * tileH) : ((currentOption?.offsetY || 0) + r * (tileH + (currentOption?.spacingY || 0)));
           ctx.drawImage(
             img,
-            c * srcTileW, r * srcTileH, srcTileW, srcTileH,
+            srcOffX, srcOffY, tileW, tileH,
             c * resW, r * resH, resW, resH
           );
         }
@@ -1160,7 +1167,11 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
         cols: currentOption.cols,
         size: currentOption.size || 32,
         frameWidth: resW,
-        frameHeight: resH
+        frameHeight: resH,
+        offsetX: 0,
+        offsetY: 0,
+        spacingX: 0,
+        spacingY: 0
       };
 
       // 1. Update charImageOverrides State & localStorage
@@ -1180,7 +1191,13 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
               ...opt,
               url: updatedUrl,
               cols: currentOption.cols,
-              rows: currentOption.rows
+              rows: currentOption.rows,
+              frameWidth: resW,
+              frameHeight: resH,
+              offsetX: 0,
+              offsetY: 0,
+              spacingX: 0,
+              spacingY: 0
             };
           }
           return opt;
