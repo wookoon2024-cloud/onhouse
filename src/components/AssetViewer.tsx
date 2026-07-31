@@ -838,48 +838,52 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   };
 
   // Helper to load/resample pixel grid at resolution (resW, resH)
-  const loadPixelGridForRes = (resW: number, resH: number, col: number, row: number, imageUrl: string) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = resW;
-      canvas.height = resH;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+  const loadPixelGridForRes = async (resW: number, resH: number, col: number, row: number, imageUrl: string) => {
+    try {
+      const cleanUrl = await loadImageAsCleanDataUrl(imageUrl);
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = resW;
+        canvas.height = resH;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
 
-      ctx.clearRect(0, 0, resW, resH);
-      // Sample source frame region dynamically using exact image dimensions
-      const tileW = Math.max(1, Math.floor(img.width / currentOption.cols));
-      const tileH = Math.max(1, Math.floor(img.height / currentOption.rows));
+        ctx.clearRect(0, 0, resW, resH);
+        // Sample source frame region dynamically using exact image dimensions
+        const tileW = Math.max(1, Math.floor(img.width / (currentOption?.cols || 4)));
+        const tileH = Math.max(1, Math.floor(img.height / (currentOption?.rows || 7)));
 
-      ctx.drawImage(img, col * tileW, row * tileH, tileW, tileH, 0, 0, resW, resH);
+        ctx.drawImage(img, col * tileW, row * tileH, tileW, tileH, 0, 0, resW, resH);
 
-      const imgData = ctx.getImageData(0, 0, resW, resH);
-      const grid: string[][] = Array.from({ length: resH }, () => Array(resW).fill('transparent'));
+        const imgData = ctx.getImageData(0, 0, resW, resH);
+        const grid: string[][] = Array.from({ length: resH }, () => Array(resW).fill('transparent'));
 
-      for (let y = 0; y < resH; y++) {
-        for (let x = 0; x < resW; x++) {
-          const idx = (y * resW + x) * 4;
-          const r = imgData.data[idx];
-          const g = imgData.data[idx + 1];
-          const b = imgData.data[idx + 2];
-          const a = imgData.data[idx + 3];
+        for (let y = 0; y < resH; y++) {
+          for (let x = 0; x < resW; x++) {
+            const idx = (y * resW + x) * 4;
+            const r = imgData.data[idx];
+            const g = imgData.data[idx + 1];
+            const b = imgData.data[idx + 2];
+            const a = imgData.data[idx + 3];
 
-          if (a > 10) {
-            const hexR = r.toString(16).padStart(2, '0');
-            const hexG = g.toString(16).padStart(2, '0');
-            const hexB = b.toString(16).padStart(2, '0');
-            grid[y][x] = `#${hexR}${hexG}${hexB}`;
-          } else {
-            grid[y][x] = 'transparent';
+            if (a > 10) {
+              const hexR = r.toString(16).padStart(2, '0');
+              const hexG = g.toString(16).padStart(2, '0');
+              const hexB = b.toString(16).padStart(2, '0');
+              grid[y][x] = `#${hexR}${hexG}${hexB}`;
+            } else {
+              grid[y][x] = 'transparent';
+            }
           }
         }
-      }
 
-      setPixelGrid(grid);
-    };
-    img.src = imageUrl;
+        setPixelGrid(grid);
+      };
+      img.src = cleanUrl;
+    } catch (e) {
+      console.warn('Failed to load pixel grid:', e);
+    }
   };
 
   // Open Pixel Editor for a frame - restores saved grid resolution for this frame!
@@ -982,15 +986,15 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     setCropRect((prev) => ({ ...prev, x: newX, y: newY }));
   };
 
-  // Step 2: Confirm Crop Selection -> Sample into Pixel Board Grid
-  const handleConfirmCropAndApply = () => {
+  // Step 2: Confirm Crop -> Replace current pixelGrid with cropped frame region
+  const handleConfirmCropImport = () => {
     if (!cropModalImage) return;
 
     const img = new Image();
-    img.crossOrigin = 'anonymous';
     img.onload = () => {
       const resW = editorGridResW;
       const resH = editorGridResH;
+
       const canvas = document.createElement('canvas');
       canvas.width = resW;
       canvas.height = resH;
@@ -998,12 +1002,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       if (!ctx) return;
 
       ctx.clearRect(0, 0, resW, resH);
-      // Draw selected cropped sub-rectangle scaled onto resW x resH canvas
-      ctx.drawImage(
-        img,
-        cropRect.x, cropRect.y, cropRect.w, cropRect.h,
-        0, 0, resW, resH
-      );
+      ctx.drawImage(img, cropRect.x, cropRect.y, cropRect.w, cropRect.h, 0, 0, resW, resH);
 
       const imgData = ctx.getImageData(0, 0, resW, resH);
       const grid: string[][] = Array.from({ length: resH }, () => Array(resW).fill('transparent'));
@@ -1029,12 +1028,13 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
 
       setPixelGrid(grid);
       setCropModalImage(null);
+      setToastMessage('✂️ 선택 영역 도트 크롭 불러오기가 완료되었습니다!');
     };
     img.src = cropModalImage;
   };
 
   // Save painted frame back onto spritesheet canvas with exact chosen resolution!
-  const handleSavePixelEditor = () => {
+  const handleSavePixelEditor = async () => {
     if (!editingTile) return;
     const { charId, col, row } = editingTile;
     const resW = editorGridResW;
@@ -1044,139 +1044,128 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     const frameResKey = `on_house_char_frame_res_${charId}_${row}_${col}`;
     localStorage.setItem(frameResKey, `${resW}x${resH}`);
 
-    let isSaved = false;
+    try {
+      const cleanUrl = await loadImageAsCleanDataUrl(currentOption.url);
+      const img = new Image();
 
-    const processSave = (img: HTMLImageElement) => {
-      if (isSaved) return;
-      isSaved = true;
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = (e) => reject(e);
+        img.src = cleanUrl;
+        if (img.complete && img.naturalWidth > 0) resolve();
+      });
 
-      try {
-        const cols = currentOption.cols || 4;
-        const rows = currentOption.rows || 7;
+      const cols = currentOption.cols || 4;
+      const rows = currentOption.rows || 7;
 
-        const canvas = document.createElement('canvas');
-        canvas.width = cols * resW;
-        canvas.height = rows * resH;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-        ctx.imageSmoothingEnabled = false;
+      const canvas = document.createElement('canvas');
+      canvas.width = cols * resW;
+      canvas.height = rows * resH;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas 2D context unavailable');
+      ctx.imageSmoothingEnabled = false;
 
-        const srcTileW = (img.width || (cols * resW)) / cols;
-        const srcTileH = (img.height || (rows * resH)) / rows;
+      const srcTileW = (img.width || (cols * resW)) / cols;
+      const srcTileH = (img.height || (rows * resH)) / rows;
 
-        // Resample existing tiles to new frame dimensions (resW x resH)
-        for (let r = 0; r < rows; r++) {
-          for (let c = 0; c < cols; c++) {
-            ctx.drawImage(
-              img,
-              c * srcTileW, r * srcTileH, srcTileW, srcTileH,
-              c * resW, r * resH, resW, resH
-            );
-          }
+      // Resample existing tiles to new frame dimensions (resW x resH)
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          ctx.drawImage(
+            img,
+            c * srcTileW, r * srcTileH, srcTileW, srcTileH,
+            c * resW, r * resH, resW, resH
+          );
         }
-
-        // Clear specified (col, row) tile region
-        ctx.clearRect(col * resW, row * resH, resW, resH);
-
-        // Render pixelGrid (resH x resW) onto temp canvas then draw 1:1 crisp to main canvas frame slot
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = resW;
-        tempCanvas.height = resH;
-        const tempCtx = tempCanvas.getContext('2d');
-        if (tempCtx) {
-          tempCtx.imageSmoothingEnabled = false;
-          for (let y = 0; y < resH; y++) {
-            for (let x = 0; x < resW; x++) {
-              const color = pixelGrid[y]?.[x];
-              if (color && color !== 'transparent') {
-                tempCtx.fillStyle = color;
-                tempCtx.fillRect(x, y, 1, 1);
-              }
-            }
-          }
-          // Draw 1:1 crisp to main canvas frame slot without downsampling loss!
-          ctx.drawImage(tempCanvas, 0, 0, resW, resH, col * resW, row * resH, resW, resH);
-        }
-
-        const updatedUrl = canvas.toDataURL('image/png');
-        const newOverrideObj = {
-          url: updatedUrl,
-          rows: currentOption.rows,
-          cols: currentOption.cols,
-          size: currentOption.size || 32,
-          frameWidth: resW,
-          frameHeight: resH
-        };
-
-        // 1. Update charImageOverrides State & localStorage
-        setCharImageOverrides((prev) => {
-          const next = { ...prev, [charId]: newOverrideObj };
-          try {
-            localStorage.setItem('on_house_char_image_overrides', JSON.stringify(next));
-          } catch (e) {}
-          return next;
-        });
-
-        // 2. Update customCharSprites State & localStorage
-        setCustomCharSprites((prev) => {
-          const next = prev.map((opt) => {
-            if (opt.id === charId) {
-              return {
-                ...opt,
-                url: updatedUrl,
-                cols: currentOption.cols,
-                rows: currentOption.rows
-              };
-            }
-            return opt;
-          });
-          try {
-            localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(next));
-          } catch (e) {}
-          return next;
-        });
-
-        // 3. Save directly to Cloud DB (Supabase)
-        const currentHouseCode = getSavedHouseCode();
-        const foundOpt = customCharSprites.find((c) => c.id === charId) || DEFAULT_CHARACTER_SPRITES.find((c) => c.id === charId);
-        const assetData = {
-          id: charId,
-          name: foundOpt?.name || charId,
-          url: updatedUrl,
-          cols: currentOption.cols,
-          rows: currentOption.rows,
-          size: currentOption.size || 32,
-          isCustom: true
-        };
-        saveHouseAssetToDB(currentHouseCode, 'char_sprite', assetData);
-        saveHouseAssetToDB(currentHouseCode, 'char_image_override', {
-          id: charId,
-          ...newOverrideObj
-        });
-
-        // 4. Notify app & game engine to update character image caches immediately
-        window.dispatchEvent(new Event('on_house_sprites_updated'));
-
-        setEditingTile(null);
-      } catch (err) {
-        console.error('Failed to save pixel editor:', err);
-        alert('도트 반영 중 오류가 발생했습니다: ' + (err as any)?.message);
       }
-    };
 
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => processSave(img);
-    img.onerror = () => {
-      const fallbackImg = new Image();
-      fallbackImg.onload = () => processSave(fallbackImg);
-      fallbackImg.onerror = () => alert('캐릭터 기존 이미지를 불러올 수 없어 도트 반영에 실패했습니다.');
-      fallbackImg.src = currentOption.url;
-    };
-    img.src = currentOption.url;
+      // Clear specified (col, row) tile region
+      ctx.clearRect(col * resW, row * resH, resW, resH);
 
-    if (img.complete && img.naturalWidth > 0) {
-      processSave(img);
+      // Render pixelGrid (resH x resW) onto temp canvas then draw 1:1 crisp to main canvas frame slot
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = resW;
+      tempCanvas.height = resH;
+      const tempCtx = tempCanvas.getContext('2d');
+      if (tempCtx) {
+        tempCtx.imageSmoothingEnabled = false;
+        for (let y = 0; y < resH; y++) {
+          for (let x = 0; x < resW; x++) {
+            const color = pixelGrid[y]?.[x];
+            if (color && color !== 'transparent') {
+              tempCtx.fillStyle = color;
+              tempCtx.fillRect(x, y, 1, 1);
+            }
+          }
+        }
+        // Draw 1:1 crisp to main canvas frame slot without downsampling loss!
+        ctx.drawImage(tempCanvas, 0, 0, resW, resH, col * resW, row * resH, resW, resH);
+      }
+
+      const updatedUrl = canvas.toDataURL('image/png');
+      const newOverrideObj = {
+        url: updatedUrl,
+        rows: currentOption.rows,
+        cols: currentOption.cols,
+        size: currentOption.size || 32,
+        frameWidth: resW,
+        frameHeight: resH
+      };
+
+      // 1. Update charImageOverrides State & localStorage
+      setCharImageOverrides((prev) => {
+        const next = { ...prev, [charId]: newOverrideObj };
+        try {
+          localStorage.setItem('on_house_char_image_overrides', JSON.stringify(next));
+        } catch (e) {}
+        return next;
+      });
+
+      // 2. Update customCharSprites State & localStorage
+      setCustomCharSprites((prev) => {
+        const next = prev.map((opt) => {
+          if (opt.id === charId) {
+            return {
+              ...opt,
+              url: updatedUrl,
+              cols: currentOption.cols,
+              rows: currentOption.rows
+            };
+          }
+          return opt;
+        });
+        try {
+          localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(next));
+        } catch (e) {}
+        return next;
+      });
+
+      // 3. Save directly to Cloud DB (Supabase)
+      const currentHouseCode = getSavedHouseCode();
+      const foundOpt = customCharSprites.find((c) => c.id === charId) || DEFAULT_CHARACTER_SPRITES.find((c) => c.id === charId);
+      const assetData = {
+        id: charId,
+        name: foundOpt?.name || charId,
+        url: updatedUrl,
+        cols: currentOption.cols,
+        rows: currentOption.rows,
+        size: currentOption.size || 32,
+        isCustom: true
+      };
+      saveHouseAssetToDB(currentHouseCode, 'char_sprite', assetData);
+      saveHouseAssetToDB(currentHouseCode, 'char_image_override', {
+        id: charId,
+        ...newOverrideObj
+      });
+
+      // 4. Notify app & game engine to update character image caches immediately
+      window.dispatchEvent(new Event('on_house_sprites_updated'));
+
+      setToastMessage("💾 픽셀 도트 수정이 성공적으로 반영되었습니다!");
+      setEditingTile(null);
+    } catch (err) {
+      console.error('Failed to save pixel editor:', err);
+      alert('도트 반영 중 오류가 발생했습니다: ' + (err as any)?.message);
     }
   };
 
