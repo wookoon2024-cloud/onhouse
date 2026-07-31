@@ -175,14 +175,14 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   const [fileDataUrl, setFileDataUrl] = useState<string | null>(null);
   const [imgWidth, setImgWidth] = useState<number>(0);
   const [imgHeight, setImgHeight] = useState<number>(0);
-  const [customColsInput, setCustomColsInput] = useState<number>(4);
-  const [customRowsInput, setCustomRowsInput] = useState<number>(9);
-  const [customMarginInput, setCustomMarginInput] = useState<number>(0);
-  const [customSpacingInput, setCustomSpacingInput] = useState<number>(0);
-  const [customFrameWidthInput, setCustomFrameWidthInput] = useState<number>(32);
-  const [customFrameHeightInput, setCustomFrameHeightInput] = useState<number>(32);
-  const [customOffsetXInput, setCustomOffsetXInput] = useState<number>(0);
-  const [customOffsetYInput, setCustomOffsetYInput] = useState<number>(0);
+  const [customColsInput, setCustomColsInput] = useState<number | ''>(4);
+  const [customRowsInput, setCustomRowsInput] = useState<number | ''>(9);
+  const [customMarginInput, setCustomMarginInput] = useState<number | ''>(0);
+  const [customSpacingInput, setCustomSpacingInput] = useState<number | ''>(0);
+  const [customFrameWidthInput, setCustomFrameWidthInput] = useState<number | ''>(32);
+  const [customFrameHeightInput, setCustomFrameHeightInput] = useState<number | ''>(32);
+  const [customOffsetXInput, setCustomOffsetXInput] = useState<number | ''>(0);
+  const [customOffsetYInput, setCustomOffsetYInput] = useState<number | ''>(0);
   const [isCustomFrameSize, setIsCustomFrameSize] = useState<boolean>(false);
   const [isNormalizing, setIsNormalizing] = useState<boolean>(false);
   const [previewZoom, setPreviewZoom] = useState<number>(1.0); // 1.0 (Fit), 1.5x, 2.0x, 3.0x, 4.0x
@@ -3358,10 +3358,23 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                         value={customFrameWidthInput}
                         disabled={isSavingAsset}
                         onChange={(e) => {
-                          const w = Math.max(1, parseInt(e.target.value, 10) || 1);
-                          setCustomFrameWidthInput(w);
-                          if (imgWidth > 0) {
-                            setCustomColsInput(Math.max(1, Math.floor((imgWidth - customOffsetXInput) / w)));
+                          const valStr = e.target.value;
+                          if (valStr === '') {
+                            setCustomFrameWidthInput('');
+                            return;
+                          }
+                          const w = parseInt(valStr, 10);
+                          if (!isNaN(w)) {
+                            setCustomFrameWidthInput(w);
+                            if (imgWidth > 0 && w > 0) {
+                              const offX = typeof customOffsetXInput === 'number' ? customOffsetXInput : 0;
+                              setCustomColsInput(Math.max(1, Math.floor((imgWidth - offX) / w)));
+                            }
+                          }
+                        }}
+                        onBlur={() => {
+                          if (customFrameWidthInput === '' || customFrameWidthInput <= 0) {
+                            setCustomFrameWidthInput(tileSizeInput || 32);
                           }
                         }}
                         style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '4px 6px', color: '#fff', fontSize: '11px', textAlign: 'center' }}
@@ -3379,10 +3392,23 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                         value={customFrameHeightInput}
                         disabled={isSavingAsset}
                         onChange={(e) => {
-                          const h = Math.max(1, parseInt(e.target.value, 10) || 1);
-                          setCustomFrameHeightInput(h);
-                          if (imgHeight > 0) {
-                            setCustomRowsInput(Math.max(1, Math.floor((imgHeight - customOffsetYInput) / h)));
+                          const valStr = e.target.value;
+                          if (valStr === '') {
+                            setCustomFrameHeightInput('');
+                            return;
+                          }
+                          const h = parseInt(valStr, 10);
+                          if (!isNaN(h)) {
+                            setCustomFrameHeightInput(h);
+                            if (imgHeight > 0 && h > 0) {
+                              const offY = typeof customOffsetYInput === 'number' ? customOffsetYInput : 0;
+                              setCustomRowsInput(Math.max(1, Math.floor((imgHeight - offY) / h)));
+                            }
+                          }
+                        }}
+                        onBlur={() => {
+                          if (customFrameHeightInput === '' || customFrameHeightInput <= 0) {
+                            setCustomFrameHeightInput(tileSizeInput || 32);
                           }
                         }}
                         style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '4px 6px', color: '#fff', fontSize: '11px', textAlign: 'center' }}
@@ -3400,8 +3426,20 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                         value={customOffsetXInput}
                         disabled={isSavingAsset}
                         onChange={(e) => {
-                          const offX = Math.max(0, parseInt(e.target.value, 10) || 0);
-                          setCustomOffsetXInput(offX);
+                          const valStr = e.target.value;
+                          if (valStr === '') {
+                            setCustomOffsetXInput('');
+                            return;
+                          }
+                          const offX = parseInt(valStr, 10);
+                          if (!isNaN(offX)) {
+                            setCustomOffsetXInput(Math.max(0, offX));
+                          }
+                        }}
+                        onBlur={() => {
+                          if (customOffsetXInput === '') {
+                            setCustomOffsetXInput(0);
+                          }
                         }}
                         style={{ width: '100%', background: '#0d0d12', border: '1px solid #ffd700', borderRadius: 0, padding: '4px 6px', color: '#fff', fontSize: '11px', textAlign: 'center' }}
                       />
@@ -3418,8 +3456,20 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                         value={customOffsetYInput}
                         disabled={isSavingAsset}
                         onChange={(e) => {
-                          const offY = Math.max(0, parseInt(e.target.value, 10) || 0);
-                          setCustomOffsetYInput(offY);
+                          const valStr = e.target.value;
+                          if (valStr === '') {
+                            setCustomOffsetYInput('');
+                            return;
+                          }
+                          const offY = parseInt(valStr, 10);
+                          if (!isNaN(offY)) {
+                            setCustomOffsetYInput(Math.max(0, offY));
+                          }
+                        }}
+                        onBlur={() => {
+                          if (customOffsetYInput === '') {
+                            setCustomOffsetYInput(0);
+                          }
                         }}
                         style={{ width: '100%', background: '#0d0d12', border: '1px solid #ffd700', borderRadius: 0, padding: '4px 6px', color: '#fff', fontSize: '11px', textAlign: 'center' }}
                       />
@@ -3441,7 +3491,18 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                       max={16}
                       value={customSpacingInput}
                       disabled={isSavingAsset}
-                      onChange={(e) => handleSpacingChange(parseInt(e.target.value, 10) || 0)}
+                      onChange={(e) => {
+                        const valStr = e.target.value;
+                        if (valStr === '') {
+                          setCustomSpacingInput('');
+                          return;
+                        }
+                        const s = parseInt(valStr, 10);
+                        if (!isNaN(s)) handleSpacingChange(Math.max(0, s));
+                      }}
+                      onBlur={() => {
+                        if (customSpacingInput === '') setCustomSpacingInput(0);
+                      }}
                       placeholder="예: 1 (검은줄 1px)"
                       style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '4px 8px', color: '#fff', fontSize: '11px', textAlign: 'center', fontWeight: 'normal' }}
                     />
@@ -3457,7 +3518,18 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                       max={16}
                       value={customMarginInput}
                       disabled={isSavingAsset}
-                      onChange={(e) => handleMarginChange(parseInt(e.target.value, 10) || 0)}
+                      onChange={(e) => {
+                        const valStr = e.target.value;
+                        if (valStr === '') {
+                          setCustomMarginInput('');
+                          return;
+                        }
+                        const m = parseInt(valStr, 10);
+                        if (!isNaN(m)) handleMarginChange(Math.max(0, m));
+                      }}
+                      onBlur={() => {
+                        if (customMarginInput === '') setCustomMarginInput(0);
+                      }}
                       placeholder="예: 0"
                       style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '4px 8px', color: '#fff', fontSize: '11px', textAlign: 'center', fontWeight: 'normal' }}
                     />
@@ -3543,15 +3615,16 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                       }}>
                         {/* Grid Lines Overlay */}
                         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none' }}>
-                          {Array.from({ length: customColsInput }).map((_, c) =>
-                            Array.from({ length: customRowsInput }).map((_, r) => {
-                              const effFrameW = customFrameWidthInput || tileSizeInput;
-                              const effFrameH = customFrameHeightInput || tileSizeInput;
-                              const effOffX = customOffsetXInput || customMarginInput || 0;
-                              const effOffY = customOffsetYInput || customMarginInput || 0;
+                          {Array.from({ length: typeof customColsInput === 'number' ? customColsInput : 4 }).map((_, c) =>
+                            Array.from({ length: typeof customRowsInput === 'number' ? customRowsInput : 7 }).map((_, r) => {
+                              const effFrameW = typeof customFrameWidthInput === 'number' ? customFrameWidthInput : tileSizeInput;
+                              const effFrameH = typeof customFrameHeightInput === 'number' ? customFrameHeightInput : tileSizeInput;
+                              const effOffX = typeof customOffsetXInput === 'number' ? customOffsetXInput : (typeof customMarginInput === 'number' ? customMarginInput : 0);
+                              const effOffY = typeof customOffsetYInput === 'number' ? customOffsetYInput : (typeof customMarginInput === 'number' ? customMarginInput : 0);
+                              const effSpacing = typeof customSpacingInput === 'number' ? customSpacingInput : 0;
 
-                              const leftPct = ((effOffX + c * (effFrameW + customSpacingInput)) / imgWidth) * 100;
-                              const topPct = ((effOffY + r * (effFrameH + customSpacingInput)) / imgHeight) * 100;
+                              const leftPct = ((effOffX + c * (effFrameW + effSpacing)) / imgWidth) * 100;
+                              const topPct = ((effOffY + r * (effFrameH + effSpacing)) / imgHeight) * 100;
                               const widthPct = (effFrameW / imgWidth) * 100;
                               const heightPct = (effFrameH / imgHeight) * 100;
                               const isFirst = c === 0 && r === 0;
@@ -3589,15 +3662,16 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                       }}>
                         {/* Grid Lines Overlay */}
                         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none' }}>
-                          {Array.from({ length: customColsInput }).map((_, c) =>
-                            Array.from({ length: customRowsInput }).map((_, r) => {
-                              const effFrameW = customFrameWidthInput || tileSizeInput;
-                              const effFrameH = customFrameHeightInput || tileSizeInput;
-                              const effOffX = customOffsetXInput || customMarginInput || 0;
-                              const effOffY = customOffsetYInput || customMarginInput || 0;
+                          {Array.from({ length: typeof customColsInput === 'number' ? customColsInput : 4 }).map((_, c) =>
+                            Array.from({ length: typeof customRowsInput === 'number' ? customRowsInput : 7 }).map((_, r) => {
+                              const effFrameW = typeof customFrameWidthInput === 'number' ? customFrameWidthInput : tileSizeInput;
+                              const effFrameH = typeof customFrameHeightInput === 'number' ? customFrameHeightInput : tileSizeInput;
+                              const effOffX = typeof customOffsetXInput === 'number' ? customOffsetXInput : (typeof customMarginInput === 'number' ? customMarginInput : 0);
+                              const effOffY = typeof customOffsetYInput === 'number' ? customOffsetYInput : (typeof customMarginInput === 'number' ? customMarginInput : 0);
+                              const effSpacing = typeof customSpacingInput === 'number' ? customSpacingInput : 0;
 
-                              const leftPx = (effOffX + c * (effFrameW + customSpacingInput)) * previewZoom;
-                              const topPx = (effOffY + r * (effFrameH + customSpacingInput)) * previewZoom;
+                              const leftPx = (effOffX + c * (effFrameW + effSpacing)) * previewZoom;
+                              const topPx = (effOffY + r * (effFrameH + effSpacing)) * previewZoom;
                               const widthPx = effFrameW * previewZoom;
                               const heightPx = effFrameH * previewZoom;
                               const isFirst = c === 0 && r === 0;
@@ -3626,9 +3700,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
 
                   {/* Calculation summary badge */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#ccc', background: 'rgba(139, 92, 246, 0.12)', padding: '6px 10px', borderRadius: 0, border: '1px solid #4a4a6b' }}>
-                    <span>분할 결과: <span style={{ color: '#fff' }}>{customColsInput}열 x {customRowsInput}행</span></span>
+                    <span>분할 결과: <span style={{ color: '#fff' }}>{customColsInput || 0}열 x {customRowsInput || 0}행</span></span>
                     <span className="pixel-text" style={{ color: '#a78bfa', fontWeight: 'normal' }}>
-                      총 {customColsInput * customRowsInput}개 프레임 ({customFrameWidthInput || Math.round(imgWidth / Math.max(1, customColsInput))}x{customFrameHeightInput || Math.round(imgHeight / Math.max(1, customRowsInput))}px/프레임)
+                      총 {(typeof customColsInput === 'number' ? customColsInput : 0) * (typeof customRowsInput === 'number' ? customRowsInput : 0)}개 프레임 ({typeof customFrameWidthInput === 'number' ? customFrameWidthInput : 0}x{typeof customFrameHeightInput === 'number' ? customFrameHeightInput : 0}px/프레임)
                     </span>
                   </div>
 
@@ -3643,10 +3717,23 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                         value={customColsInput}
                         disabled={isSavingAsset}
                         onChange={(e) => {
-                          const cols = Math.max(1, parseInt(e.target.value, 10) || 1);
-                          setCustomColsInput(cols);
-                          if (imgWidth > 0) {
-                            setCustomFrameWidthInput(Math.max(1, Math.round((imgWidth - customOffsetXInput) / cols)));
+                          const valStr = e.target.value;
+                          if (valStr === '') {
+                            setCustomColsInput('');
+                            return;
+                          }
+                          const cols = parseInt(valStr, 10);
+                          if (!isNaN(cols)) {
+                            setCustomColsInput(cols);
+                            if (imgWidth > 0 && cols > 0) {
+                              const offX = typeof customOffsetXInput === 'number' ? customOffsetXInput : 0;
+                              setCustomFrameWidthInput(Math.max(1, Math.round((imgWidth - offX) / cols)));
+                            }
+                          }
+                        }}
+                        onBlur={() => {
+                          if (customColsInput === '' || customColsInput <= 0) {
+                            setCustomColsInput(4);
                           }
                         }}
                         style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '4px 8px', color: '#fff', fontSize: '11px', textAlign: 'center', fontWeight: 'normal' }}
@@ -3662,10 +3749,23 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                         value={customRowsInput}
                         disabled={isSavingAsset}
                         onChange={(e) => {
-                          const rows = Math.max(1, parseInt(e.target.value, 10) || 1);
-                          setCustomRowsInput(rows);
-                          if (imgHeight > 0) {
-                            setCustomFrameHeightInput(Math.max(1, Math.round((imgHeight - customOffsetYInput) / rows)));
+                          const valStr = e.target.value;
+                          if (valStr === '') {
+                            setCustomRowsInput('');
+                            return;
+                          }
+                          const rows = parseInt(valStr, 10);
+                          if (!isNaN(rows)) {
+                            setCustomRowsInput(rows);
+                            if (imgHeight > 0 && rows > 0) {
+                              const offY = typeof customOffsetYInput === 'number' ? customOffsetYInput : 0;
+                              setCustomFrameHeightInput(Math.max(1, Math.round((imgHeight - offY) / rows)));
+                            }
+                          }
+                        }}
+                        onBlur={() => {
+                          if (customRowsInput === '' || customRowsInput <= 0) {
+                            setCustomRowsInput(7);
                           }
                         }}
                         style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '4px 8px', color: '#fff', fontSize: '11px', textAlign: 'center', fontWeight: 'normal' }}
