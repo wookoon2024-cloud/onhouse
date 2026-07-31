@@ -407,16 +407,22 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
 
   const activeDisplayTile = selectedTileState || hoveredTile;
 
-  // Visual UI display size per tile cell on screen (decoupled from native 16/32/64 tile resolution!)
-  const visualCellSize = activeTab === 'character' ? 36 * gridZoom : ((currentOption?.size || 16) * gridZoom);
+  // Visual UI display size per tile cell on screen (supports non-square frameWidth & frameHeight!)
+  const visualCellWidth = activeTab === 'character'
+    ? ((currentOption?.frameWidth || currentOption?.size || 36) * gridZoom)
+    : ((currentOption?.size || 16) * gridZoom);
+
+  const visualCellHeight = activeTab === 'character'
+    ? ((currentOption?.frameHeight || currentOption?.size || 36) * gridZoom)
+    : ((currentOption?.size || 16) * gridZoom);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    const col = Math.floor(x / visualCellSize);
-    const row = Math.floor(y / visualCellSize);
+    const col = Math.floor(x / visualCellWidth);
+    const row = Math.floor(y / visualCellHeight);
 
     if (col >= 0 && col < currentOption.cols && row >= 0 && row < currentOption.rows) {
       const index = row * currentOption.cols + col;
@@ -1641,19 +1647,19 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       setSaveProgressText('💾 로컬 저장소 등록 중...');
 
       if (uploadCategory === 'map') {
-        setCustomMapTilesets((prev) => {
-          const next = [...prev, newOption];
-          localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(next));
-          return next;
-        });
+        const existingStr = localStorage.getItem('on_house_custom_map_tilesets');
+        const existing: TilesetOption[] = existingStr ? JSON.parse(existingStr) : customMapTilesets;
+        const next = [...existing.filter((m) => m.id !== newId), newOption];
+        localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(next));
+        setCustomMapTilesets(next);
         setActiveTab('map');
         setSelectedMapId(newId);
       } else {
-        setCustomCharSprites((prev) => {
-          const next = [...prev, newOption];
-          localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(next));
-          return next;
-        });
+        const existingStr = localStorage.getItem('on_house_custom_char_sprites');
+        const existing: TilesetOption[] = existingStr ? JSON.parse(existingStr) : customCharSprites;
+        const next = [...existing.filter((c) => c.id !== newId), newOption];
+        localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(next));
+        setCustomCharSprites(next);
         setActiveTab('character');
         setSelectedCharId(newId);
       }
@@ -2145,8 +2151,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
           <div style={{
             position: 'relative',
             margin: 'auto',
-            width: `${currentOption.cols * visualCellSize}px`,
-            height: `${currentOption.rows * visualCellSize}px`,
+            width: `${currentOption.cols * visualCellWidth}px`,
+            height: `${currentOption.rows * visualCellHeight}px`,
             marginBottom: activeTab === 'character' ? '48px' : 0
           }}>
             {/* 1. Delete (-) Button on Left of Each Row */}
@@ -2161,7 +2167,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 style={{
                   position: 'absolute',
                   left: '-32px',
-                  top: `${rIdx * visualCellSize + (visualCellSize - 24) / 2}px`,
+                  top: `${rIdx * visualCellHeight + (visualCellHeight - 24) / 2}px`,
                   width: '24px',
                   height: '24px',
                   background: 'rgba(239, 68, 68, 0.25)',
@@ -2197,8 +2203,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
               }}
               style={{
                 position: 'relative',
-                width: `${currentOption.cols * visualCellSize}px`,
-                height: `${currentOption.rows * visualCellSize}px`,
+                width: `${currentOption.cols * visualCellWidth}px`,
+                height: `${currentOption.rows * visualCellHeight}px`,
                 cursor: 'pointer',
                 boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
                 overflow: 'hidden',
@@ -2248,10 +2254,10 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                     }}
                     style={{
                       position: 'absolute',
-                      left: `${cIdx * visualCellSize}px`,
-                      top: `${rIdx * visualCellSize}px`,
-                      width: `${visualCellSize}px`,
-                      height: `${visualCellSize}px`,
+                      left: `${cIdx * visualCellWidth}px`,
+                      top: `${rIdx * visualCellHeight}px`,
+                      width: `${visualCellWidth}px`,
+                      height: `${visualCellHeight}px`,
                       boxSizing: 'border-box',
                       zIndex: 1
                     }}
@@ -2263,7 +2269,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
               <div style={{
                 position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
                 backgroundImage: 'linear-gradient(rgba(255,255,255,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.12) 1px, transparent 1px)',
-                backgroundSize: `${visualCellSize}px ${visualCellSize}px`,
+                backgroundSize: `${visualCellWidth}px ${visualCellHeight}px`,
                 pointerEvents: 'none'
               }} />
 
@@ -2271,10 +2277,10 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
               {selectedTileState && (
                 <div style={{
                   position: 'absolute',
-                  left: `${selectedTileState.col * visualCellSize}px`,
-                  top: `${selectedTileState.row * visualCellSize}px`,
-                  width: `${visualCellSize}px`,
-                  height: `${visualCellSize}px`,
+                  left: `${selectedTileState.col * visualCellWidth}px`,
+                  top: `${selectedTileState.row * visualCellHeight}px`,
+                  width: `${visualCellWidth}px`,
+                  height: `${visualCellHeight}px`,
                   border: '2px solid #ff79c6',
                   boxSizing: 'border-box',
                   pointerEvents: 'none',
@@ -2288,10 +2294,10 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
               {hoveredTile && (!selectedTileState || selectedTileState.col !== hoveredTile.col || selectedTileState.row !== hoveredTile.row) && (
                 <div style={{
                   position: 'absolute',
-                  left: `${hoveredTile.col * visualCellSize}px`,
-                  top: `${hoveredTile.row * visualCellSize}px`,
-                  width: `${visualCellSize}px`,
-                  height: `${visualCellSize}px`,
+                  left: `${hoveredTile.col * visualCellWidth}px`,
+                  top: `${hoveredTile.row * visualCellHeight}px`,
+                  width: `${visualCellWidth}px`,
+                  height: `${visualCellHeight}px`,
                   border: '2px dashed #8be9fd',
                   boxSizing: 'border-box',
                   pointerEvents: 'none',
@@ -2313,7 +2319,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 style={{
                   position: 'absolute',
                   right: '-32px',
-                  top: `${rIdx * visualCellSize + (visualCellSize - 24) / 2}px`,
+                  top: `${rIdx * visualCellHeight + (visualCellHeight - 24) / 2}px`,
                   width: '24px',
                   height: '24px',
                   background: 'rgba(139, 92, 246, 0.25)',
@@ -2342,8 +2348,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 style={{
                   position: 'absolute',
                   left: '0px',
-                  top: `${currentOption.rows * visualCellSize + 10}px`,
-                  width: `${currentOption.cols * visualCellSize}px`,
+                  top: `${currentOption.rows * visualCellHeight + 10}px`,
+                  width: `${currentOption.cols * visualCellWidth}px`,
                   height: '32px',
                   background: 'rgba(245, 194, 231, 0.2)',
                   border: '1px dashed #f5c2e7',
