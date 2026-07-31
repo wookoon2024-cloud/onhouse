@@ -1580,6 +1580,30 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
                 const targetTy = obj.y + ody;
                 if (targetTx >= 0 && targetTx < map.width && targetTy >= 0 && targetTy < map.height) {
                   if (obj.tiles) {
+                    // A. Render background tile if present
+                    if (obj.bgTiles && obj.bgTiles[ody]) {
+                      const bgIdx = obj.bgTiles[ody][odx] !== undefined ? obj.bgTiles[ody][odx] : -1;
+                      if (bgIdx !== -1) {
+                        const bgDrawInfo = getTileDrawInfo(bgIdx, tsKey);
+                        if (bgDrawInfo) {
+                          const bgImg = images[bgDrawInfo.tilesetKey];
+                          if (bgImg) {
+                            const bgTsInfo = getTilesetInfo(bgDrawInfo.tilesetKey);
+                            const bgTileW = Math.max(1, Math.floor(bgImg.width / bgTsInfo.cols));
+                            const bgTileH = Math.max(1, Math.floor(bgImg.height / bgTsInfo.rows));
+                            const srcX = (bgDrawInfo.localIdx % bgTsInfo.cols) * bgTileW;
+                            const srcY = Math.floor(bgDrawInfo.localIdx / bgTsInfo.cols) * bgTileH;
+                            ctx.drawImage(
+                              bgImg,
+                              srcX, srcY, bgTileW, bgTileH,
+                              targetTx * vSize, targetTy * vSize, vSize, vSize
+                            );
+                          }
+                        }
+                      }
+                    }
+
+                    // B. Render foreground tile on top
                     const row = obj.tiles[ody];
                     const tileIdx = row && row[odx] !== undefined ? row[odx] : -1;
                     if (tileIdx !== -1) {

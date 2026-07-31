@@ -337,8 +337,9 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   const trimTilesGrid = (
     tilesGrid: number[][],
     originX: number,
-    originY: number
-  ): { trimmedGrid: number[][]; x: number; y: number; width: number; height: number } => {
+    originY: number,
+    bgGrid?: number[][]
+  ): { trimmedGrid: number[][]; trimmedBgGrid?: number[][]; x: number; y: number; width: number; height: number } => {
     const rows = tilesGrid.length;
     if (rows === 0) return { trimmedGrid: [], x: originX, y: originY, width: 0, height: 0 };
     const cols = tilesGrid[0].length;
@@ -347,7 +348,9 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
-        if (tilesGrid[r][c] !== -1) {
+        const hasFg = tilesGrid[r][c] !== -1;
+        const hasBg = bgGrid && bgGrid[r] && bgGrid[r][c] !== -1;
+        if (hasFg || hasBg) {
           if (r < minR) minR = r;
           if (r > maxR) maxR = r;
           if (c < minC) minC = c;
@@ -357,16 +360,21 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     }
 
     if (maxR === -1 || maxC === -1) {
-      return { trimmedGrid: tilesGrid, x: originX, y: originY, width: cols, height: rows };
+      return { trimmedGrid: tilesGrid, trimmedBgGrid: bgGrid, x: originX, y: originY, width: cols, height: rows };
     }
 
     const trimmedGrid: number[][] = [];
+    const trimmedBgGrid: number[][] = [];
     for (let r = minR; r <= maxR; r++) {
       trimmedGrid.push(tilesGrid[r].slice(minC, maxC + 1));
+      if (bgGrid && bgGrid[r]) {
+        trimmedBgGrid.push(bgGrid[r].slice(minC, maxC + 1));
+      }
     }
 
     return {
       trimmedGrid,
+      trimmedBgGrid: bgGrid ? trimmedBgGrid : undefined,
       x: originX + minC,
       y: originY + minR,
       width: maxC - minC + 1,
@@ -615,6 +623,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       const newBase = (prev.baseLayer || []).map(r => [...r]);
       let restoredCount = 0;
 
+      const newStandaloneObjs: MapObjectInstance[] = [];
+
       targetObjs.forEach(obj => {
         // Find target layer by obj.layerId or editLayer fallback
         let targetIndex = updatedLayers.findIndex(l => l.id === obj.layerId);
@@ -633,38 +643,75 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
             const tileX = obj.x + c;
             const tileY = obj.y + r;
             if (tileX >= 0 && tileX < prev.width && tileY >= 0 && tileY < prev.height) {
-              let tileVal = getTileValueForCell(obj, r, c);
+              const bgVal = (obj.bgTiles && obj.bgTiles[r] && obj.bgTiles[r][c] !== undefined) ? obj.bgTiles[r][c] : -1;
+              let fgVal = getTileValueForCell(obj, r, c);
 
-              // If tileVal is -1 inside the object grid, sample neighboring non-empty tiles from object to fill the gap!
-              if (tileVal === -1) {
-                const neighbors: number[] = [];
-                if (c > 0) { const v = getTileValueForCell(obj, r, c - 1); if (v !== -1) neighbors.push(v); }
-                if (c < obj.width - 1) { const v = getTileValueForCell(obj, r, c + 1); if (v !== -1) neighbors.push(v); }
-                if (r > 0) { const v = getTileValueForCell(obj, r - 1, c); if (v !== -1) neighbors.push(v); }
-                if (r < obj.height - 1) { const v = getTileValueForCell(obj, r + 1, c); if (v !== -1) neighbors.push(v); }
-                if (neighbors.length >= 1) {
-                  tileVal = neighbors[0];
-                }
-              }
-
-              if (tileVal !== -1) {
-                targetGrid[tileY][tileX] = tileVal;
+              // A. If object has a background brush tile stored: restore background tile to map layer grid!
+              if (bgVal !== -1) {
+                targetGrid[tileY][tileX] = bgVal;
                 if (isBase) {
-                  newBase[tileY][tileX] = tileVal;
+                  newBase[tileY][tileX] = bgVal;
                 } else {
-                  newDecor[tileY][tileX] = tileVal;
+                  newDecor[tileY][tileX] = bgVal;
                 }
                 restoredCount++;
+
+                // If object also has a foreground object tile (e.g. 1x1 transparent window), restore standalone 1x1 object!
+                if (fgVal !== -1) {
+                  const drawInfo = getTileDrawInfo(fgVal, obj.tilesetKey || prev.tileset);
+                  const tsKey = drawInfo?.tilesetKey || obj.tilesetKey || prev.tileset;
+                  const tsInfo = getTilesetInfoLocal(tsKey) || getTilesetInfo(tsKey);
+                  let startCol = 0, startRow = 0;
+                  if (drawInfo && tsInfo) {
+                    startCol = drawInfo.localIdx % tsInfo.cols;
+                    startRow = Math.floor(drawInfo.localIdx / tsInfo.cols);
+                  }
+                  newStandaloneObjs.push({
+                    id: `obj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                    tilesetKey: tsKey,
+                    startCol,
+                    startRow,
+                    width: 1,
+                    height: 1,
+                    x: tileX,
+                    y: tileY,
+                    layer: obj.layer,
+                    layerId: obj.layerId,
+                    zIndex: Date.now() + Math.random()
+                  });
+                }
+              } else {
+                // Standard dissolve into layer grid
+                if (fgVal === -1) {
+                  const neighbors: number[] = [];
+                  if (c > 0) { const v = getTileValueForCell(obj, r, c - 1); if (v !== -1) neighbors.push(v); }
+                  if (c < obj.width - 1) { const v = getTileValueForCell(obj, r, c + 1); if (v !== -1) neighbors.push(v); }
+                  if (r > 0) { const v = getTileValueForCell(obj, r - 1, c); if (v !== -1) neighbors.push(v); }
+                  if (r < obj.height - 1) { const v = getTileValueForCell(obj, r + 1, c); if (v !== -1) neighbors.push(v); }
+                  if (neighbors.length >= 1) {
+                    fgVal = neighbors[0];
+                  }
+                }
+
+                if (fgVal !== -1) {
+                  targetGrid[tileY][tileX] = fgVal;
+                  if (isBase) {
+                    newBase[tileY][tileX] = fgVal;
+                  } else {
+                    newDecor[tileY][tileX] = fgVal;
+                  }
+                  restoredCount++;
+                }
               }
             }
           }
         }
       });
 
-      const remainingObjs = currentObjs.filter(o => !selectedObjectIds.includes(o.id));
+      const remainingObjs = [...currentObjs.filter(o => !selectedObjectIds.includes(o.id)), ...newStandaloneObjs];
 
       setSelectedObjectIds([]);
-      setPickedToast(`💥 ${targetObjs.length}개 오브젝트가 해제되어 배경 타일로 전환되었습니다!`);
+      setPickedToast(`💥 ${targetObjs.length}개 오브젝트가 해제되었습니다!`);
       setTimeout(() => setPickedToast(null), 2500);
 
       return {
@@ -1087,6 +1134,28 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               const targetTy = obj.y + ody;
               if (targetTx >= 0 && targetTx < localMap.width && targetTy >= 0 && targetTy < localMap.height) {
                 if (obj.tiles) {
+                  // A. Render background brush tile if present
+                  if (obj.bgTiles && obj.bgTiles[ody]) {
+                    const bgIdx = obj.bgTiles[ody][odx] !== undefined ? obj.bgTiles[ody][odx] : -1;
+                    if (bgIdx !== -1) {
+                      const bgDrawInfo = getTileDrawInfo(bgIdx, obj.tilesetKey || localMap.tileset);
+                      if (bgDrawInfo) {
+                        const bgImg = images[bgDrawInfo.tilesetKey];
+                        if (bgImg) {
+                          const bgTsInfo = getTilesetInfoLocal(bgDrawInfo.tilesetKey);
+                          const srcX = (bgDrawInfo.localIdx % bgTsInfo.cols) * 16;
+                          const srcY = Math.floor(bgDrawInfo.localIdx / bgTsInfo.cols) * 16;
+                          ctx.drawImage(
+                            bgImg,
+                            srcX, srcY, 16, 16,
+                            targetTx * tileSize, targetTy * tileSize, tileSize, tileSize
+                          );
+                        }
+                      }
+                    }
+                  }
+
+                  // B. Render foreground tile on top
                   const row = obj.tiles[ody];
                   const tileIdx = row && row[odx] !== undefined ? row[odx] : -1;
                   if (tileIdx !== -1) {
@@ -1818,16 +1887,18 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       let nextObjects = prev.objects ? [...prev.objects] : [];
 
       const tilesGrid: number[][] = [];
+      const bgTilesGrid: number[][] = [];
 
       for (let r = 0; r < rows; r++) {
         const rowTiles: number[] = [];
+        const rowBgTiles: number[] = [];
         for (let c = 0; c < cols; c++) {
           const curTx = startCol + c;
           const curTy = startRow + r;
 
           if (curTx >= 0 && curTx < prev.width && curTy >= 0 && curTy < prev.height) {
-            let tileVal = -1;
-            let fromExistingObj = false;
+            let fgTileVal = -1;
+            let bgTileVal = activeGrid[curTy] ? activeGrid[curTy][curTx] : -1;
 
             // Check existing objects matching target layer first
             if (nextObjects.length > 0) {
@@ -1839,37 +1910,43 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                   const relC = curTx - obj.x;
                   const val = getTileValueForCell(obj, relR, relC);
                   if (val !== -1) {
-                    tileVal = val;
-                    fromExistingObj = true;
+                    fgTileVal = val;
+                    if (obj.bgTiles && obj.bgTiles[relR] && obj.bgTiles[relR][relC] !== -1) {
+                      bgTileVal = obj.bgTiles[relR][relC];
+                    }
                     break;
                   }
                 }
               }
             }
 
-            // Fallback to active layer grid ONLY!
-            if (tileVal === -1) {
-              tileVal = activeGrid[curTy] ? activeGrid[curTy][curTx] : -1;
+            // Fallback: If no object tile, the layer tile becomes the foreground tile
+            if (fgTileVal === -1) {
+              fgTileVal = bgTileVal;
+              bgTileVal = -1;
             }
 
-            rowTiles.push(tileVal);
+            rowTiles.push(fgTileVal);
+            rowBgTiles.push(bgTileVal);
 
             // Erase vacated tile from active layer grid
             if (activeGrid[curTy]) {
               activeGrid[curTy][curTx] = -1;
             }
             if (autoCollision && targetIndex !== 0) {
-              newCollision[curTy][curTx] = tileVal !== -1;
+              newCollision[curTy][curTx] = (fgTileVal !== -1 || bgTileVal !== -1);
             }
           } else {
             rowTiles.push(-1);
+            rowBgTiles.push(-1);
           }
         }
         tilesGrid.push(rowTiles);
+        bgTilesGrid.push(rowBgTiles);
       }
 
-      // Trim empty padding (-1) from outer edges of tilesGrid
-      const { trimmedGrid, x: trimmedX, y: trimmedY, width: trimmedW, height: trimmedH } = trimTilesGrid(tilesGrid, startCol, startRow);
+      // Trim empty padding (-1) from outer edges of tilesGrid & bgTilesGrid
+      const { trimmedGrid, trimmedBgGrid, x: trimmedX, y: trimmedY, width: trimmedW, height: trimmedH } = trimTilesGrid(tilesGrid, startCol, startRow, bgTilesGrid);
 
       // Sample primary tile from trimmedGrid
       let sampleTileIdx = -1;
@@ -1895,6 +1972,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         objStartRow = Math.floor(drawInfo.localIdx / tsInfo.cols);
       }
 
+      const hasBg = trimmedBgGrid && trimmedBgGrid.some(r => r.some(v => v !== -1));
+
       const newObj: MapObjectInstance = {
         id: `obj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         tilesetKey: targetTsKey,
@@ -1907,7 +1986,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         layer: targetIndex === 0 ? 'base' : 'decor',
         layerId: activeLayerId,
         zIndex: Date.now(),
-        tiles: trimmedGrid
+        tiles: trimmedGrid,
+        bgTiles: hasBg ? trimmedBgGrid : undefined
       };
 
       // Only remove sub-objects that belong to target layer and are FULLY CONTAINED inside box selection

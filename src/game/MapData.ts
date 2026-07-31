@@ -10,7 +10,8 @@ export interface MapObjectInstance {
   layer: 'base' | 'decor';
   layerId?: string; // 바인딩된 고유 레이어 ID (Dynamic Multi-Layer 연동용)
   zIndex?: number; // 앞뒤 순서 제어용 z-index
-  tiles?: number[][]; // 커스텀 묶음 오브젝트용 2D 타일 인덱스 배열
+  tiles?: number[][]; // 커스텀 묶음 오브젝트용 2D 타일 인덱스 배열 (전경)
+  bgTiles?: number[][]; // 배경 브러시 타일 보존용 2D 타일 인덱스 배열 (투명 오브젝트 하단)
 }
 
 export function cleanDuplicateObjects(objects?: MapObjectInstance[]): MapObjectInstance[] {
