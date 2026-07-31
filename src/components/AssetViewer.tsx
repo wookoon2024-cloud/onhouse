@@ -100,8 +100,14 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
         if (savedMaps) setCustomMapTilesets(JSON.parse(savedMaps));
         const savedChars = localStorage.getItem('on_house_custom_char_sprites');
         if (savedChars) setCustomCharSprites(JSON.parse(savedChars));
+        const savedOverrides = localStorage.getItem('on_house_char_image_overrides');
+        if (savedOverrides) setCharImageOverrides(JSON.parse(savedOverrides));
+        const savedActions = localStorage.getItem('on_house_char_row_actions');
+        if (savedActions) setCharRowActions(JSON.parse(savedActions));
       } catch (e) {}
     };
+
+    syncLocalAssets();
 
     window.addEventListener('storage', syncLocalAssets);
     window.addEventListener('on_house_sprites_updated', syncLocalAssets);
