@@ -431,19 +431,17 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     effFrameH = Math.round(spriteNaturalSize.height / currentOption.rows);
   }
 
-  // Base Width is determined by 맵 출력 크기 (currentOption.size, default 32px or 24px)
-  let rawSize = currentOption?.size || 32;
-  // Safety cap: If size was set to large frameHeight (e.g. > 64) during upload, default display base width to 32px
-  if (activeTab === 'character' && rawSize > 64) {
-    rawSize = 32;
-  }
+  // Base Cell Dimensions (Character tiles use exact frameWidth and frameHeight, scaled by gridZoom)
+  const baseW = effFrameW || currentOption?.size || 32;
+  const baseH = effFrameH || currentOption?.size || 32;
 
-  const displayBaseWidth = activeTab === 'character' ? rawSize : (currentOption?.size || 16);
-  const frameAspectRatio = (effFrameW && effFrameH && effFrameW > 0) ? (effFrameH / effFrameW) : 1.0;
-  const displayBaseHeight = activeTab === 'character' ? Math.round(displayBaseWidth * frameAspectRatio) : (currentOption?.size || 16);
+  const visualCellWidth = activeTab === 'character'
+    ? Math.round(baseW * gridZoom)
+    : Math.round((currentOption?.size || 16) * gridZoom);
 
-  const visualCellWidth = Math.round(displayBaseWidth * gridZoom);
-  const visualCellHeight = Math.round(displayBaseHeight * gridZoom);
+  const visualCellHeight = activeTab === 'character'
+    ? Math.round(baseH * gridZoom)
+    : Math.round((currentOption?.size || 16) * gridZoom);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -1682,8 +1680,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
             customMarginInput,
             customSpacingInput
           );
-        } else if (offX > 0 || offY > 0 || (imgWidth > 0 && (frameW !== Math.round((imgWidth - offX) / cols) || frameH !== Math.round((imgHeight - offY) / rows)))) {
-          // Automatic cropping for start offsets (시작 X, Y) and custom frame dimensions
+        } else if (uploadCategory === 'character' || offX > 0 || offY > 0 || (imgWidth > 0 && (frameW !== Math.round((imgWidth - offX) / cols) || frameH !== Math.round((imgHeight - offY) / rows)))) {
+          // Automatic cropping for character sprite sheets, start offsets (시작 X, Y), and custom frame dimensions
           setSaveProgressText('✂️ 에셋 영역 자동 크롭 및 오프셋 정제 중...');
           finalUrl = await cropSpriteSheetRegion(
             fileDataUrl,
