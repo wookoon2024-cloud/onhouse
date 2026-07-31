@@ -1094,12 +1094,16 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     const resW = editorGridResW;
     const resH = editorGridResH;
 
+    console.log(`[PixelEditor 1/6] 💾 handleSavePixelEditor initiated for charId: "${charId}", frame: (col ${col}, row ${row}), resolution: ${resW}x${resH}`);
+
     // Save frame resolution preference
     const frameResKey = `on_house_char_frame_res_${charId}_${row}_${col}`;
     localStorage.setItem(frameResKey, `${resW}x${resH}`);
 
     try {
       const cleanUrl = await loadImageAsCleanDataUrl(currentOption.url);
+      console.log(`[PixelEditor 2/6] 🖼️ Loaded clean URL for sampling (length: ${cleanUrl.length})`);
+
       const img = new Image();
       img.crossOrigin = 'anonymous';
 
@@ -1136,6 +1140,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       const curOverride = charImageOverrides[charId];
       const hasOverride = !!(curOverride && curOverride.url);
 
+      console.log(`[PixelEditor 3/6] 🎨 Sampling source sheet (natural: ${img.naturalWidth}x${img.naturalHeight}, tileW: ${tileW}, tileH: ${tileH}, hasOverride: ${hasOverride})`);
+
       // Resample existing tiles to new frame dimensions (resW x resH) with original offset calculation
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
@@ -1157,6 +1163,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       tempCanvas.width = resW;
       tempCanvas.height = resH;
       const tempCtx = tempCanvas.getContext('2d');
+      let nonTransparentPixelsCount = 0;
       if (tempCtx) {
         tempCtx.imageSmoothingEnabled = false;
         for (let y = 0; y < resH; y++) {
@@ -1165,6 +1172,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
             if (color && color !== 'transparent') {
               tempCtx.fillStyle = color;
               tempCtx.fillRect(x, y, 1, 1);
+              nonTransparentPixelsCount++;
             }
           }
         }
@@ -1172,7 +1180,11 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
         ctx.drawImage(tempCanvas, 0, 0, resW, resH, col * resW, row * resH, resW, resH);
       }
 
+      console.log(`[PixelEditor 4/6] ✍️ Rendered ${nonTransparentPixelsCount} non-transparent pixels onto frame (col: ${col}, row: ${row})`);
+
       const updatedUrl = canvas.toDataURL('image/png');
+      console.log(`[PixelEditor 5/6] 📦 Generated updated data URL (length: ${updatedUrl.length})`);
+
       const newOverrideObj = {
         url: updatedUrl,
         rows: currentOption.rows,
@@ -1186,43 +1198,41 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
         spacingY: 0
       };
 
-      // 1. Update charImageOverrides State & localStorage
-      setCharImageOverrides((prev) => {
-        const next = { ...prev, [charId]: newOverrideObj };
-        try {
-          localStorage.setItem('on_house_char_image_overrides', JSON.stringify(next));
-        } catch (e) {}
-        return next;
+      // Calculate next states
+      const nextOverrides = { ...charImageOverrides, [charId]: newOverrideObj };
+      const nextCustomChars = customCharSprites.map((opt) => {
+        if (opt.id === charId) {
+          return {
+            ...opt,
+            url: updatedUrl,
+            cols: currentOption.cols,
+            rows: currentOption.rows,
+            frameWidth: resW,
+            frameHeight: resH,
+            offsetX: 0,
+            offsetY: 0,
+            spacingX: 0,
+            spacingY: 0
+          };
+        }
+        return opt;
       });
 
-      // 2. Update customCharSprites State & localStorage
-      setCustomCharSprites((prev) => {
-        const next = prev.map((opt) => {
-          if (opt.id === charId) {
-            return {
-              ...opt,
-              url: updatedUrl,
-              cols: currentOption.cols,
-              rows: currentOption.rows,
-              frameWidth: resW,
-              frameHeight: resH,
-              offsetX: 0,
-              offsetY: 0,
-              spacingX: 0,
-              spacingY: 0
-            };
-          }
-          return opt;
-        });
-        try {
-          localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(next));
-        } catch (e) {}
-        return next;
-      });
+      // Synchronously write to localStorage BEFORE updating state or triggering event listeners!
+      try {
+        localStorage.setItem('on_house_char_image_overrides', JSON.stringify(nextOverrides));
+        localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(nextCustomChars));
+      } catch (e) {
+        console.warn('[PixelEditor] Failed to write to localStorage:', e);
+      }
 
-      // 3. Save directly to Cloud DB (Supabase)
+      // Update React state
+      setCharImageOverrides(nextOverrides);
+      setCustomCharSprites(nextCustomChars);
+
+      // Save directly to Cloud DB (Supabase)
       const currentHouseCode = getSavedHouseCode();
-      const foundOpt = customCharSprites.find((c) => c.id === charId) || DEFAULT_CHARACTER_SPRITES.find((c) => c.id === charId);
+      const foundOpt = nextCustomChars.find((c) => c.id === charId) || DEFAULT_CHARACTER_SPRITES.find((c) => c.id === charId);
       const assetData = {
         id: charId,
         name: foundOpt?.name || charId,
@@ -1238,14 +1248,15 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
         ...newOverrideObj
       });
 
-      // 4. Force immediate board re-render and broadcast to game engine
+      // Force immediate board re-render and broadcast to game engine
       setBoardRenderKey((prev) => prev + 1);
       window.dispatchEvent(new Event('on_house_sprites_updated'));
 
+      console.log(`[PixelEditor 6/6] ✅ Save process completed successfully for "${charId}"!`);
       setToastMessage("💾 픽셀 도트 수정이 성공적으로 반영되었습니다!");
       setEditingTile(null);
     } catch (err) {
-      console.error('Failed to save pixel editor:', err);
+      console.error('[PixelEditor Error] Failed to save pixel editor:', err);
       alert('도트 반영 중 오류가 발생했습니다: ' + (err as any)?.message);
     }
   };

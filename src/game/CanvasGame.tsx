@@ -611,16 +611,12 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         pig: overrides['pig']?.url || pigUrl
       };
 
-      // Add custom uploaded character sprites
-      try {
-        const customChars = localStorage.getItem('on_house_custom_char_sprites');
-        if (customChars) {
-          const list = JSON.parse(customChars);
-          list.forEach((opt: { id: string; url: string }) => {
-            assets[opt.id] = overrides[opt.id]?.url || opt.url;
-          });
+      // Apply overrides for any character sprite ID
+      Object.entries(overrides).forEach(([key, val]) => {
+        if (val && val.url) {
+          assets[key] = val.url;
         }
-      } catch (e) {}
+      });
 
       // Add custom uploaded map tilesets
       try {
