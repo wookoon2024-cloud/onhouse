@@ -1484,7 +1484,50 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         });
       }
 
-      // 3. Render Layer 2 Decor Tiles, Standing Decor Objects & Players Interleaved Row by Row (Y-Depth Sorting!)
+      // 2.7 Render Upper Custom Layer Grid Tiles (Layer 2, Layer 3, etc. - Red brick walls, painted tiles)
+      const upperLayers = [...normLayers.slice(1)];
+      const hasUpperTiles = upperLayers.some(l => l.grid && l.grid.some(r => r && r.some(t => t !== -1)));
+      if (!hasUpperTiles && map.decorLayer) {
+        upperLayers.unshift({
+          id: 'layer_decor_fallback',
+          name: '2단계(오브젝트)',
+          visible: true,
+          grid: map.decorLayer
+        });
+      }
+
+      // Draw standard upper layer tiles BEFORE standing objects (matching Map Editor render order)
+      upperLayers.filter(l => l.type !== 'top').forEach((layer) => {
+        if (layer.visible !== false && layer.grid) {
+          for (let ty = 0; ty < map.height; ty++) {
+            for (let tx = 0; tx < map.width; tx++) {
+              const tileIdx = layer.grid[ty] ? layer.grid[ty][tx] : -1;
+              if (tileIdx !== -1 && tileIdx !== undefined && tileIdx !== null) {
+                const drawInfo = getTileDrawInfo(tileIdx, map.tileset);
+                if (drawInfo) {
+                  const img = images[drawInfo.tilesetKey];
+                  if (img && img.complete && img.naturalWidth > 0) {
+                    const tsInfo = getTilesetInfo(drawInfo.tilesetKey);
+                    const tileW = Math.max(1, Math.floor(img.width / tsInfo.cols));
+                    const tileH = Math.max(1, Math.floor(img.height / tsInfo.rows));
+                    const srcX = (drawInfo.localIdx % tsInfo.cols) * tileW;
+                    const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * tileH;
+                    if (srcX >= 0 && srcX < img.width && srcY >= 0 && srcY < img.height) {
+                      ctx.drawImage(
+                        img,
+                        srcX, srcY, tileW, tileH,
+                        tx * vSize, ty * vSize, vSize, vSize
+                      );
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // 3. Render Standing Decor Objects & Players Interleaved Row by Row (Y-Depth Sorting!)
       const objectTilesSet = new Set<string>();
       const objectRootRowMap: Record<number, MapObjectInstance[]> = {};
 
@@ -1589,19 +1632,8 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         renderPlayerIdx++;
       }
 
-      // C. Render Upper Custom Layers (Layer 2, Layer 3, Layer 4... Painted brush tiles on top of objects!)
-      const upperLayers = [...normLayers.slice(1)];
-      const hasUpperTiles = upperLayers.some(l => l.grid && l.grid.some(r => r && r.some(t => t !== -1)));
-      if (!hasUpperTiles && map.decorLayer) {
-        upperLayers.unshift({
-          id: 'layer_decor_fallback',
-          name: '2단계(오브젝트)',
-          visible: true,
-          grid: map.decorLayer
-        });
-      }
-
-      upperLayers.forEach((layer) => {
+      // 3.5 Render Top Overlay Layers (type === 'top')
+      upperLayers.filter(l => l.type === 'top').forEach((layer) => {
         if (layer.visible !== false && layer.grid) {
           for (let ty = 0; ty < map.height; ty++) {
             for (let tx = 0; tx < map.width; tx++) {
