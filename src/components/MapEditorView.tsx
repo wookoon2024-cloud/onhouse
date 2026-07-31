@@ -3784,6 +3784,10 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                 const newTs = e.target.value;
                 setActiveTileset(newTs);
                 setSelectedTile(getPrefixedIndex(0, newTs));
+                if (tool !== 'brush' && tool !== 'object') {
+                  setTool('brush');
+                  if (editLayer === 'collision') setEditLayer('decor');
+                }
               }}
               style={{
                 width: '100%', background: '#0a0a0f', border: '1px solid var(--border-glass)',
@@ -3855,7 +3859,10 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                           setBrushSize(1);
                           setSelectedTile(prefixedIdx);
                           setSelectedObjectId(null);
-                          if (tool === 'select') setTool('brush');
+                          if (tool !== 'brush' && tool !== 'object') {
+                            setTool('brush');
+                            if (editLayer === 'collision') setEditLayer('decor');
+                          }
                         }}
                         onMouseEnter={() => {
                           setHoverPaletteTile({ col: c, row: r });
