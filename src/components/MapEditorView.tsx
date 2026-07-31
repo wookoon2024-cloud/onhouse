@@ -108,7 +108,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   const [selectedMapId, setSelectedMapId] = useState<string>(initialMapId && activeMaps[initialMapId] ? initialMapId : (availableMapIds[0] || 'room'));
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [customNameInput, setCustomNameInput] = useState<string>('');
-  const [editLayer, setEditLayer] = useState<'base' | 'decor' | 'collision'>('base');
+  const [editLayer, setEditLayer] = useState<'base' | 'decor' | 'collision'>('decor');
   const [leftSidebarTab, setLeftSidebarTab] = useState<'basic' | 'size' | 'option'>('basic');
   
   // Brush & Tools
@@ -2768,8 +2768,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           </div>
         )}
 
-        {/* Drag Slider Size Control for tools requiring size (Collision, Brush, Eraser) */}
-        {(tool === 'collision' || editLayer === 'collision' || tool === 'brush' || selectedTile === -1) && (
+        {/* Drag Slider Size Control for tools requiring size (Collision Wall, Eraser) */}
+        {(tool === 'collision' || editLayer === 'collision' || selectedTile === -1) && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingRight: '10px', borderRight: '1px solid rgba(255,255,255,0.12)' }}>
             <span style={{ fontSize: '11px', color: '#89b4fa', fontWeight: 'normal', whiteSpace: 'nowrap' }}>
               크기:
@@ -3141,103 +3141,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                   </div>
                 </div>
 
-                {/* Section 3: 브러시 크기 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
-                  <h4 style={{ fontSize: '13px', color: 'var(--accent)', margin: '0 0 2px 0', borderBottom: '1px solid var(--border-glass)', paddingBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'normal' }}>
-                    <span style={{ fontSize: '10px', opacity: 0.7 }}>▪</span> 브러시 크기
-                  </h4>
 
-                  {/* Preset 1x1, 2x2 next row 3x3, 4x4 Grid */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px' }}>
-                    {([1, 2, 3, 4] as const).map((sz) => {
-                      const isSelected = !paletteSelection && brushSize === sz;
-                      return (
-                        <button
-                          key={sz}
-                          onClick={() => {
-                            setBrushSize(sz);
-                            setCustomBrushInput(String(sz));
-                            setPaletteSelection(null);
-                          }}
-                          style={{
-                            padding: '6px 4px', fontSize: '11px', borderRadius: '4px',
-                            background: isSelected ? 'var(--accent)' : 'rgba(255,255,255,0.03)',
-                            color: isSelected ? '#000' : '#fff',
-                            border: isSelected ? '1px solid var(--accent)' : '1px solid var(--border-glass)',
-                            fontWeight: 'normal', cursor: 'pointer', transition: 'all 0.15s ease'
-                          }}
-                        >
-                          {sz}x{sz}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Custom Size Input Row */}
-                  {(() => {
-                    const isCustomSelected = !([1, 2, 3, 4].includes(brushSize));
-                    return (
-                      <div style={{
-                        display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px',
-                        background: isCustomSelected ? 'rgba(245, 194, 231, 0.2)' : 'rgba(255,255,255,0.02)',
-                        padding: '6px 8px', borderRadius: '4px',
-                        border: isCustomSelected ? '1px solid #f5c2e7' : '1px solid var(--border-glass)',
-                        transition: 'all 0.15s ease',
-                        boxShadow: isCustomSelected ? '0 0 10px rgba(245, 194, 231, 0.2)' : 'none'
-                      }}>
-                        <span style={{ fontSize: '11px', color: isCustomSelected ? '#f5c2e7' : 'var(--text-secondary)', fontWeight: 'normal' }}>
-                          사용자 정의:
-                        </span>
-                        <input
-                          type="number"
-                          min="1"
-                          max="20"
-                          value={customBrushInput}
-                          onChange={(e) => setCustomBrushInput(e.target.value)}
-                          style={{
-                            width: '36px', background: '#0a0a0f',
-                            border: isCustomSelected ? '1px solid #f5c2e7' : '1px solid var(--border-glass)',
-                            borderRadius: '3px', padding: '3px 4px', fontSize: '12px', color: '#fff', textAlign: 'center'
-                          }}
-                        />
-                        <span style={{ fontSize: '11px', color: isCustomSelected ? '#f5c2e7' : 'var(--text-muted)' }}>x</span>
-                        <input
-                          type="number"
-                          min="1"
-                          max="20"
-                          value={customBrushInput}
-                          onChange={(e) => setCustomBrushInput(e.target.value)}
-                          style={{
-                            width: '36px', background: '#0a0a0f',
-                            border: isCustomSelected ? '1px solid #f5c2e7' : '1px solid var(--border-glass)',
-                            borderRadius: '3px', padding: '3px 4px', fontSize: '12px', color: '#fff', textAlign: 'center'
-                          }}
-                        />
-                        <button
-                          onClick={() => {
-                            const val = parseInt(customBrushInput, 10);
-                            if (!isNaN(val) && val >= 1 && val <= 20) {
-                              setBrushSize(val);
-                              setPaletteSelection(null);
-                              if (tool !== 'brush') setTool('brush');
-                            } else {
-                              alert('브러시 크기는 1에서 20 사이의 숫자로 지정해 주세요.');
-                            }
-                          }}
-                          style={{
-                            marginLeft: 'auto', padding: '3px 8px', fontSize: '11px', borderRadius: '3px',
-                            background: isCustomSelected ? '#f5c2e7' : 'var(--primary)',
-                            color: isCustomSelected ? '#000' : '#fff',
-                            border: 'none', fontWeight: 'normal', cursor: 'pointer',
-                            transition: 'all 0.15s ease'
-                          }}
-                        >
-                          적용
-                        </button>
-                      </div>
-                    );
-                  })()}
-                </div>
 
                 {/* Section 4: 현재 브러시 */}
                 {(() => {
@@ -3319,30 +3223,68 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                   <span style={{ fontSize: "9px", opacity: 0.7 }}>▪</span> 지도 크기
                 </h4>
                 <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  {/* Width Input Box with Right-aligned Stepper */}
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: "9px", color: "var(--text-secondary)", marginBottom: "4px" }}>가로 (너비)</div>
-                    <input
-                      type="number"
-                      value={widthInput}
-                      onChange={(e) => setWidthInput(e.target.value)}
-                      style={{
-                        width: "100%", background: "#0a0a0f", border: "1px solid var(--border-glass)",
-                        borderRadius: "4px", padding: "6px 10px", fontSize: "12px", color: "#fff", textAlign: "center"
-                      }}
-                    />
+                    <div style={{ display: 'flex', alignItems: 'center', background: '#222222', border: '1px solid #484848', borderRadius: '4px', overflow: 'hidden' }}>
+                      <input
+                        type="number"
+                        min="10"
+                        max="200"
+                        value={widthInput}
+                        onChange={(e) => setWidthInput(e.target.value)}
+                        style={{
+                          flex: 1, width: '100%', background: 'transparent', border: 'none',
+                          padding: '6px 8px', fontSize: '12px', color: '#fff', textAlign: 'left',
+                          outline: 'none'
+                        }}
+                      />
+                      <div style={{ display: 'flex', flexDirection: 'column', borderLeft: '1px solid #484848', background: '#292929' }}>
+                        <button
+                          type="button"
+                          onClick={() => setWidthInput(String(Math.min(200, (parseInt(widthInput) || 0) + 1)))}
+                          style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', padding: '1px 5px', fontSize: '8px', lineHeight: '1' }}
+                        >▲</button>
+                        <button
+                          type="button"
+                          onClick={() => setWidthInput(String(Math.max(10, (parseInt(widthInput) || 0) - 1)))}
+                          style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', padding: '1px 5px', fontSize: '8px', lineHeight: '1' }}
+                        >▼</button>
+                      </div>
+                    </div>
                   </div>
+
                   <span style={{ fontSize: "12px", marginTop: "16px", color: "var(--text-muted)" }}>x</span>
+
+                  {/* Height Input Box with Right-aligned Stepper */}
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: "9px", color: "var(--text-secondary)", marginBottom: "4px" }}>세로 (높이)</div>
-                    <input
-                      type="number"
-                      value={heightInput}
-                      onChange={(e) => setHeightInput(e.target.value)}
-                      style={{
-                        width: "100%", background: "#0a0a0f", border: "1px solid var(--border-glass)",
-                        borderRadius: "4px", padding: "6px 10px", fontSize: "12px", color: "#fff", textAlign: "center"
-                      }}
-                    />
+                    <div style={{ display: 'flex', alignItems: 'center', background: '#222222', border: '1px solid #484848', borderRadius: '4px', overflow: 'hidden' }}>
+                      <input
+                        type="number"
+                        min="10"
+                        max="200"
+                        value={heightInput}
+                        onChange={(e) => setHeightInput(e.target.value)}
+                        style={{
+                          flex: 1, width: '100%', background: 'transparent', border: 'none',
+                          padding: '6px 8px', fontSize: '12px', color: '#fff', textAlign: 'left',
+                          outline: 'none'
+                        }}
+                      />
+                      <div style={{ display: 'flex', flexDirection: 'column', borderLeft: '1px solid #484848', background: '#292929' }}>
+                        <button
+                          type="button"
+                          onClick={() => setHeightInput(String(Math.min(200, (parseInt(heightInput) || 0) + 1)))}
+                          style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', padding: '1px 5px', fontSize: '8px', lineHeight: '1' }}
+                        >▲</button>
+                        <button
+                          type="button"
+                          onClick={() => setHeightInput(String(Math.max(10, (parseInt(heightInput) || 0) - 1)))}
+                          style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', padding: '1px 5px', fontSize: '8px', lineHeight: '1' }}
+                        >▼</button>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <button
