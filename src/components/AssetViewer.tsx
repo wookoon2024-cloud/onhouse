@@ -842,45 +842,78 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     try {
       const cleanUrl = await loadImageAsCleanDataUrl(imageUrl);
       const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = resW;
-        canvas.height = resH;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
+      img.crossOrigin = 'anonymous';
 
-        ctx.clearRect(0, 0, resW, resH);
-        // Sample source frame region dynamically using exact image dimensions
-        const tileW = Math.max(1, Math.floor(img.width / (currentOption?.cols || 4)));
-        const tileH = Math.max(1, Math.floor(img.height / (currentOption?.rows || 7)));
+      let isLoaded = false;
+      const processGrid = () => {
+        if (isLoaded) return;
+        isLoaded = true;
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = resW;
+          canvas.height = resH;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return;
 
-        ctx.drawImage(img, col * tileW, row * tileH, tileW, tileH, 0, 0, resW, resH);
+          ctx.clearRect(0, 0, resW, resH);
 
-        const imgData = ctx.getImageData(0, 0, resW, resH);
-        const grid: string[][] = Array.from({ length: resH }, () => Array(resW).fill('transparent'));
+          const cols = currentOption?.cols || 4;
+          const rows = currentOption?.rows || 7;
 
-        for (let y = 0; y < resH; y++) {
-          for (let x = 0; x < resW; x++) {
-            const idx = (y * resW + x) * 4;
-            const r = imgData.data[idx];
-            const g = imgData.data[idx + 1];
-            const b = imgData.data[idx + 2];
-            const a = imgData.data[idx + 3];
+          const naturalW = img.naturalWidth || img.width || (cols * resW);
+          const naturalH = img.naturalHeight || img.height || (rows * resH);
 
-            if (a > 10) {
-              const hexR = r.toString(16).padStart(2, '0');
-              const hexG = g.toString(16).padStart(2, '0');
-              const hexB = b.toString(16).padStart(2, '0');
-              grid[y][x] = `#${hexR}${hexG}${hexB}`;
-            } else {
-              grid[y][x] = 'transparent';
+          // Use exact custom frame size if present, otherwise divide natural dimensions
+          const frameW = currentOption?.frameWidth || (naturalW / cols);
+          const frameH = currentOption?.frameHeight || (naturalH / rows);
+
+          const offX = (currentOption?.offsetX || 0) + col * (frameW + (currentOption?.spacingX || 0));
+          const offY = (currentOption?.offsetY || 0) + row * (frameH + (currentOption?.spacingY || 0));
+
+          ctx.drawImage(
+            img,
+            offX, offY, frameW, frameH,
+            0, 0, resW, resH
+          );
+
+          const imgData = ctx.getImageData(0, 0, resW, resH);
+          const grid: string[][] = Array.from({ length: resH }, () => Array(resW).fill('transparent'));
+
+          for (let y = 0; y < resH; y++) {
+            for (let x = 0; x < resW; x++) {
+              const idx = (y * resW + x) * 4;
+              const r = imgData.data[idx];
+              const g = imgData.data[idx + 1];
+              const b = imgData.data[idx + 2];
+              const a = imgData.data[idx + 3];
+
+              if (a > 5) {
+                const hexR = r.toString(16).padStart(2, '0');
+                const hexG = g.toString(16).padStart(2, '0');
+                const hexB = b.toString(16).padStart(2, '0');
+                grid[y][x] = `#${hexR}${hexG}${hexB}`;
+              } else {
+                grid[y][x] = 'transparent';
+              }
             }
           }
-        }
 
-        setPixelGrid(grid);
+          setPixelGrid(grid);
+        } catch (err) {
+          console.error('Error sampling pixel grid:', err);
+        }
+      };
+
+      img.onload = processGrid;
+      img.onerror = () => {
+        console.warn('Image failed to load in loadPixelGridForRes');
       };
       img.src = cleanUrl;
+
+      // Data URLs complete synchronously in browser memory!
+      if (img.complete && (img.naturalWidth > 0 || img.width > 0)) {
+        processGrid();
+      }
     } catch (e) {
       console.warn('Failed to load pixel grid:', e);
     }
@@ -3099,23 +3132,24 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 </div>
               </div>
 
-              {/* Zoomable & Scrollable Cell Grid Container */}
+              {/* Fit-to-Container Cell Grid Container (Scrollbars Completely Removed!) */}
               {(() => {
-                const maxW = 320;
-                const maxH = 320;
+                const maxW = 300;
+                const maxH = 300;
                 const scaleW = maxW / editorGridResW;
                 const scaleH = maxH / editorGridResH;
                 const baseScale = Math.min(scaleW, scaleH);
-                const cellSizePx = Math.max(1, baseScale * editorZoom);
-                const boardW = editorGridResW * cellSizePx;
-                const boardH = editorGridResH * cellSizePx;
+                const cellSizePx = Math.max(0.2, baseScale * editorZoom);
+                const boardW = Math.round(editorGridResW * cellSizePx);
+                const boardH = Math.round(editorGridResH * cellSizePx);
+                const showBorders = editorGridResW <= 48 && editorGridResH <= 48;
 
                 return (
                   <div style={{
-                    maxWidth: '320px', maxHeight: '320px', overflow: 'auto',
+                    width: '320px', height: '320px', overflow: 'hidden',
                     background: '#0a0a0f', borderRadius: '8px', border: '1px solid var(--border-glass)',
                     padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.8)', margin: '0 auto'
+                    boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.8)', margin: '0 auto', boxSizing: 'border-box'
                   }}>
                     <div
                       onMouseDown={() => setIsMouseDown(true)}
@@ -3152,8 +3186,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                               width: `${cellSizePx}px`, height: `${cellSizePx}px`,
                               background: color === 'transparent' ? '#0d0d14' : color,
                               boxSizing: 'border-box',
-                              borderRight: '1px solid rgba(255,255,255,0.08)',
-                              borderBottom: '1px solid rgba(255,255,255,0.08)'
+                              borderRight: showBorders ? '1px solid rgba(255,255,255,0.08)' : 'none',
+                              borderBottom: showBorders ? '1px solid rgba(255,255,255,0.08)' : 'none'
                             }}
                           />
                         ))
