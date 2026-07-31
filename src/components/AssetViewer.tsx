@@ -169,6 +169,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
 
   const [hoveredTile, setHoveredTile] = useState<{ col: number; row: number; index: number; prefixedId?: number } | null>(null);
   const [selectedTileState, setSelectedTileState] = useState<{ col: number; row: number; index: number; prefixedId?: number } | null>(null);
+  const [boardRenderKey, setBoardRenderKey] = useState<number>(0);
 
   // Right Click Context Menu & Copy/Paste Buffer State
   const [contextMenuTile, setContextMenuTile] = useState<{ x: number; y: number; col: number; row: number } | null>(null);
@@ -1100,12 +1101,23 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     try {
       const cleanUrl = await loadImageAsCleanDataUrl(currentOption.url);
       const img = new Image();
+      img.crossOrigin = 'anonymous';
 
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = (e) => reject(e);
+      await new Promise<void>((resolve) => {
+        let done = false;
+        const complete = () => {
+          if (!done) {
+            done = true;
+            resolve();
+          }
+        };
+        img.onload = complete;
+        img.onerror = complete;
         img.src = cleanUrl;
-        if (img.complete && img.naturalWidth > 0) resolve();
+        if (img.complete && (img.naturalWidth > 0 || img.width > 0)) {
+          complete();
+        }
+        setTimeout(complete, 400);
       });
 
       const cols = currentOption.cols || 4;
@@ -1226,7 +1238,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
         ...newOverrideObj
       });
 
-      // 4. Notify app & game engine to update character image caches immediately
+      // 4. Force immediate board re-render and broadcast to game engine
+      setBoardRenderKey((prev) => prev + 1);
       window.dispatchEvent(new Event('on_house_sprites_updated'));
 
       setToastMessage("💾 픽셀 도트 수정이 성공적으로 반영되었습니다!");
@@ -2472,8 +2485,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 background: '#0a0a0f'
               }}
             >
-              {/* Background Sprite Image with onError fallback */}
+              {/* Background Sprite Image with onError fallback & dynamic key for instant re-mount */}
               <img
+                key={`board-img-${currentSelectedId}-${boardRenderKey}-${(currentOption.url || '').slice(-20)}`}
                 src={currentOption.url}
                 alt={currentOption.name}
                 onError={(e) => {
