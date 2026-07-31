@@ -547,9 +547,15 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     const checkMobile = () => {
-      const touchCapable = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
-      const smallScreen = window.innerWidth < 768;
-      setIsMobile(touchCapable || smallScreen);
+      const ua = navigator.userAgent || '';
+      const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|CriOS/i.test(ua);
+      if (isMobileUA) {
+        setIsMobile(true);
+        return;
+      }
+      const isCoarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      const isSmallScreen = window.innerWidth < 768;
+      setIsMobile(isCoarsePointer && isSmallScreen);
     };
     checkMobile();
     window.addEventListener('resize', checkMobile);

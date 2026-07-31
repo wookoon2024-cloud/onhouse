@@ -198,7 +198,17 @@ export default function App() {
     };
   }, []);
 
-  const isMobileDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0 || window.innerWidth < 768;
+  const checkIsMobileDevice = (): boolean => {
+    if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+    const ua = navigator.userAgent || '';
+    const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|CriOS/i.test(ua);
+    if (isMobileUA) return true;
+    const isCoarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    const isSmallScreen = window.innerWidth < 768;
+    return isCoarsePointer && isSmallScreen;
+  };
+
+  const isMobileDevice = checkIsMobileDevice();
 
   // 1. Local Player State
   const [localPlayer, setLocalPlayer] = useState<PlayerState>(() => {
@@ -242,7 +252,11 @@ export default function App() {
     if (availableMapIds.length > 0 && !availableMapIds.includes(localPlayer.mapId)) {
       setLocalPlayer((prev) => ({ ...prev, mapId: availableMapIds[0] }));
     }
-  }, [availableMapIds, localPlayer.mapId]);
+    const currentIsMobile = checkIsMobileDevice();
+    if (localPlayer.isMobile !== currentIsMobile) {
+      setLocalPlayer(prev => ({ ...prev, isMobile: currentIsMobile }));
+    }
+  }, [availableMapIds, localPlayer.mapId, localPlayer.isMobile]);
 
   // 2. Multi-player lists
   const [otherPlayers, setOtherPlayers] = useState<Record<string, PlayerState>>({});
