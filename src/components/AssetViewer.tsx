@@ -143,7 +143,11 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
         url: override.url,
         rows: override.rows || opt.rows,
         cols: override.cols || opt.cols,
-        size: override.size || opt.size || 16
+        size: override.size || opt.size || 16,
+        frameWidth: override.frameWidth || opt.frameWidth,
+        frameHeight: override.frameHeight || opt.frameHeight,
+        offsetX: override.offsetX !== undefined ? override.offsetX : opt.offsetX,
+        offsetY: override.offsetY !== undefined ? override.offsetY : opt.offsetY
       };
     }
     return opt;
@@ -407,14 +411,36 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
 
   const activeDisplayTile = selectedTileState || hoveredTile;
 
-  // Visual UI display size per tile cell on screen (supports non-square frameWidth & frameHeight!)
+  const [spriteNaturalSize, setSpriteNaturalSize] = useState<{ width: number; height: number } | null>(null);
+
+  useEffect(() => {
+    if (!currentOption?.url) return;
+    const img = new Image();
+    img.src = currentOption.url;
+    img.onload = () => {
+      setSpriteNaturalSize({ width: img.naturalWidth, height: img.naturalHeight });
+    };
+  }, [currentOption?.url]);
+
+  // Natural frame dimensions calculation (derived from custom frame size OR natural image size / grid)
+  let effFrameW = currentOption?.frameWidth;
+  let effFrameH = currentOption?.frameHeight;
+
+  if ((!effFrameW || !effFrameH) && spriteNaturalSize && spriteNaturalSize.width > 0 && currentOption?.cols > 0) {
+    effFrameW = Math.round(spriteNaturalSize.width / currentOption.cols);
+    effFrameH = Math.round(spriteNaturalSize.height / currentOption.rows);
+  }
+
+  const baseW = effFrameW || currentOption?.size || 36;
+  const baseH = effFrameH || currentOption?.size || 36;
+
   const visualCellWidth = activeTab === 'character'
-    ? ((currentOption?.frameWidth || currentOption?.size || 36) * gridZoom)
-    : ((currentOption?.size || 16) * gridZoom);
+    ? Math.round(baseW * gridZoom)
+    : Math.round((currentOption?.size || 16) * gridZoom);
 
   const visualCellHeight = activeTab === 'character'
-    ? ((currentOption?.frameHeight || currentOption?.size || 36) * gridZoom)
-    : ((currentOption?.size || 16) * gridZoom);
+    ? Math.round(baseH * gridZoom)
+    : Math.round((currentOption?.size || 16) * gridZoom);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
