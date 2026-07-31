@@ -2238,42 +2238,50 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     setObjectDragStart(null);
 
     if (tool === 'select' && mapBoxSelection) {
-      const selectMinX = mapBoxSelection.startCol;
-      const selectMinY = mapBoxSelection.startRow;
-      const selectMaxX = mapBoxSelection.startCol + mapBoxSelection.cols;
-      const selectMaxY = mapBoxSelection.startRow + mapBoxSelection.rows;
+      // Single click selection (1x1 box) -> Select overlapping object if present
+      if (mapBoxSelection.cols === 1 && mapBoxSelection.rows === 1) {
+        const selectMinX = mapBoxSelection.startCol;
+        const selectMinY = mapBoxSelection.startRow;
+        const selectMaxX = mapBoxSelection.startCol + 1;
+        const selectMaxY = mapBoxSelection.startRow + 1;
 
-      let overlapped = (localMap.objects || []).filter(o => {
-        if (editLayer === "base" && o.layer !== "base") return false;
-        if (editLayer === "decor" && o.layer === "base") return false;
-        const oMinX = o.x;
-        const oMinY = o.y;
-        const oMaxX = o.x + o.width;
-        const oMaxY = o.y + o.height;
-        return !(oMaxX <= selectMinX || oMinX >= selectMaxX || oMaxY <= selectMinY || oMinY >= selectMaxY);
-      });
-
-      // Fallback: If no objects matched on active editLayer, search ALL objects across all layers!
-      if (overlapped.length === 0) {
-        overlapped = (localMap.objects || []).filter(o => {
+        let overlapped = (localMap.objects || []).filter(o => {
+          if (editLayer === "base" && o.layer !== "base") return false;
+          if (editLayer === "decor" && o.layer === "base") return false;
           const oMinX = o.x;
           const oMinY = o.y;
           const oMaxX = o.x + o.width;
           const oMaxY = o.y + o.height;
           return !(oMaxX <= selectMinX || oMinX >= selectMaxX || oMaxY <= selectMinY || oMinY >= selectMaxY);
         });
-        if (overlapped.length > 0) {
-          setEditLayer(overlapped[0].layer === "base" ? "base" : "decor");
-        }
-      }
 
-      if (overlapped.length > 0) {
-        setSelectedObjectIds(overlapped.map(o => o.id));
-        setMapBoxSelection(null);
-        setPickedToast(`📦 ${overlapped.length}개 오브젝트가 선택되었습니다!`);
-        setTimeout(() => setPickedToast(null), 2000);
+        // Fallback: If no objects matched on active editLayer, search ALL objects across all layers!
+        if (overlapped.length === 0) {
+          overlapped = (localMap.objects || []).filter(o => {
+            const oMinX = o.x;
+            const oMinY = o.y;
+            const oMaxX = o.x + o.width;
+            const oMaxY = o.y + o.height;
+            return !(oMaxX <= selectMinX || oMinX >= selectMaxX || oMaxY <= selectMinY || oMinY >= selectMaxY);
+          });
+          if (overlapped.length > 0) {
+            setEditLayer(overlapped[0].layer === "base" ? "base" : "decor");
+          }
+        }
+
+        if (overlapped.length > 0) {
+          setSelectedObjectIds(overlapped.map(o => o.id));
+          setMapBoxSelection(null);
+          setPickedToast(`📦 ${overlapped.length}개 오브젝트가 선택되었습니다!`);
+          setTimeout(() => setPickedToast(null), 2000);
+        } else {
+          setMapBoxSelection(null);
+        }
       } else {
-        setMapBoxSelection(null);
+        // Multi-tile Box Drag Selection (cols > 1 || rows > 1) -> KEEP mapBoxSelection active for "✨ 1개의 오브젝트로 묶기"!
+        setSelectedObjectIds([]);
+        setPickedToast(`📦 맵 범위가 선택되었습니다! (하단 버튼 클릭으로 오브젝트화)`);
+        setTimeout(() => setPickedToast(null), 2000);
       }
     }
 
