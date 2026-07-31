@@ -1,30 +1,7 @@
-@import url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2201-2@1.0/Galmuri11.woff2');
-@import url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2201-2@1.0/Galmuri9.woff2');
-@import url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2105_2@1.0/DungGeunMo.woff2');
-
-@font-face {
-  font-family: 'Galmuri11';
-  src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2201-2@1.0/Galmuri11.woff2') format('woff2');
-  font-weight: normal;
-  font-style: normal;
-}
-
-@font-face {
-  font-family: 'Galmuri9';
-  src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2201-2@1.0/Galmuri9.woff2') format('woff2');
-  font-weight: normal;
-  font-style: normal;
-}
-
-@font-face {
-  font-family: 'DungGeunMo';
-  src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2105_2@1.0/DungGeunMo.woff2') format('woff2');
-  font-weight: normal;
-  font-style: normal;
-}
+@import url('https://cdn.jsdelivr.net/npm/galmuri/dist/galmuri.css');
 
 :root {
-  --font-pixel: 'Galmuri11', 'Galmuri9', 'DungGeunMo', sans-serif;
+  --font-pixel: 'Galmuri11', 'Galmuri9', monospace, sans-serif;
   --font-sans: 'Galmuri11', 'Galmuri9', 'Inter', system-ui, -apple-system, sans-serif;
   
   /* Modern Dark/Glass Theme colors */
