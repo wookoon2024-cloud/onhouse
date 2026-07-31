@@ -1042,7 +1042,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   // Main Canvas Render Loop
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !images.outdoor) return;
+    if (!canvas || !localMap) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
