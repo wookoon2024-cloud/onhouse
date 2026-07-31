@@ -2319,6 +2319,9 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       const cols = eCol - sCol + 1;
       const rows = eRow - sRow + 1;
       setMapBoxSelection({ startCol: sCol, startRow: sRow, cols, rows });
+      if (selectedObjectIds.length > 0) {
+        setSelectedObjectIds([]);
+      }
       return;
     }
 
@@ -3482,7 +3485,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           </div>
 
           {/* Floating Object Smart Edit Action Bar (Fixed on bottom center) */}
-          {selectedObjectIds.length > 0 && (
+          {!mapBoxSelection && selectedObjectIds.length > 0 && (
             <div style={{
               position: "absolute", bottom: "24px", left: "50%", transform: "translateX(-50%)", zIndex: 100,
               background: "rgba(20, 20, 32, 0.95)", border: "1px solid #ffd700",
@@ -3579,7 +3582,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           )}
 
           {/* Floating Map Drag-Box Selection Action Bar (Group tiles into Single Object) */}
-          {mapBoxSelection && !selectedObjectId && (
+          {mapBoxSelection && (
             <div style={{
               position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 100,
               background: 'rgba(20, 20, 32, 0.95)', border: '1px solid #ffd700',
