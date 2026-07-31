@@ -115,7 +115,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   const [selectedTile, setSelectedTile] = useState<number>(1199);
   const [brushSize, setBrushSize] = useState<number>(1);
   const [customBrushInput, setCustomBrushInput] = useState<string>('5');
-  const [tool, setTool] = useState<'brush' | 'bucket' | 'eyedropper' | 'select' | 'object' | 'collision'>('brush');
+  const [tool, setTool] = useState<'brush' | 'bucket' | 'eyedropper' | 'select' | 'object' | 'collision'>('select');
   const [collisionSubMode, setCollisionSubMode] = useState<'delete' | 'add'>('delete');
   const [autoCollision, setAutoCollision] = useState<boolean>(true);
 
