@@ -422,7 +422,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     };
   }, [currentOption?.url]);
 
-  // Natural frame dimensions calculation (derived from custom frame size OR natural image size / grid)
+  // Natural frame aspect ratio calculation (derived from custom frame size OR natural image size / grid)
   let effFrameW = currentOption?.frameWidth;
   let effFrameH = currentOption?.frameHeight;
 
@@ -431,16 +431,13 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     effFrameH = Math.round(spriteNaturalSize.height / currentOption.rows);
   }
 
-  const baseW = effFrameW || currentOption?.size || 36;
-  const baseH = effFrameH || currentOption?.size || 36;
+  // Base Width is determined by 맵 출력 크기 (currentOption.size, default 32px or 24px)
+  const displayBaseWidth = activeTab === 'character' ? (currentOption?.size || 32) : (currentOption?.size || 16);
+  const frameAspectRatio = (effFrameW && effFrameH && effFrameW > 0) ? (effFrameH / effFrameW) : 1.0;
+  const displayBaseHeight = activeTab === 'character' ? Math.round(displayBaseWidth * frameAspectRatio) : (currentOption?.size || 16);
 
-  const visualCellWidth = activeTab === 'character'
-    ? Math.round(baseW * gridZoom)
-    : Math.round((currentOption?.size || 16) * gridZoom);
-
-  const visualCellHeight = activeTab === 'character'
-    ? Math.round(baseH * gridZoom)
-    : Math.round((currentOption?.size || 16) * gridZoom);
+  const visualCellWidth = Math.round(displayBaseWidth * gridZoom);
+  const visualCellHeight = Math.round(displayBaseHeight * gridZoom);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
