@@ -69,9 +69,17 @@ export const fetchHouseDeletedMaps = async (houseCode: string): Promise<string[]
         }
       });
     }
-    return Array.from(new Set(dbDeleted));
+    const finalDeleted = Array.from(new Set(dbDeleted));
+    try {
+      localStorage.setItem(`on_house_deleted_maps_${houseCode}`, JSON.stringify(finalDeleted));
+    } catch (e) {}
+    return finalDeleted;
   } catch (err) {
-    console.warn('[OnHouse Sync] fetchHouseDeletedMaps network/timeout, returning empty list:', err);
+    console.warn('[OnHouse Sync] fetchHouseDeletedMaps network/timeout, returning cached list:', err);
+    try {
+      const saved = localStorage.getItem(`on_house_deleted_maps_${houseCode}`);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
     return [];
   }
 };
@@ -79,6 +87,10 @@ export const fetchHouseDeletedMaps = async (houseCode: string): Promise<string[]
 // Save deleted map IDs list to Supabase DB
 export const saveHouseDeletedMapsToDB = async (houseCode: string, deletedIds: string[]) => {
   try {
+    try {
+      localStorage.setItem(`on_house_deleted_maps_${houseCode}`, JSON.stringify(deletedIds));
+    } catch (e) {}
+
     await withTimeout(
       supabase
         .from('house_assets')
@@ -209,22 +221,62 @@ export const fetchHouseMaps = async (houseCode: string): Promise<Record<string, 
         }
       });
 
-      // Append default maps that were not in DB
+      // Append default maps that were not in DB and not deleted
       Object.keys(loadedMaps).forEach((id) => {
         if (!sortedMaps[id] && !deletedMapIds.includes(id)) {
           sortedMaps[id] = loadedMaps[id];
         }
       });
 
+      try {
+        localStorage.setItem(`on_house_custom_house_maps_${houseCode}`, JSON.stringify(sortedMaps));
+      } catch (e) {}
+
       console.log(`[OnHouse Sync] Successfully loaded ${Object.keys(sortedMaps).length} maps for houseCode [${houseCode}] in sort order:`, Object.keys(sortedMaps));
       return sortedMaps;
     }
 
+    try {
+      localStorage.setItem(`on_house_custom_house_maps_${houseCode}`, JSON.stringify(loadedMaps));
+    } catch (e) {}
+
     console.log(`[OnHouse Sync] Successfully loaded ${Object.keys(loadedMaps).length} maps for houseCode [${houseCode}]:`, Object.keys(loadedMaps));
     return loadedMaps;
   } catch (err) {
-    console.warn(`[OnHouse Sync] Supabase fetchHouseMaps timeout/error for [${houseCode}], using fresh default maps:`, err);
-    // Always fallback to pristine factory default maps
+    console.warn(`[OnHouse Sync] Supabase fetchHouseMaps timeout/error for [${houseCode}], using cached map list:`, err);
+    
+    // Check localStorage for cached house maps and deleted maps
+    try {
+      const savedDeleted = localStorage.getItem(`on_house_deleted_maps_${houseCode}`);
+      const deletedList: string[] = savedDeleted ? JSON.parse(savedDeleted) : [];
+
+      const savedHouseMaps = localStorage.getItem(`on_house_custom_house_maps_${houseCode}`);
+      if (savedHouseMaps) {
+        const parsedHouseMaps: Record<string, MapDefinition> = JSON.parse(savedHouseMaps);
+        const filteredCachedMaps: Record<string, MapDefinition> = {};
+        Object.entries(parsedHouseMaps).forEach(([id, def]) => {
+          if (!deletedList.includes(id)) {
+            filteredCachedMaps[id] = def;
+          }
+        });
+        if (Object.keys(filteredCachedMaps).length > 0) {
+          return filteredCachedMaps;
+        }
+      }
+
+      // If no custom house cache, fallback to default maps excluding deleted ones
+      const fallbackMaps: Record<string, MapDefinition> = {};
+      Object.entries(maps).forEach(([id, def]) => {
+        if (!deletedList.includes(id)) {
+          fallbackMaps[id] = JSON.parse(JSON.stringify(def));
+        }
+      });
+
+      if (Object.keys(fallbackMaps).length > 0) {
+        return fallbackMaps;
+      }
+    } catch (e) {}
+
     const loadedMaps: Record<string, MapDefinition> = {};
     Object.entries(maps).forEach(([id, def]) => {
       loadedMaps[id] = JSON.parse(JSON.stringify(def));
