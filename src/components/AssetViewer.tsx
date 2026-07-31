@@ -435,9 +435,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   // Frame aspect ratio (height / width)
   const frameAspectRatio = (effFrameW && effFrameH && effFrameW > 0) ? (effFrameH / effFrameW) : 1.0;
 
-  // Base Cell Dimensions (Character tiles scale base width by 맵 출력 크기, preserving natural frame aspect ratio)
-  const mapOutputW = currentOption?.size || (activeTab === 'character' ? 32 : 16);
-  const mapOutputH = activeTab === 'character' ? Math.round(mapOutputW * frameAspectRatio) : (currentOption?.size || 16);
+  // Base Cell Dimensions (Character tiles use 32px base width for clean editing view, preserving frame aspect ratio)
+  const mapOutputW = activeTab === 'character' ? 32 : (currentOption?.size || 16);
+  const mapOutputH = activeTab === 'character' ? Math.round(32 * frameAspectRatio) : (currentOption?.size || 16);
 
   const visualCellWidth = Math.round(mapOutputW * gridZoom);
   const visualCellHeight = Math.round(mapOutputH * gridZoom);
