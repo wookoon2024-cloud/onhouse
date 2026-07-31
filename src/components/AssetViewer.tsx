@@ -537,7 +537,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
             url: updatedUrl,
             rows: currentOption.rows,
             cols: currentOption.cols,
-            size: tileW
+            size: currentOption.size || 32,
+            frameWidth: currentOption.frameWidth,
+            frameHeight: currentOption.frameHeight
           }
         }));
         setContextMenuTile(null);
@@ -646,7 +648,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
           url: updatedUrl,
           rows: currentOption.rows,
           cols: newCols,
-          size: tileW
+          size: currentOption.size || 32,
+          frameWidth: currentOption.frameWidth,
+          frameHeight: currentOption.frameHeight
         }
       }));
     };
@@ -813,7 +817,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
           url: updatedUrl,
           rows,
           cols,
-          size: tileW
+          size: currentOption.size || 32,
+          frameWidth: currentOption.frameWidth,
+          frameHeight: currentOption.frameHeight
         }
       }));
 
@@ -1071,7 +1077,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
           url: updatedUrl,
           rows: currentOption.rows,
           cols: currentOption.cols,
-          size: tileSize
+          size: currentOption.size || 32,
+          frameWidth: currentOption.frameWidth,
+          frameHeight: currentOption.frameHeight
         }
       }));
 
@@ -1128,7 +1136,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
           url: updatedUrl,
           rows: newRows,
           cols,
-          size: tileW
+          size: currentOption.size || 32,
+          frameWidth: currentOption.frameWidth,
+          frameHeight: currentOption.frameHeight
         }
       }));
 
@@ -1183,7 +1193,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
           url: updatedUrl,
           rows,
           cols: newCols,
-          size: tileW
+          size: currentOption.size || 32,
+          frameWidth: currentOption.frameWidth,
+          frameHeight: currentOption.frameHeight
         }
       }));
     };
@@ -1227,7 +1239,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
           url: updatedUrl,
           rows: newRows,
           cols,
-          size: tileW
+          size: currentOption.size || 32,
+          frameWidth: currentOption.frameWidth,
+          frameHeight: currentOption.frameHeight
         }
       }));
 
