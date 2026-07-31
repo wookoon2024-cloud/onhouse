@@ -725,13 +725,71 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   };
 
   const handleCopySelectedObject = () => {
-    if (!selectedObjectId) return;
-    const obj = localMap.objects?.find(o => o.id === selectedObjectId);
-    if (obj) {
-      setCopiedObject(obj);
-      setPickedToast(`'${obj.tilesetKey}' 에셋이 클립보드에 복사되었습니다! (Ctrl+V로 붙여넣기)`);
-      setTimeout(() => setPickedToast(null), 2200);
+    const targetIds = selectedObjectIds.length > 0 ? selectedObjectIds : (selectedObjectId ? [selectedObjectId] : []);
+    if (targetIds.length === 0) return;
+
+    const currentObjs = localMap.objects || [];
+    const targetObjs = currentObjs.filter(o => targetIds.includes(o.id));
+    if (targetObjs.length === 0) return;
+
+    setHistory(prev => [...prev, localMap]);
+    setRedoHistory([]);
+
+    const newObjIds: string[] = [];
+    const newDuplicatedObjs: MapObjectInstance[] = [];
+
+    // Calculate duplicate offset (+1 tile right, or +1 tile down if at right boundary)
+    const maxRight = Math.max(...targetObjs.map(o => o.x + o.width));
+    const offsetX = (maxRight < localMap.width - 1) ? 1 : 0;
+    const offsetY = (maxRight < localMap.width - 1) ? 0 : 1;
+
+    setLocalMap(prev => {
+      const newCollision = prev.collision.map(r => [...r]);
+
+      targetObjs.forEach(obj => {
+        const newId = `obj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+        newObjIds.push(newId);
+
+        const destX = Math.max(0, Math.min(prev.width - obj.width, obj.x + offsetX));
+        const destY = Math.max(0, Math.min(prev.height - obj.height, obj.y + offsetY));
+
+        const duplicatedObj: MapObjectInstance = {
+          ...obj,
+          id: newId,
+          x: destX,
+          y: destY,
+          zIndex: Date.now() + Math.random()
+        };
+
+        if (autoCollision && obj.layer !== 'base') {
+          for (let ody = 0; ody < obj.height; ody++) {
+            for (let odx = 0; odx < obj.width; odx++) {
+              const ptx = destX + odx;
+              const pty = destY + ody;
+              if (ptx >= 0 && ptx < prev.width && pty >= 0 && pty < prev.height) {
+                newCollision[pty][ptx] = true;
+              }
+            }
+          }
+        }
+
+        newDuplicatedObjs.push(duplicatedObj);
+      });
+
+      return {
+        ...prev,
+        collision: newCollision,
+        objects: [...(prev.objects || []), ...newDuplicatedObjs]
+      };
+    });
+
+    if (targetObjs.length > 0) {
+      setCopiedObject(targetObjs[0]);
     }
+
+    setSelectedObjectIds(newObjIds);
+    setPickedToast(`📋 ${targetObjs.length}개 오브젝트가 복사되어 옆에 생성되었습니다!`);
+    setTimeout(() => setPickedToast(null), 2000);
   };
 
   const handlePasteObject = (targetTx?: number, targetTy?: number) => {
