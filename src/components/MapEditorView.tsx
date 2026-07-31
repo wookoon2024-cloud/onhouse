@@ -331,6 +331,47 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     });
   };
 
+  // Helper to trim empty (-1) rows and columns around the edges of a 2D tiles grid, adjusting origin coordinates
+  const trimTilesGrid = (
+    tilesGrid: number[][],
+    originX: number,
+    originY: number
+  ): { trimmedGrid: number[][]; x: number; y: number; width: number; height: number } => {
+    const rows = tilesGrid.length;
+    if (rows === 0) return { trimmedGrid: [], x: originX, y: originY, width: 0, height: 0 };
+    const cols = tilesGrid[0].length;
+
+    let minR = rows, maxR = -1, minC = cols, maxC = -1;
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (tilesGrid[r][c] !== -1) {
+          if (r < minR) minR = r;
+          if (r > maxR) maxR = r;
+          if (c < minC) minC = c;
+          if (c > maxC) maxC = c;
+        }
+      }
+    }
+
+    if (maxR === -1 || maxC === -1) {
+      return { trimmedGrid: tilesGrid, x: originX, y: originY, width: cols, height: rows };
+    }
+
+    const trimmedGrid: number[][] = [];
+    for (let r = minR; r <= maxR; r++) {
+      trimmedGrid.push(tilesGrid[r].slice(minC, maxC + 1));
+    }
+
+    return {
+      trimmedGrid,
+      x: originX + minC,
+      y: originY + minR,
+      width: maxC - minC + 1,
+      height: maxR - minR + 1
+    };
+  };
+
   // Undo / Redo stacks
   const [history, setHistory] = useState<MapDefinition[]>([]);
   const [redoHistory, setRedoHistory] = useState<MapDefinition[]>([]);
@@ -510,19 +551,22 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         }
       });
 
+      const { trimmedGrid, x: trimmedX, y: trimmedY, width: trimmedW, height: trimmedH } = trimTilesGrid(tilesGrid, minX, minY);
+
       const primaryTsKey = targetObjs[0].tilesetKey || activeTileset;
       const mergedObj: MapObjectInstance = {
         id: `obj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         tilesetKey: primaryTsKey,
         startCol: 0,
         startRow: 0,
-        width: cols,
-        height: rows,
-        x: minX,
-        y: minY,
+        width: trimmedW,
+        height: trimmedH,
+        x: trimmedX,
+        y: trimmedY,
         layer: editLayer === "base" ? "base" : "decor",
+        layerId: activeLayerId,
         zIndex: Date.now(),
-        tiles: tilesGrid
+        tiles: trimmedGrid
       };
 
       const remainingObjs = currentObjs.filter(o => {
@@ -1797,9 +1841,12 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         tilesGrid.push(rowTiles);
       }
 
-      // Sample primary tile from tilesGrid
+      // Trim empty padding (-1) from outer edges of tilesGrid
+      const { trimmedGrid, x: trimmedX, y: trimmedY, width: trimmedW, height: trimmedH } = trimTilesGrid(tilesGrid, startCol, startRow);
+
+      // Sample primary tile from trimmedGrid
       let sampleTileIdx = -1;
-      for (const row of tilesGrid) {
+      for (const row of trimmedGrid) {
         for (const val of row) {
           if (val !== -1 && val !== 1199 && val !== 2000) {
             sampleTileIdx = val;
@@ -1826,14 +1873,14 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         tilesetKey: targetTsKey,
         startCol: objStartCol,
         startRow: objStartRow,
-        width: cols,
-        height: rows,
-        x: startCol,
-        y: startRow,
+        width: trimmedW,
+        height: trimmedH,
+        x: trimmedX,
+        y: trimmedY,
         layer: targetIndex === 0 ? 'base' : 'decor',
         layerId: activeLayerId,
         zIndex: Date.now(),
-        tiles: tilesGrid
+        tiles: trimmedGrid
       };
 
       // Only remove sub-objects that belong to target layer and are FULLY CONTAINED inside box selection
