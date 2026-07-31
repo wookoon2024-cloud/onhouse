@@ -432,7 +432,13 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   }
 
   // Base Width is determined by 맵 출력 크기 (currentOption.size, default 32px or 24px)
-  const displayBaseWidth = activeTab === 'character' ? (currentOption?.size || 32) : (currentOption?.size || 16);
+  let rawSize = currentOption?.size || 32;
+  // Safety cap: If size was set to large frameHeight (e.g. > 64) during upload, default display base width to 32px
+  if (activeTab === 'character' && rawSize > 64) {
+    rawSize = 32;
+  }
+
+  const displayBaseWidth = activeTab === 'character' ? rawSize : (currentOption?.size || 16);
   const frameAspectRatio = (effFrameW && effFrameH && effFrameW > 0) ? (effFrameH / effFrameW) : 1.0;
   const displayBaseHeight = activeTab === 'character' ? Math.round(displayBaseWidth * frameAspectRatio) : (currentOption?.size || 16);
 
@@ -1367,6 +1373,48 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     });
   };
 
+  // Helper to crop precise sprite sheet region (with start offsets and custom frame sizes) into a clean 100% gapless PNG
+  const cropSpriteSheetRegion = (
+    sourceUrl: string,
+    offX: number,
+    offY: number,
+    cols: number,
+    rows: number,
+    frameW: number,
+    frameH: number
+  ): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = cols * frameW;
+        canvas.height = rows * frameH;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(sourceUrl);
+          return;
+        }
+        ctx.imageSmoothingEnabled = false;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(
+          img,
+          offX,
+          offY,
+          cols * frameW,
+          rows * frameH,
+          0,
+          0,
+          cols * frameW,
+          rows * frameH
+        );
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.onerror = () => resolve(sourceUrl);
+      img.src = sourceUrl;
+    });
+  };
+
   // Smart Auto-Trim & Normalizer Algorithm for Custom Sprite Sheets
   const handleAutoNormalizeSpriteSheet = () => {
     if (!fileDataUrl) return;
@@ -1634,6 +1682,20 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
             customMarginInput,
             customSpacingInput
           );
+        } else if (offX > 0 || offY > 0 || (imgWidth > 0 && (frameW !== Math.round((imgWidth - offX) / cols) || frameH !== Math.round((imgHeight - offY) / rows)))) {
+          // Automatic cropping for start offsets (시작 X, Y) and custom frame dimensions
+          setSaveProgressText('✂️ 에셋 영역 자동 크롭 및 오프셋 정제 중...');
+          finalUrl = await cropSpriteSheetRegion(
+            fileDataUrl,
+            offX,
+            offY,
+            cols,
+            rows,
+            frameW,
+            frameH
+          );
+          offX = 0;
+          offY = 0;
         }
       } else {
         alert("맵 타일셋의 경우 이미지 파일을 선택해 주세요!");
@@ -1653,7 +1715,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
         url: finalUrl!,
         cols,
         rows,
-        size: Math.max(frameW, frameH),
+        size: tSize || 32,
         frameWidth: frameW,
         frameHeight: frameH,
         offsetX: offX,
