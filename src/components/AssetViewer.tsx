@@ -3336,36 +3336,88 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 />
               </div>
 
-              <div>
-                <label style={{ fontSize: '11px', color: '#aaa', display: 'block', marginBottom: '6px' }}>
-                  {uploadCategory === 'character' ? "프레임 1개 단위 크기 (px):" : "타일 1개 단위 크기 (px):"}
-                </label>
-                <select
-                  value={isCustomFrameSize ? 'custom' : tileSizeInput}
-                  disabled={isSavingAsset}
-                  onChange={(e) => {
-                    if (e.target.value === 'custom') {
-                      setIsCustomFrameSize(true);
-                    } else {
-                      setIsCustomFrameSize(false);
-                      const val = parseInt(e.target.value, 10);
-                      handleTileSizeSelect(val);
-                      setCustomFrameWidthInput(val);
-                      setCustomFrameHeightInput(val);
-                    }
-                  }}
-                  style={{
-                    width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b',
-                    borderRadius: 0, padding: '8px 10px', color: '#fff', fontSize: '12px', outline: 'none',
-                    fontWeight: 'normal'
-                  }}
-                >
-                  <option value={16}>16 x 16 px (레트로 / 도트 2D 타일 표준)</option>
-                  <option value={32}>32 x 32 px (HD 픽셀 타일 규격)</option>
-                  <option value={48}>48 x 48 px (RPG Maker 규격)</option>
-                  <option value={64}>64 x 64 px (고해상도 HD 규격)</option>
-                  <option value="custom">✏️ 사용자 정의 규격 / 비정방형 (가로 x 세로 자유 지정)</option>
-                </select>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: '11px', color: '#aaa', display: 'block', marginBottom: '6px' }}>
+                    {uploadCategory === 'character' ? "프레임 1개 단위 크기 (px):" : "타일 1개 단위 크기 (px):"}
+                  </label>
+                  <select
+                    value={isCustomFrameSize ? 'custom' : tileSizeInput}
+                    disabled={isSavingAsset}
+                    onChange={(e) => {
+                      if (e.target.value === 'custom') {
+                        setIsCustomFrameSize(true);
+                      } else {
+                        setIsCustomFrameSize(false);
+                        const val = parseInt(e.target.value, 10);
+                        handleTileSizeSelect(val);
+                        setCustomFrameWidthInput(val);
+                        setCustomFrameHeightInput(val);
+                      }
+                    }}
+                    style={{
+                      width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b',
+                      borderRadius: 0, padding: '8px 10px', color: '#fff', fontSize: '12px', outline: 'none',
+                      fontWeight: 'normal'
+                    }}
+                  >
+                    <option value={16}>16 x 16 px (레트로 / 도트 2D 타일 표준)</option>
+                    <option value={32}>32 x 32 px (HD 픽셀 타일 규격)</option>
+                    <option value={48}>48 x 48 px (RPG Maker 규격)</option>
+                    <option value={64}>64 x 64 px (고해상도 HD 규격)</option>
+                    <option value="custom">✏️ 사용자 정의 규격 / 비정방형 (가로 x 세로 자유 지정)</option>
+                  </select>
+                </div>
+
+                <div style={{ flex: 1, display: 'flex', gap: '6px' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: '11px', color: '#a78bfa', display: 'block', marginBottom: '6px' }}>가로 열 수 (Cols):</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={64}
+                      value={customColsInput}
+                      disabled={isSavingAsset}
+                      onChange={(e) => {
+                        const valStr = e.target.value;
+                        if (valStr === '') {
+                          setCustomColsInput('');
+                          return;
+                        }
+                        const cols = parseInt(valStr, 10);
+                        if (!isNaN(cols)) setCustomColsInput(cols);
+                      }}
+                      onBlur={() => {
+                        if (customColsInput === '' || customColsInput <= 0) setCustomColsInput(4);
+                      }}
+                      style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '7px 8px', color: '#fff', fontSize: '12px', textAlign: 'center', outline: 'none', fontWeight: 'normal' }}
+                    />
+                  </div>
+
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: '11px', color: '#a78bfa', display: 'block', marginBottom: '6px' }}>세로 행 수 (Rows):</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={64}
+                      value={customRowsInput}
+                      disabled={isSavingAsset}
+                      onChange={(e) => {
+                        const valStr = e.target.value;
+                        if (valStr === '') {
+                          setCustomRowsInput('');
+                          return;
+                        }
+                        const rows = parseInt(valStr, 10);
+                        if (!isNaN(rows)) setCustomRowsInput(rows);
+                      }}
+                      onBlur={() => {
+                        if (customRowsInput === '' || customRowsInput <= 0) setCustomRowsInput(7);
+                      }}
+                      style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '7px 8px', color: '#fff', fontSize: '12px', textAlign: 'center', outline: 'none', fontWeight: 'normal' }}
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Custom Frame Size & Start Offsets (X, Y 시작점) Controls */}
@@ -3745,65 +3797,6 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                     <span className="pixel-text" style={{ color: '#a78bfa', fontWeight: 'normal' }}>
                       총 {(typeof customColsInput === 'number' ? customColsInput : 0) * (typeof customRowsInput === 'number' ? customRowsInput : 0)}개 프레임 ({typeof customFrameWidthInput === 'number' ? customFrameWidthInput : 0}x{typeof customFrameHeightInput === 'number' ? customFrameHeightInput : 0}px/프레임)
                     </span>
-                  </div>
-
-                  {/* Editable Cols & Rows Controls */}
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: '10px', color: '#aaa', display: 'block', marginBottom: '2px' }}>가로 열 수 (Cols)</label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={64}
-                        value={customColsInput}
-                        disabled={isSavingAsset}
-                        onChange={(e) => {
-                          const valStr = e.target.value;
-                          if (valStr === '') {
-                            setCustomColsInput('');
-                            return;
-                          }
-                          const cols = parseInt(valStr, 10);
-                          if (!isNaN(cols)) {
-                            setCustomColsInput(cols);
-                          }
-                        }}
-                        onBlur={() => {
-                          if (customColsInput === '' || customColsInput <= 0) {
-                            setCustomColsInput(4);
-                          }
-                        }}
-                        style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '4px 8px', color: '#fff', fontSize: '11px', textAlign: 'center', fontWeight: 'normal' }}
-                      />
-                    </div>
-
-                    <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: '10px', color: '#aaa', display: 'block', marginBottom: '2px' }}>세로 행 수 (Rows)</label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={64}
-                        value={customRowsInput}
-                        disabled={isSavingAsset}
-                        onChange={(e) => {
-                          const valStr = e.target.value;
-                          if (valStr === '') {
-                            setCustomRowsInput('');
-                            return;
-                          }
-                          const rows = parseInt(valStr, 10);
-                          if (!isNaN(rows)) {
-                            setCustomRowsInput(rows);
-                          }
-                        }}
-                        onBlur={() => {
-                          if (customRowsInput === '' || customRowsInput <= 0) {
-                            setCustomRowsInput(7);
-                          }
-                        }}
-                        style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '4px 8px', color: '#fff', fontSize: '11px', textAlign: 'center', fontWeight: 'normal' }}
-                      />
-                    </div>
                   </div>
                 </div>
               )}
