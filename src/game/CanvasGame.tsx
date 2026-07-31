@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { type MapDefinition, type MapObjectInstance, cleanDuplicateObjects, getCharRowActions, getCharGridDimensions, getCharDisplaySize, getNormalizedLayers } from './MapData';
+import { type MapDefinition, type MapObjectInstance, cleanDuplicateObjects, getCharRowActions, getCharGridDimensions, getCharDisplaySize, getCustomCharSpriteInfo, getNormalizedLayers } from './MapData';
 import type { PlayerState } from './syncManager';
 import { getDyedSprite } from './spriteDyer';
 
