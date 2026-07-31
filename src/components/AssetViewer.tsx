@@ -3342,8 +3342,28 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
               {/* Custom Frame Size & Start Offsets (X, Y 시작점) Controls */}
               {(isCustomFrameSize || (uploadCategory === 'character' && fileDataUrl)) && (
                 <div style={{ background: '#101018', padding: '10px', border: '1px solid #3b3b54', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div style={{ fontSize: '11px', color: '#a78bfa', fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    📐 프레임 상세 해상도 & X, Y 시작 위치 오프셋 (세로가 긴 캐릭터 / 자유 규격)
+                  <div style={{ fontSize: '11px', color: '#a78bfa', fontWeight: 'normal', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '4px' }}>
+                    <span>📐 프레임 해상도 & 시작 오프셋 (개별 자유 수정 가능)</span>
+                    {imgWidth > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const cols = typeof customColsInput === 'number' && customColsInput > 0 ? customColsInput : 4;
+                          const rows = typeof customRowsInput === 'number' && customRowsInput > 0 ? customRowsInput : 7;
+                          const offX = typeof customOffsetXInput === 'number' ? customOffsetXInput : 0;
+                          const offY = typeof customOffsetYInput === 'number' ? customOffsetYInput : 0;
+                          setCustomFrameWidthInput(Math.max(1, Math.round((imgWidth - offX) / cols)));
+                          setCustomFrameHeightInput(Math.max(1, Math.round((imgHeight - offY) / rows)));
+                        }}
+                        style={{
+                          fontSize: '10px', color: '#a78bfa', background: '#252538',
+                          border: '1px solid #4a4a6b', padding: '2px 6px', cursor: 'pointer',
+                          borderRadius: 0
+                        }}
+                      >
+                        ⚡ 이미지 크기 자동 맞춤
+                      </button>
+                    )}
                   </div>
 
                   <div style={{ display: 'flex', gap: '6px' }}>
@@ -3366,10 +3386,6 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                           const w = parseInt(valStr, 10);
                           if (!isNaN(w)) {
                             setCustomFrameWidthInput(w);
-                            if (imgWidth > 0 && w > 0) {
-                              const offX = typeof customOffsetXInput === 'number' ? customOffsetXInput : 0;
-                              setCustomColsInput(Math.max(1, Math.floor((imgWidth - offX) / w)));
-                            }
                           }
                         }}
                         onBlur={() => {
@@ -3400,10 +3416,6 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                           const h = parseInt(valStr, 10);
                           if (!isNaN(h)) {
                             setCustomFrameHeightInput(h);
-                            if (imgHeight > 0 && h > 0) {
-                              const offY = typeof customOffsetYInput === 'number' ? customOffsetYInput : 0;
-                              setCustomRowsInput(Math.max(1, Math.floor((imgHeight - offY) / h)));
-                            }
                           }
                         }}
                         onBlur={() => {
@@ -3725,10 +3737,6 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                           const cols = parseInt(valStr, 10);
                           if (!isNaN(cols)) {
                             setCustomColsInput(cols);
-                            if (imgWidth > 0 && cols > 0) {
-                              const offX = typeof customOffsetXInput === 'number' ? customOffsetXInput : 0;
-                              setCustomFrameWidthInput(Math.max(1, Math.round((imgWidth - offX) / cols)));
-                            }
                           }
                         }}
                         onBlur={() => {
@@ -3757,10 +3765,6 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                           const rows = parseInt(valStr, 10);
                           if (!isNaN(rows)) {
                             setCustomRowsInput(rows);
-                            if (imgHeight > 0 && rows > 0) {
-                              const offY = typeof customOffsetYInput === 'number' ? customOffsetYInput : 0;
-                              setCustomFrameHeightInput(Math.max(1, Math.round((imgHeight - offY) / rows)));
-                            }
                           }
                         }}
                         onBlur={() => {
