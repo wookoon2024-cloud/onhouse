@@ -101,6 +101,10 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     setDraggedTabId(null);
     setDragOverTabId(null);
   };
+
+  const handleTabDragLeave = () => {
+    setDragOverTabId(null);
+  };
   const [selectedMapId, setSelectedMapId] = useState<string>(initialMapId && activeMaps[initialMapId] ? initialMapId : (availableMapIds[0] || 'room'));
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [customNameInput, setCustomNameInput] = useState<string>('');
