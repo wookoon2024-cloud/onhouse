@@ -379,6 +379,7 @@ export default function App() {
   const [activeCreateMemoPos, setActiveCreateMemoPos] = useState<{ x: number; y: number } | null>(null);
   const [activeViewMemo, setActiveViewMemo] = useState<MapMemo | null>(null);
   const [showInventoryModal, setShowInventoryModal] = useState<boolean>(false);
+  const memoChannelRef = useRef<any>(null);
 
   // Load & Realtime Sync Memos
   useEffect(() => {
@@ -397,23 +398,31 @@ export default function App() {
       })
       .subscribe();
 
+    memoChannelRef.current = channel;
+
     return () => {
       supabase.removeChannel(channel);
+      memoChannelRef.current = null;
     };
   }, [houseCode, localPlayer.mapId]);
 
   // Handle Create Memo Submission
   const handleCreateMemoSubmit = (newMemo: MapMemo) => {
-    saveMemoToDB(houseCode, newMemo);
+    // 1. Instant Optimistic local state update!
     setMemos(prev => [...prev.filter(m => m.id !== newMemo.id), newMemo]);
     setActiveCreateMemoPos(null);
 
-    // Broadcast to other online players in house
-    supabase.channel(`house_memos_${houseCode}_${newMemo.mapId}`).send({
-      type: 'broadcast',
-      event: 'memo_add',
-      payload: newMemo
-    }).catch(() => {});
+    // 2. Non-blocking async DB save in background
+    saveMemoToDB(houseCode, newMemo);
+
+    // 3. Instant Realtime broadcast to online players via connected channel
+    if (memoChannelRef.current) {
+      memoChannelRef.current.send({
+        type: 'broadcast',
+        event: 'memo_add',
+        payload: newMemo
+      }).catch(() => {});
+    }
   };
 
   // Handle Pickup One-Time Memo to Inventory (🎒 장비함)
@@ -423,12 +432,14 @@ export default function App() {
     setMemos(prev => prev.filter(m => m.id !== memo.id));
     setActiveViewMemo(null);
 
-    // Broadcast deletion to other players
-    supabase.channel(`house_memos_${houseCode}_${memo.mapId}`).send({
-      type: 'broadcast',
-      event: 'memo_delete',
-      payload: { id: memo.id }
-    }).catch(() => {});
+    // Broadcast deletion to other players via connected channel
+    if (memoChannelRef.current) {
+      memoChannelRef.current.send({
+        type: 'broadcast',
+        event: 'memo_delete',
+        payload: { id: memo.id }
+      }).catch(() => {});
+    }
 
     // Add to Inventory
     const now = new Date();
@@ -469,20 +480,25 @@ export default function App() {
       createdAt: formattedDate
     };
 
-    saveMemoToDB(houseCode, newMemo);
+    // 1. Instant Optimistic local state update!
     setMemos(prev => [...prev.filter(m => m.id !== newMemo.id), newMemo]);
+
+    // 2. Non-blocking async DB save in background
+    saveMemoToDB(houseCode, newMemo);
 
     // Remove from Inventory
     const updatedInv = inventory.filter(i => i.id !== item.id);
     setInventory(updatedInv);
     saveLocalInventory(updatedInv);
 
-    // Broadcast addition to other players
-    supabase.channel(`house_memos_${houseCode}_${newMemo.mapId}`).send({
-      type: 'broadcast',
-      event: 'memo_add',
-      payload: newMemo
-    }).catch(() => {});
+    // Broadcast addition to other players via connected channel
+    if (memoChannelRef.current) {
+      memoChannelRef.current.send({
+        type: 'broadcast',
+        event: 'memo_add',
+        payload: newMemo
+      }).catch(() => {});
+    }
   };
 
   // Handle Delete Inventory Item
