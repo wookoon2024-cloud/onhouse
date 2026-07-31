@@ -1854,8 +1854,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
             rowTiles.push(tileVal);
 
-            // Erase vacated tile ONLY from active layer grid!
-            if (!fromExistingObj && activeGrid[curTy]) {
+            // Erase vacated tile from active layer grid
+            if (activeGrid[curTy]) {
               activeGrid[curTy][curTx] = -1;
             }
             if (autoCollision && targetIndex !== 0) {
