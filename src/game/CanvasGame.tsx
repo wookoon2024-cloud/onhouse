@@ -1213,13 +1213,18 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
 
         const dyedSpriteSheet = getDyedSprite(spriteSheet, player.hue, player.isOnline);
 
-        // Calculate sprite sheet grid bounds dynamically from character dimension rules & image size
-        const { cols: gridCols, rows: gridRows } = getCharGridDimensions(player.spriteType);
-        const maxCols = Math.max(1, gridCols);
-        const maxRows = Math.max(1, gridRows);
+        // Calculate sprite sheet grid bounds & frame offsets dynamically
+        const charInfo = getCustomCharSpriteInfo(player.spriteType);
+        const maxCols = Math.max(1, charInfo.cols);
+        const maxRows = Math.max(1, charInfo.rows);
 
-        const tileW = spriteSheet.width / maxCols;
-        const tileH = spriteSheet.height / maxRows;
+        const startX = charInfo.offsetX || 0;
+        const startY = charInfo.offsetY || 0;
+        const spacingX = charInfo.spacingX || 0;
+        const spacingY = charInfo.spacingY || 0;
+
+        const tileW = charInfo.frameWidth || Math.max(1, Math.floor((spriteSheet.width - startX) / maxCols));
+        const tileH = charInfo.frameHeight || Math.max(1, Math.floor((spriteSheet.height - startY) / maxRows));
 
         const isEmoting = !!(player.emoteUntil && Date.now() < player.emoteUntil && player.currentEmote);
         const charRowActions = getCharRowActions(player.spriteType);
@@ -1272,6 +1277,9 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         col = Math.min(col, maxCols - 1);
         row = Math.min(row, maxRows - 1);
 
+        const srcX = startX + col * (tileW + spacingX);
+        const srcY = startY + row * (tileH + spacingY);
+
         const charDrawX = Math.round(player.x * tileScale);
         const charDrawY = Math.round(player.y * tileScale);
 
@@ -1285,9 +1293,14 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
           ctx.filter = 'none';
         }
 
-        const baseCharSize = player.charSize || getCharDisplaySize(player.spriteType) || 16;
-        const charDrawW = Math.round((baseCharSize / 16) * vSize);
-        const charDrawH = Math.round((baseCharSize / 16) * vSize);
+        const baseCharSize = player.charSize || charInfo.size || 16;
+        const aspect = tileW / Math.max(1, tileH);
+        let charDrawW = Math.round((baseCharSize / 16) * vSize);
+        let charDrawH = Math.round((baseCharSize / 16) * vSize);
+
+        if (aspect < 0.95 || aspect > 1.05) {
+          charDrawH = Math.round(charDrawW / aspect);
+        }
 
         const drawX = Math.round(charDrawX - (charDrawW - vSize) / 2);
         const drawY = Math.round(charDrawY - (charDrawH - vSize));
@@ -1316,13 +1329,13 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
 
           ctx.drawImage(
             dyedSpriteSheet,
-            col * tileW, row * tileH, tileW, tileH,
+            srcX, srcY, tileW, tileH,
             -charDrawW / 2, -charDrawH / 2, charDrawW, charDrawH
           );
         } else {
           ctx.drawImage(
             dyedSpriteSheet,
-            col * tileW, row * tileH, tileW, tileH,
+            srcX, srcY, tileW, tileH,
             drawX, drawY, charDrawW, charDrawH
           );
         }

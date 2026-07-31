@@ -179,6 +179,11 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   const [customRowsInput, setCustomRowsInput] = useState<number>(9);
   const [customMarginInput, setCustomMarginInput] = useState<number>(0);
   const [customSpacingInput, setCustomSpacingInput] = useState<number>(0);
+  const [customFrameWidthInput, setCustomFrameWidthInput] = useState<number>(32);
+  const [customFrameHeightInput, setCustomFrameHeightInput] = useState<number>(32);
+  const [customOffsetXInput, setCustomOffsetXInput] = useState<number>(0);
+  const [customOffsetYInput, setCustomOffsetYInput] = useState<number>(0);
+  const [isCustomFrameSize, setIsCustomFrameSize] = useState<boolean>(false);
   const [isNormalizing, setIsNormalizing] = useState<boolean>(false);
   const [previewZoom, setPreviewZoom] = useState<number>(1.0); // 1.0 (Fit), 1.5x, 2.0x, 3.0x, 4.0x
 
@@ -1228,20 +1233,26 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
         setImgWidth(img.width);
         setImgHeight(img.height);
 
-        setImgHeight(img.height);
-
-        const currentTileSize = tileSizeInput || (uploadCategory === 'map' ? 16 : 16);
+        const currentTileSize = tileSizeInput || 16;
         if (uploadCategory === 'map') {
           const autoCols = Math.max(1, Math.floor((img.width - customMarginInput * 2 + customSpacingInput) / (currentTileSize + customSpacingInput)));
           const autoRows = Math.max(1, Math.floor((img.height - customMarginInput * 2 + customSpacingInput) / (currentTileSize + customSpacingInput)));
           setCustomColsInput(autoCols);
           setCustomRowsInput(autoRows);
+          setCustomFrameWidthInput(currentTileSize);
+          setCustomFrameHeightInput(currentTileSize);
         } else {
           const autoCols = 4;
           const estRowH = img.width / autoCols;
           const autoRows = estRowH > 0 ? Math.round(img.height / estRowH) : 7;
+          const finalRows = autoRows > 0 ? autoRows : 7;
           setCustomColsInput(autoCols);
-          setCustomRowsInput(autoRows > 0 ? autoRows : 7);
+          setCustomRowsInput(finalRows);
+
+          const initW = Math.max(1, Math.round(img.width / autoCols));
+          const initH = Math.max(1, Math.round(img.height / finalRows));
+          setCustomFrameWidthInput(initW);
+          setCustomFrameHeightInput(initH);
         }
       };
       img.src = result;
@@ -1569,14 +1580,19 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       let rows = 7;
       const tSize = tileSizeInput || 32;
 
+      let frameW = customFrameWidthInput || tSize;
+      let frameH = customFrameHeightInput || tSize;
+      let offX = customOffsetXInput || 0;
+      let offY = customOffsetYInput || 0;
+
       if (uploadCategory === 'character' && !fileDataUrl) {
         const template = createDefaultCharTemplate(tSize);
         finalUrl = template.dataUrl;
         cols = template.cols;
         rows = template.rows;
       } else if (fileDataUrl) {
-        cols = customColsInput || Math.max(1, Math.floor(imgWidth / tSize));
-        rows = customRowsInput || Math.max(1, Math.floor(imgHeight / tSize));
+        cols = customColsInput || Math.max(1, Math.floor((imgWidth - offX) / frameW));
+        rows = customRowsInput || Math.max(1, Math.floor((imgHeight - offY) / frameH));
 
         // Automatic Gap & Margin Extraction for Map Tilesets
         if (uploadCategory === 'map' && (customSpacingInput > 0 || customMarginInput > 0)) {
@@ -1608,7 +1624,13 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
         url: finalUrl!,
         cols,
         rows,
-        size: tSize,
+        size: Math.max(frameW, frameH),
+        frameWidth: frameW,
+        frameHeight: frameH,
+        offsetX: offX,
+        offsetY: offY,
+        spacingX: customSpacingInput || 0,
+        spacingY: customSpacingInput || 0,
         prefix: uploadCategory === 'map' ? nextPrefix : undefined,
         isCustom: true
       };
@@ -3290,21 +3312,121 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                   {uploadCategory === 'character' ? "프레임 1개 단위 크기 (px):" : "타일 1개 단위 크기 (px):"}
                 </label>
                 <select
-                  value={tileSizeInput}
+                  value={isCustomFrameSize ? 'custom' : tileSizeInput}
                   disabled={isSavingAsset}
-                  onChange={(e) => handleTileSizeSelect(parseInt(e.target.value, 10))}
+                  onChange={(e) => {
+                    if (e.target.value === 'custom') {
+                      setIsCustomFrameSize(true);
+                    } else {
+                      setIsCustomFrameSize(false);
+                      const val = parseInt(e.target.value, 10);
+                      handleTileSizeSelect(val);
+                      setCustomFrameWidthInput(val);
+                      setCustomFrameHeightInput(val);
+                    }
+                  }}
                   style={{
                     width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b',
                     borderRadius: 0, padding: '8px 10px', color: '#fff', fontSize: '12px', outline: 'none',
                     fontWeight: 'normal'
                   }}
                 >
-                  <option value={16}>16 x 16 px (레트로 / 도트 2D 타일 표준 - 추천)</option>
+                  <option value={16}>16 x 16 px (레트로 / 도트 2D 타일 표준)</option>
                   <option value={32}>32 x 32 px (HD 픽셀 타일 규격)</option>
                   <option value={48}>48 x 48 px (RPG Maker 규격)</option>
                   <option value={64}>64 x 64 px (고해상도 HD 규격)</option>
+                  <option value="custom">✏️ 사용자 정의 규격 / 비정방형 (가로 x 세로 자유 지정)</option>
                 </select>
               </div>
+
+              {/* Custom Frame Size & Start Offsets (X, Y 시작점) Controls */}
+              {(isCustomFrameSize || (uploadCategory === 'character' && fileDataUrl)) && (
+                <div style={{ background: '#101018', padding: '10px', border: '1px solid #3b3b54', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ fontSize: '11px', color: '#a78bfa', fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    📐 프레임 상세 해상도 & X, Y 시작 위치 오프셋 (세로가 긴 캐릭터 / 자유 규격)
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '10px', color: '#ccc', display: 'block', marginBottom: '3px' }}>
+                        가로 프레임(px):
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={1024}
+                        value={customFrameWidthInput}
+                        disabled={isSavingAsset}
+                        onChange={(e) => {
+                          const w = Math.max(1, parseInt(e.target.value, 10) || 1);
+                          setCustomFrameWidthInput(w);
+                          if (imgWidth > 0) {
+                            setCustomColsInput(Math.max(1, Math.floor((imgWidth - customOffsetXInput) / w)));
+                          }
+                        }}
+                        style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '4px 6px', color: '#fff', fontSize: '11px', textAlign: 'center' }}
+                      />
+                    </div>
+
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '10px', color: '#ccc', display: 'block', marginBottom: '3px' }}>
+                        세로 프레임(px):
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={1024}
+                        value={customFrameHeightInput}
+                        disabled={isSavingAsset}
+                        onChange={(e) => {
+                          const h = Math.max(1, parseInt(e.target.value, 10) || 1);
+                          setCustomFrameHeightInput(h);
+                          if (imgHeight > 0) {
+                            setCustomRowsInput(Math.max(1, Math.floor((imgHeight - customOffsetYInput) / h)));
+                          }
+                        }}
+                        style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '4px 6px', color: '#fff', fontSize: '11px', textAlign: 'center' }}
+                      />
+                    </div>
+
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '10px', color: '#ffd700', display: 'block', marginBottom: '3px' }}>
+                        📍 시작 X(px):
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={1024}
+                        value={customOffsetXInput}
+                        disabled={isSavingAsset}
+                        onChange={(e) => {
+                          const offX = Math.max(0, parseInt(e.target.value, 10) || 0);
+                          setCustomOffsetXInput(offX);
+                        }}
+                        style={{ width: '100%', background: '#0d0d12', border: '1px solid #ffd700', borderRadius: 0, padding: '4px 6px', color: '#fff', fontSize: '11px', textAlign: 'center' }}
+                      />
+                    </div>
+
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '10px', color: '#ffd700', display: 'block', marginBottom: '3px' }}>
+                        📍 시작 Y(px):
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={1024}
+                        value={customOffsetYInput}
+                        disabled={isSavingAsset}
+                        onChange={(e) => {
+                          const offY = Math.max(0, parseInt(e.target.value, 10) || 0);
+                          setCustomOffsetYInput(offY);
+                        }}
+                        style={{ width: '100%', background: '#0d0d12', border: '1px solid #ffd700', borderRadius: 0, padding: '4px 6px', color: '#fff', fontSize: '11px', textAlign: 'center' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Spacing & Margin Controls for Map Tilesets */}
               {uploadCategory === 'map' && (
@@ -3423,10 +3545,15 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none' }}>
                           {Array.from({ length: customColsInput }).map((_, c) =>
                             Array.from({ length: customRowsInput }).map((_, r) => {
-                              const leftPct = ((customMarginInput + c * (tileSizeInput + customSpacingInput)) / imgWidth) * 100;
-                              const topPct = ((customMarginInput + r * (tileSizeInput + customSpacingInput)) / imgHeight) * 100;
-                              const widthPct = (tileSizeInput / imgWidth) * 100;
-                              const heightPct = (tileSizeInput / imgHeight) * 100;
+                              const effFrameW = customFrameWidthInput || tileSizeInput;
+                              const effFrameH = customFrameHeightInput || tileSizeInput;
+                              const effOffX = customOffsetXInput || customMarginInput || 0;
+                              const effOffY = customOffsetYInput || customMarginInput || 0;
+
+                              const leftPct = ((effOffX + c * (effFrameW + customSpacingInput)) / imgWidth) * 100;
+                              const topPct = ((effOffY + r * (effFrameH + customSpacingInput)) / imgHeight) * 100;
+                              const widthPct = (effFrameW / imgWidth) * 100;
+                              const heightPct = (effFrameH / imgHeight) * 100;
                               const isFirst = c === 0 && r === 0;
 
                               return (
@@ -3464,10 +3591,15 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none' }}>
                           {Array.from({ length: customColsInput }).map((_, c) =>
                             Array.from({ length: customRowsInput }).map((_, r) => {
-                              const leftPx = (customMarginInput + c * (tileSizeInput + customSpacingInput)) * previewZoom;
-                              const topPx = (customMarginInput + r * (tileSizeInput + customSpacingInput)) * previewZoom;
-                              const widthPx = tileSizeInput * previewZoom;
-                              const heightPx = tileSizeInput * previewZoom;
+                              const effFrameW = customFrameWidthInput || tileSizeInput;
+                              const effFrameH = customFrameHeightInput || tileSizeInput;
+                              const effOffX = customOffsetXInput || customMarginInput || 0;
+                              const effOffY = customOffsetYInput || customMarginInput || 0;
+
+                              const leftPx = (effOffX + c * (effFrameW + customSpacingInput)) * previewZoom;
+                              const topPx = (effOffY + r * (effFrameH + customSpacingInput)) * previewZoom;
+                              const widthPx = effFrameW * previewZoom;
+                              const heightPx = effFrameH * previewZoom;
                               const isFirst = c === 0 && r === 0;
 
                               return (
@@ -3495,7 +3627,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                   {/* Calculation summary badge */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#ccc', background: 'rgba(139, 92, 246, 0.12)', padding: '6px 10px', borderRadius: 0, border: '1px solid #4a4a6b' }}>
                     <span>분할 결과: <span style={{ color: '#fff' }}>{customColsInput}열 x {customRowsInput}행</span></span>
-                    <span className="pixel-text" style={{ color: '#a78bfa', fontWeight: 'normal' }}>총 {customColsInput * customRowsInput}개 타일 ({Math.round(imgWidth / Math.max(1, customColsInput))}x{Math.round(imgHeight / Math.max(1, customRowsInput))}px/타일)</span>
+                    <span className="pixel-text" style={{ color: '#a78bfa', fontWeight: 'normal' }}>
+                      총 {customColsInput * customRowsInput}개 프레임 ({customFrameWidthInput || Math.round(imgWidth / Math.max(1, customColsInput))}x{customFrameHeightInput || Math.round(imgHeight / Math.max(1, customRowsInput))}px/프레임)
+                    </span>
                   </div>
 
                   {/* Editable Cols & Rows Controls */}
@@ -3508,7 +3642,13 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                         max={64}
                         value={customColsInput}
                         disabled={isSavingAsset}
-                        onChange={(e) => setCustomColsInput(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                        onChange={(e) => {
+                          const cols = Math.max(1, parseInt(e.target.value, 10) || 1);
+                          setCustomColsInput(cols);
+                          if (imgWidth > 0) {
+                            setCustomFrameWidthInput(Math.max(1, Math.round((imgWidth - customOffsetXInput) / cols)));
+                          }
+                        }}
                         style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '4px 8px', color: '#fff', fontSize: '11px', textAlign: 'center', fontWeight: 'normal' }}
                       />
                     </div>
@@ -3521,7 +3661,13 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                         max={64}
                         value={customRowsInput}
                         disabled={isSavingAsset}
-                        onChange={(e) => setCustomRowsInput(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                        onChange={(e) => {
+                          const rows = Math.max(1, parseInt(e.target.value, 10) || 1);
+                          setCustomRowsInput(rows);
+                          if (imgHeight > 0) {
+                            setCustomFrameHeightInput(Math.max(1, Math.round((imgHeight - customOffsetYInput) / rows)));
+                          }
+                        }}
                         style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '4px 8px', color: '#fff', fontSize: '11px', textAlign: 'center', fontWeight: 'normal' }}
                       />
                     </div>

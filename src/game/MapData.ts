@@ -117,53 +117,70 @@ export function getCharRowActions(spriteType: string): string[] {
   return DEFAULT_CHAR_ROW_ACTIONS[spriteType] || ['대기', '걷기1', '걷기2', '걷기3', '공격', '피격', '환호'];
 }
 
-export function getCharGridDimensions(spriteType: string): { cols: number; rows: number } {
+export interface CharSpriteInfo {
+  cols: number;
+  rows: number;
+  size: number;
+  frameWidth?: number;
+  frameHeight?: number;
+  offsetX?: number;
+  offsetY?: number;
+  spacingX?: number;
+  spacingY?: number;
+}
+
+export function getCustomCharSpriteInfo(spriteType: string): CharSpriteInfo {
   try {
     const savedOverrides = localStorage.getItem('on_house_char_image_overrides');
     if (savedOverrides) {
       const overrides = JSON.parse(savedOverrides);
-      if (overrides[spriteType] && overrides[spriteType].cols && overrides[spriteType].rows) {
-        return { cols: overrides[spriteType].cols, rows: overrides[spriteType].rows };
+      if (overrides[spriteType]) {
+        const item = overrides[spriteType];
+        return {
+          cols: item.cols || 4,
+          rows: item.rows || 7,
+          size: item.size || 16,
+          frameWidth: item.frameWidth,
+          frameHeight: item.frameHeight,
+          offsetX: item.offsetX || 0,
+          offsetY: item.offsetY || 0,
+          spacingX: item.spacingX || 0,
+          spacingY: item.spacingY || 0
+        };
       }
     }
     const savedCustom = localStorage.getItem('on_house_custom_char_sprites');
     if (savedCustom) {
       const customList = JSON.parse(savedCustom);
       const matched = customList.find((item: any) => item.id === spriteType);
-      if (matched && matched.cols && matched.rows) {
-        return { cols: matched.cols, rows: matched.rows };
+      if (matched) {
+        return {
+          cols: matched.cols || 4,
+          rows: matched.rows || 7,
+          size: matched.size || 16,
+          frameWidth: matched.frameWidth,
+          frameHeight: matched.frameHeight,
+          offsetX: matched.offsetX || 0,
+          offsetY: matched.offsetY || 0,
+          spacingX: matched.spacingX || 0,
+          spacingY: matched.spacingY || 0
+        };
       }
     }
-  } catch (e) {
-    // fallback
-  }
+  } catch (e) {}
 
-  if (spriteType === 'pig') return { cols: 2, rows: 1 };
-  return { cols: 4, rows: 7 };
+  if (spriteType === 'pig') return { cols: 2, rows: 1, size: 16 };
+  return { cols: 4, rows: 7, size: 16 };
+}
+
+export function getCharGridDimensions(spriteType: string): { cols: number; rows: number } {
+  const info = getCustomCharSpriteInfo(spriteType);
+  return { cols: info.cols, rows: info.rows };
 }
 
 export function getCharDisplaySize(spriteType: string): number {
-  try {
-    const savedOverrides = localStorage.getItem('on_house_char_image_overrides');
-    if (savedOverrides) {
-      const overrides = JSON.parse(savedOverrides);
-      if (overrides[spriteType] && overrides[spriteType].size) {
-        return overrides[spriteType].size;
-      }
-    }
-    const savedCustom = localStorage.getItem('on_house_custom_char_sprites');
-    if (savedCustom) {
-      const customList = JSON.parse(savedCustom);
-      const matched = customList.find((item: any) => item.id === spriteType);
-      if (matched && matched.size) {
-        return matched.size;
-      }
-    }
-  } catch (e) {
-    // fallback
-  }
-
-  return 16; // Default base size is 16px tile scale
+  const info = getCustomCharSpriteInfo(spriteType);
+  return info.size || 16;
 }
 
 // Helper to create an empty 2D grid
