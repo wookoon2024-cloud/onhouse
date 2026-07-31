@@ -2505,13 +2505,13 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   return (
     <div style={{
       position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-      background: '#1a1a1c', zIndex: 140, display: 'flex', flexDirection: 'column',
+      background: '#181818', zIndex: 140, display: 'flex', flexDirection: 'column',
       color: '#fff', fontFamily: 'var(--font-pixel)', userSelect: 'none'
     }}>
       {/* 1. Photoshop-Style Compact Header Toolbar */}
       <div style={{
-        padding: "4px 16px 0px 16px", borderBottom: "1px solid #333336",
-        background: "#1e1e1f", display: "flex", justifyContent: "space-between",
+        padding: "4px 16px 0px 16px", borderBottom: "1px solid #282828",
+        background: "#181818", display: "flex", justifyContent: "space-between",
         alignItems: "flex-end", minHeight: "38px", zIndex: 10
       }}>
         {/* Left Actions */}
@@ -2519,7 +2519,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           <button
             onClick={handleCancel}
             style={{
-              padding: "4px 10px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.2)",
+              padding: "4px 10px", background: "#333333", border: "1px solid #484848",
               borderRadius: "4px", color: "#fff", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px",
               cursor: "pointer"
             }}
@@ -2543,7 +2543,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               onClick={handleUndo}
               disabled={history.length === 0}
               style={{
-                padding: "4px 8px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.2)",
+                padding: "4px 8px", background: "#333333", border: "1px solid #484848",
                 borderRadius: "4px 0 0 4px", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
                 cursor: history.length === 0 ? "not-allowed" : "pointer", opacity: history.length === 0 ? 0.3 : 1
               }}
@@ -2555,7 +2555,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               onClick={handleRedo}
               disabled={redoHistory.length === 0}
               style={{
-                padding: "4px 8px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.2)",
+                padding: "4px 8px", background: "#333333", border: "1px solid #484848",
                 borderLeft: "none", borderRadius: "0 4px 4px 0", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
                 cursor: redoHistory.length === 0 ? "not-allowed" : "pointer", opacity: redoHistory.length === 0 ? 0.3 : 1
               }}
@@ -2588,11 +2588,11 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                 style={{
                   display: "flex", alignItems: "center", gap: "6px",
                   padding: "6px 12px", borderRadius: "6px 6px 0 0",
-                  background: isSelected ? "#252528" : "rgba(255, 255, 255, 0.04)",
-                  color: isSelected ? "#fff" : "rgba(255, 255, 255, 0.65)",
-                  borderTop: isSelected ? "2px solid #89b4fa" : "1px solid #333336",
-                  borderLeft: isSelected ? "1px solid #38383c" : "1px solid #333336",
-                  borderRight: isSelected ? "1px solid #38383c" : "1px solid #333336",
+                  background: isSelected ? "#333333" : "#222222",
+                  color: isSelected ? "#ffffff" : "#aaaaaa",
+                  borderTop: isSelected ? "2px solid #89b4fa" : "1px solid #282828",
+                  borderLeft: isSelected ? "1px solid #444444" : "1px solid #282828",
+                  borderRight: isSelected ? "1px solid #444444" : "1px solid #282828",
                   borderBottom: "none",
                   opacity: isBeingDragged ? 0.4 : 1,
                   transition: "all 0.15s ease",
@@ -2675,11 +2675,11 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               style={{
                 display: "flex", alignItems: "center", gap: "3px",
                 padding: "6px 12px", borderRadius: "6px 6px 0 0",
-                background: "rgba(255, 255, 255, 0.05)",
+                background: "#222222",
                 color: "var(--accent)",
-                borderTop: "1px solid rgba(255,255,255,0.2)",
-                borderLeft: "1px solid rgba(255,255,255,0.18)",
-                borderRight: "1px solid rgba(255,255,255,0.18)",
+                borderTop: "1px solid #282828",
+                borderLeft: "1px solid #282828",
+                borderRight: "1px solid #282828",
                 borderBottom: "none",
                 cursor: "pointer", transition: "all 0.15s ease",
                 fontSize: "12px", fontWeight: "normal"
@@ -2716,11 +2716,11 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
       {/* Contextual Action Instruction Status Bar */}
       <div style={{
-        background: '#252528',
-        borderBottom: '1px solid #38383c',
+        background: '#333333',
+        borderBottom: '1px solid #222222',
         padding: '5px 16px',
         fontSize: '12px',
-        color: '#ccc',
+        color: '#dddddd',
         fontWeight: 'normal',
         display: 'flex',
         alignItems: 'center',
@@ -2808,14 +2808,14 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         
         {/* Left Side: Map Properties Panel with 3 Compact Tabs (기본, 크기, 옵션) */}
         <div style={{
-          width: '260px', borderRight: '1px solid #38383c',
-          background: '#212123', display: 'flex',
+          width: '260px', borderRight: '1px solid #222222',
+          background: '#333333', display: 'flex',
           flexDirection: 'column', overflow: 'hidden'
         }}>
           {/* Tab Header Row */}
           <div style={{
-            display: 'flex', borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
-            background: 'rgba(15, 15, 24, 0.8)', padding: '4px 4px 0 4px', gap: '2px'
+            display: 'flex', borderBottom: '1px solid #222222',
+            background: '#252525', padding: '4px 4px 0 4px', gap: '2px'
           }}>
             {(['basic', 'size', 'option'] as const).map((tabKey) => {
               const isActive = leftSidebarTab === tabKey;
@@ -2826,11 +2826,11 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                   onClick={() => setLeftSidebarTab(tabKey)}
                   style={{
                     flex: 1, padding: '7px 2px', fontSize: '12px', fontWeight: 'normal',
-                    color: isActive ? '#fff' : 'rgba(255, 255, 255, 0.65)',
-                    background: isActive ? '#1e1e2e' : 'rgba(255, 255, 255, 0.03)',
-                    borderTop: isActive ? '2px solid #89b4fa' : '1px solid rgba(255,255,255,0.18)',
-                    borderLeft: isActive ? '1px solid rgba(255,255,255,0.22)' : '1px solid rgba(255,255,255,0.18)',
-                    borderRight: isActive ? '1px solid rgba(255,255,255,0.22)' : '1px solid rgba(255,255,255,0.18)',
+                    color: isActive ? '#ffffff' : '#aaaaaa',
+                    background: isActive ? '#333333' : '#222222',
+                    borderTop: isActive ? '2px solid #89b4fa' : '1px solid #282828',
+                    borderLeft: isActive ? '1px solid #444444' : '1px solid #282828',
+                    borderRight: isActive ? '1px solid #444444' : '1px solid #282828',
                     borderBottom: 'none', borderRadius: '4px 4px 0 0',
                     cursor: 'pointer', transition: 'all 0.15s ease'
                   }}
