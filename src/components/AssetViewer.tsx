@@ -3338,7 +3338,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
 
               <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '11px', color: '#aaa', display: 'block', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '11px', color: '#aaa', display: 'block', marginBottom: '6px', whiteSpace: 'nowrap', height: '16px', lineHeight: '16px' }}>
                     {uploadCategory === 'character' ? "프레임 1개 단위 크기 (px):" : "타일 1개 단위 크기 (px):"}
                   </label>
                   <select
@@ -3357,8 +3357,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                     }}
                     style={{
                       width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b',
-                      borderRadius: 0, padding: '8px 10px', color: '#fff', fontSize: '12px', outline: 'none',
-                      fontWeight: 'normal'
+                      borderRadius: 0, padding: '7px 10px', color: '#fff', fontSize: '12px', outline: 'none',
+                      fontWeight: 'normal', height: '34px', boxSizing: 'border-box'
                     }}
                   >
                     <option value={16}>16 x 16 px (레트로 / 도트 2D 타일 표준)</option>
@@ -3371,7 +3371,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
 
                 <div style={{ flex: 1, display: 'flex', gap: '6px' }}>
                   <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: '11px', color: '#a78bfa', display: 'block', marginBottom: '6px' }}>가로 열 수 (Cols):</label>
+                    <label style={{ fontSize: '11px', color: '#a78bfa', display: 'block', marginBottom: '6px', whiteSpace: 'nowrap', height: '16px', lineHeight: '16px' }}>가로 열 수:</label>
                     <input
                       type="number"
                       min={1}
@@ -3390,12 +3390,12 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                       onBlur={() => {
                         if (customColsInput === '' || customColsInput <= 0) setCustomColsInput(4);
                       }}
-                      style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '7px 8px', color: '#fff', fontSize: '12px', textAlign: 'center', outline: 'none', fontWeight: 'normal' }}
+                      style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '7px 8px', color: '#fff', fontSize: '12px', textAlign: 'center', outline: 'none', fontWeight: 'normal', height: '34px', boxSizing: 'border-box' }}
                     />
                   </div>
 
                   <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: '11px', color: '#a78bfa', display: 'block', marginBottom: '6px' }}>세로 행 수 (Rows):</label>
+                    <label style={{ fontSize: '11px', color: '#a78bfa', display: 'block', marginBottom: '6px', whiteSpace: 'nowrap', height: '16px', lineHeight: '16px' }}>세로 행 수:</label>
                     <input
                       type="number"
                       min={1}
@@ -3414,7 +3414,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                       onBlur={() => {
                         if (customRowsInput === '' || customRowsInput <= 0) setCustomRowsInput(7);
                       }}
-                      style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '7px 8px', color: '#fff', fontSize: '12px', textAlign: 'center', outline: 'none', fontWeight: 'normal' }}
+                      style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '7px 8px', color: '#fff', fontSize: '12px', textAlign: 'center', outline: 'none', fontWeight: 'normal', height: '34px', boxSizing: 'border-box' }}
                     />
                   </div>
                 </div>
