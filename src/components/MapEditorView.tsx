@@ -603,12 +603,29 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       const targetObjs = currentObjs.filter(o => selectedObjectIds.includes(o.id));
       if (targetObjs.length === 0) return prev;
 
-      const newDecor = prev.decorLayer.map(r => [...r]);
-      const newBase = prev.baseLayer.map(r => [...r]);
+      const normLayers = getNormalizedLayers(prev);
+      const updatedLayers = normLayers.map(l => ({
+        ...l,
+        grid: l.grid.map(r => [...r])
+      }));
+
+      const newDecor = (prev.decorLayer || []).map(r => [...r]);
+      const newBase = (prev.baseLayer || []).map(r => [...r]);
       let restoredCount = 0;
 
       targetObjs.forEach(obj => {
-        const isBase = obj.layer === "base";
+        // Find target layer by obj.layerId or editLayer fallback
+        let targetIndex = updatedLayers.findIndex(l => l.id === obj.layerId);
+        if (targetIndex === -1) {
+          targetIndex = updatedLayers.findIndex(l => l.id === activeLayerId);
+        }
+        if (targetIndex === -1) {
+          targetIndex = obj.layer === "base" ? 0 : 1;
+        }
+
+        const targetGrid = updatedLayers[targetIndex].grid;
+        const isBase = targetIndex === 0;
+
         for (let r = 0; r < obj.height; r++) {
           for (let c = 0; c < obj.width; c++) {
             const tileX = obj.x + c;
@@ -629,15 +646,11 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               }
 
               if (tileVal !== -1) {
+                targetGrid[tileY][tileX] = tileVal;
                 if (isBase) {
                   newBase[tileY][tileX] = tileVal;
                 } else {
-                  // If decorLayer cell ALREADY contains a user's brush-painted tile on top, PRESERVE IT!
-                  if (newDecor[tileY][tileX] !== -1) {
-                    newBase[tileY][tileX] = tileVal;
-                  } else {
-                    newDecor[tileY][tileX] = tileVal;
-                  }
+                  newDecor[tileY][tileX] = tileVal;
                 }
                 restoredCount++;
               }
@@ -656,6 +669,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         ...prev,
         baseLayer: newBase,
         decorLayer: newDecor,
+        layers: updatedLayers,
         objects: remainingObjs
       };
     });
