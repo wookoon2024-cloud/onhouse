@@ -3536,6 +3536,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                         value={customFrameWidthInput}
                         disabled={isSavingAsset}
                         onChange={(e) => {
+                          setIsCustomFrameSize(true);
                           const valStr = e.target.value;
                           if (valStr === '') {
                             setCustomFrameWidthInput('');
@@ -3566,6 +3567,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                         value={customFrameHeightInput}
                         disabled={isSavingAsset}
                         onChange={(e) => {
+                          setIsCustomFrameSize(true);
                           const valStr = e.target.value;
                           if (valStr === '') {
                             setCustomFrameHeightInput('');
@@ -3772,52 +3774,60 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                     display: 'block', padding: previewZoom > 1.0 ? '12px' : 0
                   }}>
                     {previewZoom === 1.0 ? (
-                      /* Fit Mode */
-                      <div style={{
-                        position: 'relative',
-                        width: '100%',
-                        height: '100%',
-                        backgroundImage: `url(${fileDataUrl})`,
-                        backgroundSize: 'contain',
-                        backgroundRepeat: 'no-repeat',
-                        backgroundPosition: 'center',
-                        imageRendering: 'pixelated'
-                      }}>
-                        {/* Grid Lines Overlay */}
-                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none' }}>
-                          {Array.from({ length: typeof customColsInput === 'number' ? customColsInput : 4 }).map((_, c) =>
-                            Array.from({ length: typeof customRowsInput === 'number' ? customRowsInput : 7 }).map((_, r) => {
-                              const effFrameW = typeof customFrameWidthInput === 'number' ? customFrameWidthInput : tileSizeInput;
-                              const effFrameH = typeof customFrameHeightInput === 'number' ? customFrameHeightInput : tileSizeInput;
-                              const effOffX = typeof customOffsetXInput === 'number' ? customOffsetXInput : (typeof customMarginInput === 'number' ? customMarginInput : 0);
-                              const effOffY = typeof customOffsetYInput === 'number' ? customOffsetYInput : (typeof customMarginInput === 'number' ? customMarginInput : 0);
-                              const effSpacing = typeof customSpacingInput === 'number' ? customSpacingInput : 0;
+                      /* Fit Mode (Pixel-Exact Aspect Ratio Container & Scaled Overlay) */
+                      (() => {
+                        const fitScale = Math.min(480 / (imgWidth || 1), 260 / (imgHeight || 1));
+                        const fitW = imgWidth * fitScale;
+                        const fitH = imgHeight * fitScale;
 
-                              const leftPct = ((effOffX + c * (effFrameW + effSpacing)) / imgWidth) * 100;
-                              const topPct = ((effOffY + r * (effFrameH + effSpacing)) / imgHeight) * 100;
-                              const widthPct = (effFrameW / imgWidth) * 100;
-                              const heightPct = (effFrameH / imgHeight) * 100;
-                              const isFirst = c === 0 && r === 0;
+                        return (
+                          <div style={{
+                            position: 'relative',
+                            width: `${fitW}px`,
+                            height: `${fitH}px`,
+                            margin: 'auto',
+                            backgroundImage: `url(${fileDataUrl})`,
+                            backgroundSize: '100% 100%',
+                            backgroundRepeat: 'no-repeat',
+                            imageRendering: 'pixelated'
+                          }}>
+                            {/* Grid Lines Overlay */}
+                            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none' }}>
+                              {Array.from({ length: typeof customColsInput === 'number' ? customColsInput : 4 }).map((_, c) =>
+                                Array.from({ length: typeof customRowsInput === 'number' ? customRowsInput : 7 }).map((_, r) => {
+                                  const effFrameW = typeof customFrameWidthInput === 'number' && customFrameWidthInput > 0 ? customFrameWidthInput : (tileSizeInput || 32);
+                                  const effFrameH = typeof customFrameHeightInput === 'number' && customFrameHeightInput > 0 ? customFrameHeightInput : (tileSizeInput || 32);
+                                  const effOffX = typeof customOffsetXInput === 'number' ? customOffsetXInput : 0;
+                                  const effOffY = typeof customOffsetYInput === 'number' ? customOffsetYInput : 0;
+                                  const effSpacing = typeof customSpacingInput === 'number' ? customSpacingInput : 0;
 
-                              return (
-                                <div
-                                  key={`${c}-${r}`}
-                                  style={{
-                                    position: 'absolute',
-                                    left: `${leftPct}%`,
-                                    top: `${topPct}%`,
-                                    width: `${widthPct}%`,
-                                    height: `${heightPct}%`,
-                                    border: isFirst ? '2px solid #ff79c6' : '1px solid rgba(255, 121, 198, 0.45)',
-                                    background: isFirst ? 'rgba(255, 121, 198, 0.3)' : 'transparent',
-                                    boxSizing: 'border-box'
-                                  }}
-                                />
-                              );
-                            })
-                          )}
-                        </div>
-                      </div>
+                                  const leftPx = (effOffX + c * (effFrameW + effSpacing)) * fitScale;
+                                  const topPx = (effOffY + r * (effFrameH + effSpacing)) * fitScale;
+                                  const widthPx = effFrameW * fitScale;
+                                  const heightPx = effFrameH * fitScale;
+                                  const isFirst = c === 0 && r === 0;
+
+                                  return (
+                                    <div
+                                      key={`${c}-${r}`}
+                                      style={{
+                                        position: 'absolute',
+                                        left: `${leftPx}px`,
+                                        top: `${topPx}px`,
+                                        width: `${widthPx}px`,
+                                        height: `${heightPx}px`,
+                                        border: isFirst ? '2px solid #ff79c6' : '1px solid rgba(255, 121, 198, 0.45)',
+                                        background: isFirst ? 'rgba(255, 121, 198, 0.3)' : 'transparent',
+                                        boxSizing: 'border-box'
+                                      }}
+                                    />
+                                  );
+                                })
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()
                     ) : (
                       /* Magnified Zoomed Mode (Exact Pixel Scrollable Canvas) */
                       <div style={{
