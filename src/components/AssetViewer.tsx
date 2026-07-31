@@ -1666,8 +1666,13 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
         cols = template.cols;
         rows = template.rows;
       } else if (fileDataUrl) {
-        cols = customColsInput || Math.max(1, Math.floor((imgWidth - offX) / frameW));
-        rows = customRowsInput || Math.max(1, Math.floor((imgHeight - offY) / frameH));
+        cols = (typeof customColsInput === 'number' && customColsInput > 0)
+          ? customColsInput
+          : (imgWidth > 0 && offX < imgWidth ? Math.max(1, Math.floor((imgWidth - offX) / frameW)) : 4);
+
+        rows = (typeof customRowsInput === 'number' && customRowsInput > 0)
+          ? customRowsInput
+          : (imgHeight > 0 && offY < imgHeight ? Math.max(1, Math.floor((imgHeight - offY) / frameH)) : 7);
 
         // Automatic Gap & Margin Extraction for Map Tilesets
         if (uploadCategory === 'map' && (customSpacingInput > 0 || customMarginInput > 0)) {
