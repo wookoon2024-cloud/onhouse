@@ -2772,6 +2772,36 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           </div>
         )}
 
+        {/* Drag Slider Size Control for tools requiring size (Collision, Brush, Eraser) */}
+        {(tool === 'collision' || editLayer === 'collision' || tool === 'brush' || selectedTile === -1) && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingRight: '10px', borderRight: '1px solid rgba(255,255,255,0.12)' }}>
+            <span style={{ fontSize: '11px', color: '#89b4fa', fontWeight: 'normal', whiteSpace: 'nowrap' }}>
+              크기:
+            </span>
+            <input
+              type="range"
+              min="1"
+              max="10"
+              value={brushSize}
+              onChange={(e) => {
+                const val = parseInt(e.target.value) || 1;
+                setBrushSize(val);
+                if (paletteSelection) setPaletteSelection(null);
+              }}
+              style={{
+                width: '85px',
+                height: '4px',
+                accentColor: '#89b4fa',
+                cursor: 'pointer'
+              }}
+              title="도구 크기 조절 (1x1 ~ 10x10)"
+            />
+            <span style={{ fontSize: '11px', color: '#fff', minWidth: '28px', fontWeight: 'normal' }}>
+              {brushSize}x{brushSize}
+            </span>
+          </div>
+        )}
+
         <span style={{ color: '#ccc', fontWeight: 'normal' }}>
           {getActiveToolInstruction()}
         </span>
