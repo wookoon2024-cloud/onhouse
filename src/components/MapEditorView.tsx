@@ -2501,13 +2501,13 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   return (
     <div style={{
       position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-      background: '#111116', zIndex: 140, display: 'flex', flexDirection: 'column',
+      background: '#1a1a1c', zIndex: 140, display: 'flex', flexDirection: 'column',
       color: '#fff', fontFamily: 'var(--font-pixel)', userSelect: 'none'
     }}>
       {/* 1. Photoshop-Style Compact Header Toolbar */}
       <div style={{
-        padding: "4px 16px 0px 16px", borderBottom: "1px solid rgba(255, 255, 255, 0.2)",
-        background: "rgba(20, 20, 32, 0.98)", display: "flex", justifyContent: "space-between",
+        padding: "4px 16px 0px 16px", borderBottom: "1px solid #333336",
+        background: "#1e1e1f", display: "flex", justifyContent: "space-between",
         alignItems: "flex-end", minHeight: "38px", zIndex: 10
       }}>
         {/* Left Actions */}
@@ -2578,16 +2578,17 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                 draggable={true}
                 onDragStart={(e) => handleTabDragStart(e, mId)}
                 onDragOver={(e) => handleTabDragOver(e, mId)}
+                onDragLeave={handleTabDragLeave}
                 onDrop={(e) => handleTabDrop(e, mId)}
                 onDragEnd={handleTabDragEnd}
                 style={{
-                  display: "flex", alignItems: "center", gap: "4px",
+                  display: "flex", alignItems: "center", gap: "6px",
                   padding: "6px 12px", borderRadius: "6px 6px 0 0",
-                  background: isSelected ? "#1e1e2e" : (isDragOver ? "rgba(137, 180, 250, 0.25)" : "rgba(255, 255, 255, 0.05)"),
-                  color: isSelected ? "#fff" : "rgba(255, 255, 255, 0.7)",
-                  borderTop: isSelected ? "2px solid #89b4fa" : (isDragOver ? "2px solid #a6e3a1" : "1px solid rgba(255,255,255,0.2)"),
-                  borderLeft: isSelected ? "1px solid rgba(255,255,255,0.25)" : (isDragOver ? "2px solid #89b4fa" : "1px solid rgba(255,255,255,0.18)"),
-                  borderRight: isSelected ? "1px solid rgba(255,255,255,0.25)" : "1px solid rgba(255,255,255,0.18)",
+                  background: isSelected ? "#252528" : "rgba(255, 255, 255, 0.04)",
+                  color: isSelected ? "#fff" : "rgba(255, 255, 255, 0.65)",
+                  borderTop: isSelected ? "2px solid #89b4fa" : "1px solid #333336",
+                  borderLeft: isSelected ? "1px solid #38383c" : "1px solid #333336",
+                  borderRight: isSelected ? "1px solid #38383c" : "1px solid #333336",
                   borderBottom: "none",
                   opacity: isBeingDragged ? 0.4 : 1,
                   transition: "all 0.15s ease",
@@ -2640,22 +2641,13 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                   <Pencil size={11} />
                 </button>
 
-                {/* Delete button (×) */}
+                {/* Delete tab button (X) */}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (!canDelete) {
-                      alert("최소 1개의 맵은 항상 유지되어야 합니다.");
-                      return;
-                    }
-                    if (window.confirm(`'${name}' 맵을 에디터 및 서버 DB에서 영구 삭제하시겠습니까?`)) {
+                    if (!canDelete) return;
+                    if (window.confirm(`'${name}' 맵을 완전히 삭제하시겠습니까?`)) {
                       onDeleteMap(mId);
-                      if (selectedMapId === mId) {
-                        const remaining = availableMapIds.filter((id) => id !== mId);
-                        if (remaining.length > 0) {
-                          setSelectedMapId(remaining[0]);
-                        }
-                      }
                     }
                   }}
                   title={canDelete ? `${name} 맵 삭제` : "최소 1개 맵 필수"}
@@ -2720,8 +2712,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
       {/* Contextual Action Instruction Status Bar */}
       <div style={{
-        background: 'rgba(20, 20, 30, 0.95)',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.12)',
+        background: '#252528',
+        borderBottom: '1px solid #38383c',
         padding: '5px 16px',
         fontSize: '12px',
         color: '#ccc',
@@ -2812,8 +2804,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         
         {/* Left Side: Map Properties Panel with 3 Compact Tabs (기본, 크기, 옵션) */}
         <div style={{
-          width: '260px', borderRight: '1px solid rgba(255, 255, 255, 0.2)',
-          background: 'rgba(20, 20, 30, 0.5)', display: 'flex',
+          width: '260px', borderRight: '1px solid #38383c',
+          background: '#212123', display: 'flex',
           flexDirection: 'column', overflow: 'hidden'
         }}>
           {/* Tab Header Row */}
@@ -3623,7 +3615,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
             onMouseUp={handleViewportMouseUp}
             onMouseLeave={handleViewportMouseUp}
             style={{
-              width: '100%', height: '100%', background: '#0a0a0f', overflow: 'auto', display: 'block',
+              width: '100%', height: '100%', background: '#2a2a2d', overflow: 'auto', display: 'block',
               position: 'relative', padding: '60px 40px 40px 40px',
               cursor: isPanningViewport.current ? 'grabbing' : isSpaceHeld ? 'grab' : 'default',
               userSelect: 'none', boxSizing: 'border-box'
@@ -3631,7 +3623,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           >
             {/* Canvas Wrapper */}
             <div style={{
-              position: 'relative', border: '1px solid #333', boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
+              position: 'relative', border: '1px solid #3c3c3c', boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
               margin: 'auto', width: 'fit-content'
             }}>
               <canvas
@@ -3664,8 +3656,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
         <div
           onMouseDown={handlePaletteResizeStart}
           style={{
-            width: '6px', background: 'rgba(255, 255, 255, 0.08)', cursor: 'col-resize',
-            borderLeft: '1px solid rgba(255, 255, 255, 0.2)', borderRight: '1px solid rgba(255, 255, 255, 0.2)',
+            width: '6px', background: '#1e1e1f', cursor: 'col-resize',
+            borderLeft: '1px solid #38383c', borderRight: '1px solid #38383c',
             display: 'flex', justifyContent: 'center', alignItems: 'center', transition: 'background 0.2s'
           }}
           title="좌우 드래그로 크기 조절">
@@ -3674,13 +3666,13 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
         {/* Right Side: Tileset Palette & Selector Panel */}
         <div style={{
-          width: `${paletteWidth}px`, borderLeft: '1px solid rgba(255, 255, 255, 0.2)',
-          background: 'rgba(20, 20, 30, 0.65)', display: 'flex', flexDirection: 'column', overflow: 'hidden'
+          width: `${paletteWidth}px`, borderLeft: '1px solid #38383c',
+          background: '#212123', display: 'flex', flexDirection: 'column', overflow: 'hidden'
         }}>
           {/* Palette Control Header */}
           <div style={{
-            padding: '12px 16px', borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
-            background: 'rgba(30, 30, 46, 0.9)', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            padding: '12px 16px', borderBottom: '1px solid #38383c',
+            background: '#1e1e1f', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
           }}>
             <div style={{ fontSize: '12px', fontWeight: 'normal', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '6px' }}>
               🎨 타일셋 브러시 ({paletteWidth}px)
