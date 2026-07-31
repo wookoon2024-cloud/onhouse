@@ -2999,15 +2999,6 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                       </span>
                     </button>
                   </div>
-
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#ccc', cursor: 'pointer', marginTop: '4px', fontWeight: 'normal' }}>
-                    <input
-                      type="checkbox"
-                      checked={autoCollision}
-                      onChange={(e) => setAutoCollision(e.target.checked)}
-                    />
-                    오브젝트 배치 시 이동 불가 설정
-                  </label>
                 </div>
 
                 {/* Section 2: 레이어 (Photoshop-style Layers Panel - Bottom Position) */}
@@ -3317,7 +3308,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               </div>
             )}
 
-            {/* Tab 3: 👁️ 옵션 (화면 뷰 옵션) */}
+            {/* Tab 3: 👁️ 옵션 (화면 뷰 옵션 & 오브젝트 배치 옵션) */}
             {leftSidebarTab === "option" && (
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                 <h4 style={{ fontSize: "11px", color: "var(--accent)", margin: "0 0 4px 0", borderBottom: "1px solid var(--border-glass)", paddingBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
@@ -3331,6 +3322,18 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                 </label>
                 <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", cursor: "pointer", whiteSpace: "nowrap" }}>
                   <input type="checkbox" checked={showCollision} onChange={e => setShowCollision(e.target.checked)} /> 벽/통행 경계선 노출 (선명한 빨간색 🔴)
+                </label>
+
+                <h4 style={{ fontSize: "11px", color: "var(--accent)", margin: "8px 0 4px 0", borderBottom: "1px solid var(--border-glass)", paddingBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span style={{ fontSize: "9px", opacity: 0.7 }}>▪</span> 오브젝트 배치 옵션
+                </h4>
+                <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", color: "#ccc", cursor: "pointer", fontWeight: "normal" }}>
+                  <input
+                    type="checkbox"
+                    checked={autoCollision}
+                    onChange={(e) => setAutoCollision(e.target.checked)}
+                  />
+                  오브젝트 배치 시 이동 불가 자동 설정
                 </label>
               </div>
             )}
