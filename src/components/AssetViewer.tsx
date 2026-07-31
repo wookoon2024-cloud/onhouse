@@ -837,6 +837,24 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     img.src = currentOption.url;
   };
 
+  // Helper to convert any image URL (relative asset, remote URL, or blob) to clean data URL to avoid Tainted Canvas SecurityError
+  const loadImageAsCleanDataUrl = async (url: string): Promise<string> => {
+    if (!url) return '';
+    if (url.startsWith('data:image/')) return url;
+    try {
+      const resp = await fetch(url);
+      const blob = await resp.blob();
+      return new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string) || url);
+        reader.onerror = () => resolve(url);
+        reader.readAsDataURL(blob);
+      });
+    } catch (e) {
+      return url;
+    }
+  };
+
   // Helper to load/resample pixel grid at resolution (resW, resH)
   const loadPixelGridForRes = async (resW: number, resH: number, col: number, row: number, imageUrl: string) => {
     try {
@@ -863,16 +881,16 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
           const naturalW = img.naturalWidth || img.width || (cols * resW);
           const naturalH = img.naturalHeight || img.height || (rows * resH);
 
-          // Use exact custom frame size if present, otherwise divide natural dimensions
-          const frameW = currentOption?.frameWidth || (naturalW / cols);
-          const frameH = currentOption?.frameHeight || (naturalH / rows);
+          // Divide actual loaded image dimensions by grid cols & rows to get exact per-frame dimensions!
+          const tileW = Math.max(1, Math.floor(naturalW / cols));
+          const tileH = Math.max(1, Math.floor(naturalH / rows));
 
-          const offX = (currentOption?.offsetX || 0) + col * (frameW + (currentOption?.spacingX || 0));
-          const offY = (currentOption?.offsetY || 0) + row * (frameH + (currentOption?.spacingY || 0));
+          const offX = (currentOption?.offsetX || 0) + col * (tileW + (currentOption?.spacingX || 0));
+          const offY = (currentOption?.offsetY || 0) + row * (tileH + (currentOption?.spacingY || 0));
 
           ctx.drawImage(
             img,
-            offX, offY, frameW, frameH,
+            offX, offY, tileW, tileH,
             0, 0, resW, resH
           );
 
