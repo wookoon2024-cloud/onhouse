@@ -419,6 +419,8 @@ export const fetchHouseAssets = async (houseCode: string) => {
     // Trigger automatic DB trash cleanup in background to free storage space!
     cleanupDatabaseTrash(houseCode).catch(() => {});
 
+    let dbFetchFailed = false;
+
     // 1. Fetch map_tileset specifically (targeted & fast, ~0.5s)
     const mapTilesetsPromise = withTimeout(
       supabase
@@ -427,7 +429,7 @@ export const fetchHouseAssets = async (houseCode: string) => {
         .eq('house_code', houseCode)
         .eq('asset_type', 'map_tileset'),
       8000
-    ).catch(() => ({ data: [] }));
+    ).catch(() => { dbFetchFailed = true; return { data: [] }; });
 
     // 2. Fetch char_sprites, overrides, actions, deletes in parallel
     const otherAssetsPromise = withTimeout(
@@ -439,9 +441,11 @@ export const fetchHouseAssets = async (houseCode: string) => {
         .order('id', { ascending: false })
         .limit(300),
       12000
-    ).catch(() => ({ data: [] }));
+    ).catch(() => { dbFetchFailed = true; return { data: [] }; });
 
     const [mapRes, otherRes] = await Promise.all([mapTilesetsPromise, otherAssetsPromise]);
+    if (mapRes.error || otherRes.error) dbFetchFailed = true;
+    
     const combinedData = [...(mapRes.data || []), ...(otherRes.data || [])];
 
     const mapTilesets: any[] = [];
@@ -498,8 +502,8 @@ export const fetchHouseAssets = async (houseCode: string) => {
           if (loc && loc.id && !deletedAssetIds.has(loc.id) && !seenCharSpriteIds.has(loc.id)) {
             seenCharSpriteIds.add(loc.id);
             finalCharSprites.push(loc);
-            // Re-sync un-saved local asset to Supabase DB asynchronously
-            saveHouseAssetToDB(houseCode, 'char_sprite', loc).catch(() => {});
+            // Re-sync un-saved local asset to Supabase DB asynchronously ONLY if DB didn't fail
+            if (!dbFetchFailed) saveHouseAssetToDB(houseCode, 'char_sprite', loc).catch(() => {});
           }
         });
       }
@@ -514,8 +518,7 @@ export const fetchHouseAssets = async (houseCode: string) => {
           if (loc && loc.id && !deletedAssetIds.has(loc.id) && !seenMapTilesetIds.has(loc.id)) {
             seenMapTilesetIds.add(loc.id);
             finalMapTilesets.push(loc);
-            // Re-sync un-saved local asset to Supabase DB asynchronously
-            saveHouseAssetToDB(houseCode, 'map_tileset', loc).catch(() => {});
+            if (!dbFetchFailed) saveHouseAssetToDB(houseCode, 'map_tileset', loc).catch(() => {});
           }
         });
       }
@@ -531,9 +534,14 @@ export const fetchHouseAssets = async (houseCode: string) => {
             const dbOv = charOverrides[id];
             // If local override has more rows or DB has no override for this ID, use local override & re-sync to DB!
             if (!dbOv || (locOv.rows && (!dbOv.rows || locOv.rows > dbOv.rows))) {
-              console.log(`[OnHouse Sync] 🔄 Preserving local override for '${id}' (rows: ${locOv.rows}) over DB (rows: ${dbOv?.rows || 0})`);
-              charOverrides[id] = locOv;
-              saveHouseAssetToDB(houseCode, 'char_image_override', { id, ...locOv }).catch(() => {});
+              if (dbFetchFailed) {
+                // If DB fetch failed, we just silently merge it locally without logging to avoid spam
+                charOverrides[id] = locOv;
+              } else {
+                console.log(`[OnHouse Sync] 🔄 Preserving local override for '${id}' (rows: ${locOv.rows}) over DB (rows: ${dbOv?.rows || 0})`);
+                charOverrides[id] = locOv;
+                saveHouseAssetToDB(houseCode, 'char_image_override', { id, ...locOv }).catch(() => {});
+              }
             }
           }
         });
@@ -549,9 +557,13 @@ export const fetchHouseAssets = async (houseCode: string) => {
             const dbActs = charRowActions[id];
             // If local actions has more items or DB has no actions for this ID, use local actions & re-sync to DB!
             if (!dbActs || (Array.isArray(dbActs) && locActs.length > dbActs.length)) {
-              console.log(`[OnHouse Sync] 🔄 Preserving local row actions for '${id}' (count: ${locActs.length}) over DB (count: ${dbActs?.length || 0})`);
-              charRowActions[id] = locActs;
-              saveHouseAssetToDB(houseCode, 'char_row_actions', { id, actions: locActs }).catch(() => {});
+              if (dbFetchFailed) {
+                charRowActions[id] = locActs;
+              } else {
+                console.log(`[OnHouse Sync] 🔄 Preserving local row actions for '${id}' (count: ${locActs.length}) over DB (count: ${dbActs?.length || 0})`);
+                charRowActions[id] = locActs;
+                saveHouseAssetToDB(houseCode, 'char_row_actions', { id, actions: locActs }).catch(() => {});
+              }
             }
           }
         });
@@ -603,20 +615,9 @@ export const saveHouseAssetToDB = async (
   assetData: any
 ) => {
   try {
-    // Delete older rows for the same asset ID to prevent DB space accumulation
-    if (assetData && assetData.id) {
-      try {
-        await withTimeout(
-          supabase
-            .from('house_assets')
-            .delete()
-            .eq('house_code', houseCode)
-            .eq('asset_type', assetType)
-            .eq('asset_data->>id', assetData.id),
-          3000
-        );
-      } catch (e) {}
-    }
+    // Note: We deliberately SKIP synchronous deletion of older rows here to avoid 
+    // expensive sequential JSONB scans (asset_data->>id) that cause DB timeouts under load.
+    // The background `cleanupDatabaseTrash` function handles garbage collection of duplicates efficiently.
 
     const res = await withTimeout(
       supabase
