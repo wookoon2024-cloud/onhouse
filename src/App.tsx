@@ -758,29 +758,33 @@ export default function App() {
         });
       })
       .on('broadcast', { event: 'player_sync' }, ({ payload }) => {
-        if (!payload || payload.id === deviceId.current) return;
+        if (!payload) return;
+        const data = payload.player || payload;
+        const playerId = data.id || payload.id;
+        if (!playerId || playerId === deviceId.current) return;
 
         // If player has custom char data, dynamically update local asset cache & overrides
-        if (payload.customCharData && payload.customCharData.id && payload.customCharData.url) {
+        const customCharData = data.customCharData || payload.customCharData;
+        if (customCharData && customCharData.id && customCharData.url) {
           try {
             const saved = localStorage.getItem('on_house_custom_char_sprites');
             const current: any[] = saved ? JSON.parse(saved) : [];
-            const idx = current.findIndex((item: any) => item.id === payload.customCharData.id);
+            const idx = current.findIndex((item: any) => item.id === customCharData.id);
             let next: any[];
             if (idx >= 0) {
               next = [...current];
-              next[idx] = { ...next[idx], ...payload.customCharData };
+              next[idx] = { ...next[idx], ...customCharData };
             } else {
-              next = [...current, payload.customCharData];
+              next = [...current, customCharData];
             }
             localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(next));
 
             const overridesSaved = localStorage.getItem('on_house_char_image_overrides');
             const overrides = overridesSaved ? JSON.parse(overridesSaved) : {};
-            overrides[payload.customCharData.id] = {
-              url: payload.customCharData.url,
-              cols: payload.customCharData.cols || 4,
-              rows: payload.customCharData.rows || 7
+            overrides[customCharData.id] = {
+              url: customCharData.url,
+              cols: customCharData.cols || 4,
+              rows: customCharData.rows || 7
             };
             localStorage.setItem('on_house_char_image_overrides', JSON.stringify(overrides));
 
@@ -790,22 +794,24 @@ export default function App() {
         }
 
         setOtherPlayers((prev) => {
-          const isAlreadyPresent = !!prev[payload.id];
-          if (!isAlreadyPresent) {
+          const existing = prev[playerId];
+          if (!existing) {
             setChatLogs((logs) => [
               ...logs,
               {
                 id: 'sys_join_sync_' + Date.now() + Math.random(),
                 senderName: '🚀 시스템',
-                text: `${payload.nickname || '플레이어'}님이 접속하였습니다.`,
+                text: `${data.nickname || '플레이어'}님이 접속하였습니다.`,
                 time: Date.now()
               }
             ]);
           }
           return {
             ...prev,
-            [payload.id]: {
-              ...payload,
+            [playerId]: {
+              ...(existing || {}),
+              ...data,
+              id: playerId,
               isOnline: true,
               lastActive: Date.now()
             }
@@ -1212,6 +1218,13 @@ export default function App() {
         }
       });
 
+    // Periodic heartbeat sync interval every 8 seconds to ensure position alignment across computers
+    const syncInterval = setInterval(() => {
+      if (channelRef.current) {
+        sendPlayerSync(localPlayerRef.current);
+      }
+    }, 8000);
+
     // Window unload / tab close listener to broadcast player_leave & dm_close events
     const handleUnload = () => {
       if (activeDMTargetRef.current) {
@@ -1245,6 +1258,7 @@ export default function App() {
     window.addEventListener('pagehide', handleUnload);
 
     return () => {
+      clearInterval(syncInterval);
       handleUnload();
       window.removeEventListener('beforeunload', handleUnload);
       window.removeEventListener('pagehide', handleUnload);
@@ -1621,9 +1635,10 @@ export default function App() {
 
     // Heartbeat check (every 3 seconds, ping other players)
     const pingInterval = setInterval(() => {
-      bc.postMessage({
-        type: 'sync_response',
-        player: localPlayerRef.current
+      safeBroadcastChannel('player_sync', {
+        id: deviceId.current,
+        ...localPlayerRef.current,
+        lastActive: Date.now()
       });
     }, 3000);
 
@@ -1649,6 +1664,8 @@ export default function App() {
     };
   }, [houseCode]);
 
+  const lastSyncTimeRef = useRef<number>(0);
+
   // 1. Coordinate & movement updater
   const handleMove = (x: number, y: number, dir: 'down' | 'up' | 'left' | 'right', isMoving: boolean) => {
     setLocalPlayer((prev) => ({
@@ -1660,7 +1677,7 @@ export default function App() {
       lastActive: Date.now()
     }));
 
-    // Broadcast coordinate shift
+    // Broadcast coordinate shift for tabs on same device
     bcRef.current?.postMessage({
       type: 'move',
       playerId: deviceId.current,
@@ -1674,6 +1691,27 @@ export default function App() {
       isMoving,
       mapId: localPlayer.mapId
     });
+
+    // Broadcast movement real-time over WebSocket to OTHER computers! (~20 updates/sec when moving, immediately when stopping)
+    const now = Date.now();
+    if (!isMoving || now - lastSyncTimeRef.current > 50) {
+      lastSyncTimeRef.current = now;
+      safeBroadcastChannel('player_sync', {
+        id: deviceId.current,
+        nickname: localPlayer.nickname,
+        spriteType: localPlayer.spriteType,
+        hue: localPlayer.hue,
+        charSize: localPlayer.charSize,
+        x,
+        y,
+        dir,
+        isMoving,
+        mapId: localPlayer.mapId,
+        statusMessage: localPlayer.statusMessage,
+        isOnline: true,
+        lastActive: now
+      });
+    }
   };
 
   // 2. Map transitioner
@@ -1692,7 +1730,7 @@ export default function App() {
       isMoving: false
     }));
 
-    // Broadcast coordinate shift and map jump
+    // Broadcast coordinate shift and map jump for tabs on same device
     bcRef.current?.postMessage({
       type: 'move',
       playerId: deviceId.current,
