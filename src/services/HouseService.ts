@@ -125,7 +125,9 @@ export const fetchHouseMapOrder = async (houseCode: string): Promise<string[]> =
         .from('house_assets')
         .select('asset_data')
         .eq('house_code', houseCode)
-        .eq('asset_type', 'map_order'),
+        .eq('asset_type', 'map_order')
+        .order('id', { ascending: false })
+        .limit(1),
       3000
     );
 
@@ -141,40 +143,19 @@ export const fetchHouseMapOrder = async (houseCode: string): Promise<string[]> =
 // Save map order to Supabase DB
 export const saveHouseMapOrderToDB = async (houseCode: string, order: string[]) => {
   try {
-    try {
-      await withTimeout(
-        supabase
-          .from('house_assets')
-          .upsert({
-            house_code: houseCode,
-            asset_type: 'map_order',
-            asset_data: { order },
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'house_code,asset_type' }),
-        3000
-      );
-    } catch (e) {
-      await withTimeout(
-        supabase
-          .from('house_assets')
-          .delete()
-          .eq('house_code', houseCode)
-          .eq('asset_type', 'map_order'),
-        2000
-      );
-
-      await withTimeout(
-        supabase
-          .from('house_assets')
-          .insert({
-            house_code: houseCode,
-            asset_type: 'map_order',
-            asset_data: { order },
-            updated_at: new Date().toISOString()
-          }),
-        2000
-      );
-    }
+    // Simply insert the new order record. 
+    // fetchHouseMapOrder will fetch the latest one, and cleanupDatabaseTrash will delete older duplicates!
+    await withTimeout(
+      supabase
+        .from('house_assets')
+        .insert({
+          house_code: houseCode,
+          asset_type: 'map_order',
+          asset_data: { order },
+          updated_at: new Date().toISOString()
+        }),
+      2500
+    );
     console.log('[OnHouse Sync] Saved map order to Supabase DB:', houseCode, order);
   } catch (err) {
     console.warn('[OnHouse Sync] Failed to save map order to Supabase DB:', err);
@@ -709,8 +690,8 @@ export const cleanupDatabaseTrash = async (houseCode: string) => {
         return;
       }
 
-      if (assetId && (row.asset_type === 'char_sprite' || row.asset_type === 'char_image_override' || row.asset_type === 'map_tileset')) {
-        const groupKey = `${row.asset_type}:${assetId}`;
+      if (row.asset_type === 'map_order' || (assetId && (row.asset_type === 'char_sprite' || row.asset_type === 'char_image_override' || row.asset_type === 'map_tileset'))) {
+        const groupKey = row.asset_type === 'map_order' ? 'map_order:default' : `${row.asset_type}:${assetId}`;
         const existing = latestRowMap.get(groupKey);
 
         if (!existing) {
