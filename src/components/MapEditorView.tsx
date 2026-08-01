@@ -123,6 +123,36 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   const [paletteDragStart, setPaletteDragStart] = useState<{ col: number; row: number } | null>(null);
   const [paletteSelection, setPaletteSelection] = useState<{ startCol: number; startRow: number; cols: number; rows: number; tilesetKey: string } | null>(null);
 
+  // Brush History State
+  const [brushHistory, setBrushHistory] = useState<Array<{
+    selectedTile: number;
+    paletteSelection: { startCol: number; startRow: number; cols: number; rows: number; tilesetKey: string } | null;
+    activeTileset: string;
+  }>>([]);
+
+  useEffect(() => {
+    // Only track valid tiles (not eraser -1)
+    if (selectedTile === -1) return;
+    
+    setBrushHistory(prev => {
+      // Check if current brush is exactly the same as the most recent one in history
+      const isSameAsLatest = prev.length > 0 && 
+        prev[0].selectedTile === selectedTile &&
+        prev[0].activeTileset === activeTileset &&
+        JSON.stringify(prev[0].paletteSelection) === JSON.stringify(paletteSelection);
+      
+      if (isSameAsLatest) return prev;
+
+      // Filter out this exact combination if it exists elsewhere in the history, then add to front
+      const filtered = prev.filter(item => 
+        !(item.selectedTile === selectedTile && 
+          item.activeTileset === activeTileset && 
+          JSON.stringify(item.paletteSelection) === JSON.stringify(paletteSelection))
+      );
+      
+      return [{ selectedTile, paletteSelection, activeTileset }, ...filtered].slice(0, 10);
+    });
+  }, [selectedTile, paletteSelection, activeTileset]);
   // Object Selection & Smart Editing State (Step 3 & 4)
   const [selectedObjectIds, setSelectedObjectIds] = useState<string[]>([]);
   const selectedObjectId = selectedObjectIds[0] || null;
@@ -3341,6 +3371,58 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                           </div>
                         </div>
                       </div>
+                      
+                      {/* Brush History Row */}
+                      {brushHistory.length > 1 && (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "4px", padding: "4px", background: "rgba(10, 10, 15, 0.4)", borderRadius: "4px" }}>
+                          {brushHistory.slice(1).map((hist, idx) => {
+                            const hSelInfo = getTileDrawInfo(hist.selectedTile, hist.activeTileset);
+                            if (!hSelInfo) return null;
+                            const hTsInfo = getTilesetInfoLocal(hSelInfo.tilesetKey);
+                            const hCol = hSelInfo.localIdx % hTsInfo.cols;
+                            const hRow = Math.floor(hSelInfo.localIdx / hTsInfo.cols);
+                            
+                            return (
+                              <button
+                                key={idx}
+                                onClick={() => {
+                                  if (hist.activeTileset !== activeTileset) {
+                                    setActiveTileset(hist.activeTileset);
+                                  }
+                                  setPaletteSelection(hist.paletteSelection);
+                                  setSelectedTile(hist.selectedTile);
+                                  setTool('brush'); // Switch to brush tool automatically
+                                }}
+                                title="이전 브러시 다시 선택"
+                                style={{
+                                  width: "24px", height: "24px",
+                                  border: "1px solid var(--border-glass)",
+                                  borderRadius: "4px", background: "#000",
+                                  padding: 0, cursor: "pointer", flexShrink: 0,
+                                  overflow: "hidden", imageRendering: "pixelated",
+                                  opacity: 0.6, transition: "all 0.1s ease"
+                                }}
+                                onMouseOver={(e) => {
+                                  e.currentTarget.style.opacity = "1";
+                                  e.currentTarget.style.borderColor = "var(--accent)";
+                                }}
+                                onMouseOut={(e) => {
+                                  e.currentTarget.style.opacity = "0.6";
+                                  e.currentTarget.style.borderColor = "var(--border-glass)";
+                                }}
+                              >
+                                <div style={{
+                                  width: "100%", height: "100%",
+                                  backgroundImage: `url(${hTsInfo.url})`,
+                                  backgroundPosition: `-${hCol * 100}% -${hRow * 100}%`,
+                                  backgroundSize: `${hTsInfo.cols * 100}% ${hTsInfo.rows * 100}%`,
+                                  imageRendering: "pixelated"
+                                }} />
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   );
                 })()}
