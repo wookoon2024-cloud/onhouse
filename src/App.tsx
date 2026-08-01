@@ -2591,13 +2591,15 @@ export default function App() {
         reactionPrompt={reactionPrompt}
       />
 
-      {/* 2. Map Selector (Top Left) */}
-      <MapSelector
-        currentMapId={localPlayer.mapId}
-        availableMapIds={availableMapIds}
-        activeMaps={activeMaps}
-        onMapChange={handleMapChange}
-      />
+      {/* 2. Map Selector (Top Left - Only rendered after house loading completes!) */}
+      {isHouseLoaded && (
+        <MapSelector
+          currentMapId={localPlayer.mapId}
+          availableMapIds={availableMapIds}
+          activeMaps={activeMaps}
+          onMapChange={handleMapChange}
+        />
+      )}
 
 
 
