@@ -983,36 +983,45 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   };
 
   // Step 1: Select image file -> Open Interactive Image Crop Modal (Default centered crop box matching active grid res!)
-  const handleImportImageFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportImageFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const dataUrl = ev.target?.result as string;
-      const img = new Image();
-      img.onload = () => {
-        setCropImgWidth(img.width);
-        setCropImgHeight(img.height);
-        
-        // Default crop box size matches active editorGridResW!
-        const defaultSize = Math.min(img.width, img.height, editorGridResW);
-        const centerX = Math.max(0, Math.floor((img.width - defaultSize) / 2));
-        const centerY = Math.max(0, Math.floor((img.height - defaultSize) / 2));
+    try {
+      const reader = new FileReader();
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        reader.onload = (ev) => resolve((ev.target?.result as string) || '');
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
 
-        setCropRect({
-          x: centerX,
-          y: centerY,
-          w: defaultSize,
-          h: defaultSize
-        });
-        setCropZoom(1.0);
-        setCropModalImage(dataUrl);
-      };
-      img.src = dataUrl;
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
+      if (!dataUrl) return;
+
+      const img = await loadLoadedImageElement(dataUrl);
+      const w = img.naturalWidth || img.width || 32;
+      const h = img.naturalHeight || img.height || 32;
+
+      setCropImgWidth(w);
+      setCropImgHeight(h);
+
+      const defaultSize = Math.min(w, h, editorGridResW || 32);
+      const centerX = Math.max(0, Math.floor((w - defaultSize) / 2));
+      const centerY = Math.max(0, Math.floor((h - defaultSize) / 2));
+
+      setCropRect({
+        x: centerX,
+        y: centerY,
+        w: defaultSize,
+        h: defaultSize
+      });
+      setCropZoom(1.0);
+      setCropModalImage(dataUrl);
+    } catch (err) {
+      console.error('Failed to import image file:', err);
+      alert('이미지 파일 로드 중 오류가 발생했습니다.');
+    } finally {
+      e.target.value = '';
+    }
   };
 
   // Drag selection box handler over the image
@@ -1041,13 +1050,13 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   };
 
   // Step 2: Confirm Crop -> Replace current pixelGrid with cropped frame region
-  const handleConfirmCropImport = () => {
+  const handleConfirmCropImport = async () => {
     if (!cropModalImage) return;
 
-    const img = new Image();
-    img.onload = () => {
-      const resW = editorGridResW;
-      const resH = editorGridResH;
+    try {
+      const img = await loadLoadedImageElement(cropModalImage);
+      const resW = editorGridResW || 32;
+      const resH = editorGridResH || 32;
 
       const canvas = document.createElement('canvas');
       canvas.width = resW;
@@ -1083,8 +1092,10 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       setPixelGrid(grid);
       setCropModalImage(null);
       setToastMessage('✂️ 선택 영역 도트 크롭 불러오기가 완료되었습니다!');
-    };
-    img.src = cropModalImage;
+    } catch (err) {
+      console.error('Failed to confirm crop import:', err);
+      alert('크롭 이미지 반영 중 오류가 발생했습니다.');
+    }
   };
 
   // Save painted frame back onto spritesheet canvas with exact chosen resolution!
