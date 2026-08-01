@@ -2625,7 +2625,10 @@ export default function App() {
 
       {/* 6.5. Asset Viewer (Dev Tool) */}
       {showAssetViewer && (
-        <AssetViewer onClose={() => setShowAssetViewer(false)} />
+        <AssetViewer
+          dbCustomCharSprites={dbCustomCharSprites}
+          onClose={() => setShowAssetViewer(false)}
+        />
       )}
 
       {/* 6.6. Open Marketplace Modal */}

@@ -171,13 +171,14 @@ const PALETTE_COLORS = [
 interface AssetViewerProps {
   onClose: () => void;
   onSelectTile?: (index: number) => void;
+  dbCustomCharSprites?: TilesetOption[];
 }
 
-export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile }) => {
+export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile, dbCustomCharSprites }) => {
   // Character tab active by default
   const [activeTab, setActiveTab] = useState<MainCategory>('character');
   
-  // Custom uploaded options loaded from localStorage
+  // Custom uploaded options loaded from DB props / localStorage
   const [customMapTilesets, setCustomMapTilesets] = useState<TilesetOption[]>(() => {
     try {
       const saved = localStorage.getItem('on_house_custom_map_tilesets');
@@ -188,6 +189,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   });
 
   const [customCharSprites, setCustomCharSprites] = useState<TilesetOption[]>(() => {
+    if (dbCustomCharSprites && Array.isArray(dbCustomCharSprites) && dbCustomCharSprites.length > 0) {
+      return dbCustomCharSprites;
+    }
     try {
       const saved = localStorage.getItem('on_house_custom_char_sprites');
       return saved ? JSON.parse(saved) : [];
@@ -195,6 +199,14 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       return [];
     }
   });
+
+  // Keep customCharSprites synced with DB props
+  useEffect(() => {
+    if (dbCustomCharSprites && Array.isArray(dbCustomCharSprites) && dbCustomCharSprites.length > 0) {
+      console.log(`[AssetViewer Sync] 🔄 Syncing customCharSprites from DB props (${dbCustomCharSprites.length} items: ${dbCustomCharSprites.map(c => c.name || c.id).join(', ')})`);
+      setCustomCharSprites(dbCustomCharSprites);
+    }
+  }, [dbCustomCharSprites]);
 
   // Custom asset uploading & DB sync loading state
   const [isSavingAsset, setIsSavingAsset] = useState<boolean>(false);

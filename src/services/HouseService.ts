@@ -397,37 +397,32 @@ export const deleteHouseMapFromDB = async (
 
 export const fetchHouseAssets = async (houseCode: string) => {
   try {
+    console.log(`[OnHouse DB Sync] 📡 Fetching house assets from Supabase DB for houseCode: "${houseCode}"...`);
     // Trigger automatic DB trash cleanup in background to free storage space!
     cleanupDatabaseTrash(houseCode).catch(() => {});
 
-    let dbFetchFailed = false;
-
-    // 1. Fetch map_tileset specifically (targeted & fast, ~0.5s)
-    const mapTilesetsPromise = withTimeout(
-      supabase
-        .from('house_assets')
-        .select('asset_type, asset_data')
-        .eq('house_code', houseCode)
-        .eq('asset_type', 'map_tileset'),
-      8000
-    ).catch(() => { dbFetchFailed = true; return { data: [] }; });
+    // 1. Fetch map_tileset specifically (targeted & fast)
+    const mapTilesetsPromise = supabase
+      .from('house_assets')
+      .select('asset_type, asset_data')
+      .eq('house_code', houseCode)
+      .eq('asset_type', 'map_tileset');
 
     // 2. Fetch char_sprites, overrides, actions, deletes in parallel
-    const otherAssetsPromise = withTimeout(
-      supabase
-        .from('house_assets')
-        .select('asset_type, asset_data')
-        .eq('house_code', houseCode)
-        .in('asset_type', ['char_sprite', 'char_image_override', 'char_row_actions', 'char_delete'])
-        .order('id', { ascending: false })
-        .limit(300),
-      12000
-    ).catch(() => { dbFetchFailed = true; return { data: [] }; });
+    const otherAssetsPromise = supabase
+      .from('house_assets')
+      .select('asset_type, asset_data')
+      .eq('house_code', houseCode)
+      .in('asset_type', ['char_sprite', 'char_image_override', 'char_row_actions', 'char_delete'])
+      .order('id', { ascending: false })
+      .limit(300);
 
     const [mapRes, otherRes] = await Promise.all([mapTilesetsPromise, otherAssetsPromise]);
-    if (mapRes.error || otherRes.error) dbFetchFailed = true;
-    
+    if (mapRes.error) console.error('[OnHouse DB Sync Error] Map tilesets fetch error:', mapRes.error);
+    if (otherRes.error) console.error('[OnHouse DB Sync Error] Char assets fetch error:', otherRes.error);
+
     const combinedData = [...(mapRes.data || []), ...(otherRes.data || [])];
+    console.log(`[OnHouse DB Sync] 📦 Total asset rows returned from Supabase DB: ${combinedData.length}`);
 
     const mapTilesets: any[] = [];
     const charSprites: any[] = [];
@@ -473,6 +468,8 @@ export const fetchHouseAssets = async (houseCode: string) => {
       });
     }
 
+    console.log(`[OnHouse DB Sync] ✨ Active DB Assets Loaded -> charSprites: ${charSprites.length} (${charSprites.map(c => c.name || c.id).join(', ')}), mapTilesets: ${mapTilesets.length}`);
+
     // Supabase DB is 100% Single Source of Truth for all house assets!
     const finalCharSprites = [...charSprites];
     const finalMapTilesets = [...mapTilesets];
@@ -497,7 +494,7 @@ export const fetchHouseAssets = async (houseCode: string) => {
       charRowActions
     };
   } catch (err) {
-    console.warn('Supabase fetchHouseAssets warning/timeout:', err);
+    console.warn('Supabase fetchHouseAssets warning:', err);
     let mapTilesets: any[] = [];
     let charSprites: any[] = [];
     let charOverrides: Record<string, any> = {};
@@ -523,22 +520,28 @@ export const saveHouseAssetToDB = async (
   assetData: any
 ) => {
   try {
-    const { error } = await supabase
+    const assetName = assetData?.name || assetData?.id || 'Unknown';
+    const payloadSizeKb = assetData ? Math.round(JSON.stringify(assetData).length / 1024) : 0;
+    console.log(`[OnHouse DB Save] 📤 Inserting asset "${assetName}" (${assetType}, size: ~${payloadSizeKb}KB) into house_assets table for house [${houseCode}]...`);
+
+    const { data, error } = await supabase
       .from('house_assets')
       .insert({
         house_code: houseCode,
         asset_type: assetType,
         asset_data: assetData,
         updated_at: new Date().toISOString()
-      });
+      })
+      .select('id');
 
     if (error) {
-      console.error('Failed to save asset to Supabase:', error.message);
-      return { success: false, error: error.message };
+      console.error(`[OnHouse DB Save ERROR] ❌ Supabase insert failed for "${assetName}":`, error.message, error.details);
+      return { success: false, error: `${error.message}${error.hint ? ` (${error.hint})` : ''}` };
     }
+    console.log(`[OnHouse DB Save SUCCESS] ✅ Asset "${assetName}" saved to Supabase DB! Result row ID:`, data);
     return { success: true };
   } catch (err: any) {
-    console.error('Error in saveHouseAssetToDB:', err);
+    console.error(`[OnHouse DB Save EXCEPTION] 💥 Exception in saveHouseAssetToDB for "${assetData?.id}":`, err);
     return { success: false, error: err?.message || 'DB 에셋 저장 실패' };
   }
 };
