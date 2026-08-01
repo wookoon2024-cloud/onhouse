@@ -143,8 +143,17 @@ export const fetchHouseMapOrder = async (houseCode: string): Promise<string[]> =
 // Save map order to Supabase DB
 export const saveHouseMapOrderToDB = async (houseCode: string, order: string[]) => {
   try {
-    // Simply insert the new order record. 
-    // fetchHouseMapOrder will fetch the latest one, and cleanupDatabaseTrash will delete older duplicates!
+    // Delete previous order rows first (cleanupDatabaseTrash no longer runs automatically,
+    // so without this every reorder would leave a permanent orphan row behind).
+    await withTimeout(
+      supabase
+        .from('house_assets')
+        .delete()
+        .eq('house_code', houseCode)
+        .eq('asset_type', 'map_order'),
+      2500
+    );
+
     await withTimeout(
       supabase
         .from('house_assets')
@@ -402,20 +411,43 @@ export const fetchHouseAssets = async (houseCode: string) => {
     cleanupDatabaseTrash(houseCode).catch(() => {});
 
     // Stage 1: Lightweight metadata query (excludes heavy JSONB TOAST blobs, returns in ~5ms!)
-    const { data: metaRows, error: metaErr } = await supabase
-      .from('house_assets')
-      .select('id, asset_type, updated_at')
-      .eq('house_code', houseCode)
-      .order('id', { ascending: false })
-      .limit(60);
+    // 'map_tileset' gets its OWN query with a generous limit, kept completely separate from the
+    // char_* types. A house that has been played a lot can accumulate thousands of char_sprite /
+    // char_row_actions rows (every character edit/resave adds rows), and a single shared
+    // "top N most recent" window would let that churn bury older map tilesets — which is exactly
+    // what breaks custom maps like a saved '공원' map: the tileset row is still in the DB, it just
+    // never makes it into the window, so the client falls back to drawing black tiles for it.
+    // 'map_order' / 'deleted_maps' rows are excluded entirely — they are irrelevant here and are
+    // fetched separately by fetchHouseMapOrder / fetchHouseDeletedMaps.
+    const [tilesetMetaRes, charMetaRes] = await Promise.all([
+      supabase
+        .from('house_assets')
+        .select('id, asset_type, updated_at')
+        .eq('house_code', houseCode)
+        .eq('asset_type', 'map_tileset')
+        .order('id', { ascending: false })
+        .limit(300),
+      supabase
+        .from('house_assets')
+        .select('id, asset_type, updated_at')
+        .eq('house_code', houseCode)
+        .in('asset_type', ['char_sprite', 'char_image_override', 'char_row_actions', 'char_delete'])
+        .order('updated_at', { ascending: false })
+        .limit(150)
+    ]);
 
-    if (metaErr || !metaRows || metaRows.length === 0) {
-      if (metaErr) console.error('[OnHouse DB Sync Error] Asset fetch error:', metaErr);
+    if (tilesetMetaRes.error) console.error('[OnHouse DB Sync Error] Tileset meta fetch error:', tilesetMetaRes.error);
+    if (charMetaRes.error) console.error('[OnHouse DB Sync Error] Char asset meta fetch error:', charMetaRes.error);
+
+    const metaRows = [...(tilesetMetaRes.data || []), ...(charMetaRes.data || [])];
+
+    if (metaRows.length === 0) {
       return { mapTilesets: [], charSprites: [], charOverrides: {}, charRowActions: {} };
     }
 
-    // Target top 25 most recent row IDs to avoid oversized query parameter URLs
-    const targetIds = metaRows.slice(0, 25).map((r: any) => r.id);
+    // Target row IDs to hydrate in stage 2 (numeric primary keys, so this stays well under any
+    // practical URL length limit even at several hundred ids)
+    const targetIds = metaRows.map((r: any) => r.id);
 
     // Stage 2: Fetch asset_data ONLY for these target IDs using Primary Key B-Tree Index (O(1) fast, ~10ms!)
     const { data: fullRows, error: fullErr } = await supabase
@@ -544,26 +576,8 @@ export const saveHouseAssetToDB = async (
     const payloadSizeKb = assetData ? Math.round(JSON.stringify(assetData).length / 1024) : 0;
     console.log(`[OnHouse DB Save] 📤 Saving asset "${assetName}" (${assetType}, size: ~${payloadSizeKb}KB) into house_assets table for house [${houseCode}]...`);
 
-    // 1. Delete older rows for the same asset ID to keep DB 100% clean without duplicate accumulation
-    if (assetId) {
-      const { data: existingRows } = await supabase
-        .from('house_assets')
-        .select('id, asset_type, asset_data')
-        .eq('house_code', houseCode);
-
-      if (existingRows && existingRows.length > 0) {
-        const oldRowIds = existingRows
-          .filter(r => r.asset_type === assetType && r.asset_data?.id === assetId)
-          .map(r => r.id);
-
-        if (oldRowIds.length > 0) {
-          await supabase.from('house_assets').delete().in('id', oldRowIds);
-          console.log(`[OnHouse DB Save] 🧹 Hard deleted ${oldRowIds.length} old duplicate rows for asset "${assetId}"`);
-        }
-      }
-    }
-
-    // 2. Insert single clean new row
+    // 1. Insert the new row FIRST so a failed insert never leaves the asset deleted with nothing
+    // to replace it (previously delete-then-insert could silently lose the asset on insert failure).
     const { data, error } = await supabase
       .from('house_assets')
       .insert({
@@ -579,6 +593,29 @@ export const saveHouseAssetToDB = async (
       return { success: false, error: `${error.message}${error.hint ? ` (${error.hint})` : ''}` };
     }
     console.log(`[OnHouse DB Save SUCCESS] ✅ Asset "${assetName}" saved to Supabase DB! Result row ID:`, data);
+
+    // 2. Now that the new row is safely in, delete older duplicate rows for the same asset ID.
+    // Filtered at the DB level (asset_type + jsonb id) instead of pulling every asset_data blob
+    // for the house, which was slow/timeout-prone and reintroduced the TOAST issue we fixed before.
+    if (assetId) {
+      const newRowId = data && data[0]?.id;
+      const { data: existingRows } = await supabase
+        .from('house_assets')
+        .select('id')
+        .eq('house_code', houseCode)
+        .eq('asset_type', assetType)
+        .filter('asset_data->>id', 'eq', assetId);
+
+      const oldRowIds = (existingRows || [])
+        .map(r => r.id)
+        .filter(id => id !== newRowId);
+
+      if (oldRowIds.length > 0) {
+        await supabase.from('house_assets').delete().in('id', oldRowIds);
+        console.log(`[OnHouse DB Save] 🧹 Hard deleted ${oldRowIds.length} old duplicate rows for asset "${assetId}"`);
+      }
+    }
+
     return { success: true };
   } catch (err: any) {
     console.error(`[OnHouse DB Save EXCEPTION] 💥 Exception in saveHouseAssetToDB for "${assetData?.id}":`, err);
