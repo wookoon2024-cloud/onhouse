@@ -401,30 +401,17 @@ export const fetchHouseAssets = async (houseCode: string) => {
     // Trigger automatic DB trash cleanup in background to free storage space!
     cleanupDatabaseTrash(houseCode).catch(() => {});
 
-    // Step 1: Lightweight metadata query (excludes heavy JSONB TOAST blobs, returns in ~5ms!)
-    const { data: metaRows, error: metaErr } = await supabase
-      .from('house_assets')
-      .select('id, asset_type, updated_at')
-      .eq('house_code', houseCode)
-      .order('id', { ascending: false })
-      .limit(150);
-
-    if (metaErr || !metaRows || metaRows.length === 0) {
-      if (metaErr) console.error('[OnHouse DB Sync Error] Metadata fetch error:', metaErr);
-      return { mapTilesets: [], charSprites: [], charOverrides: {}, charRowActions: {} };
-    }
-
-    const rowIds = metaRows.map((r: any) => r.id);
-
-    // Step 2: Fetch asset_data ONLY for these target IDs using Primary Key B-Tree Index (O(1) fast, ~10ms!)
-    const { data: fullRows, error: fullErr } = await supabase
+    // Query clean active rows (now super fast & clean after trash cleanup)
+    const { data: rows, error: fetchErr } = await supabase
       .from('house_assets')
       .select('id, asset_type, asset_data')
-      .in('id', rowIds);
+      .eq('house_code', houseCode)
+      .order('id', { ascending: false })
+      .limit(60);
 
-    if (fullErr) console.error('[OnHouse DB Sync Error] Full rows fetch error:', fullErr);
+    if (fetchErr) console.error('[OnHouse DB Sync Error] Asset fetch error:', fetchErr);
 
-    const combinedData = fullRows || [];
+    const combinedData = rows || [];
     console.log(`[OnHouse DB Sync] 📦 Total asset rows returned from Supabase DB: ${combinedData.length}`);
 
     const mapTilesets: any[] = [];
