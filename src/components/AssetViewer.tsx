@@ -3620,8 +3620,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
             style={{
               position: 'relative',
               background: '#161622', border: '1px solid #3b3b54',
-              borderRadius: 0, padding: '20px', width: fileDataUrl ? '520px' : '400px',
-              maxWidth: '94vw', maxHeight: '92vh', overflowY: 'auto',
+              borderRadius: 0, padding: '14px 18px', width: fileDataUrl ? '500px' : '400px',
+              maxWidth: '94vw', maxHeight: '94vh', overflowY: 'auto',
+              scrollbarWidth: 'none', msOverflowStyle: 'none',
               boxShadow: '0 20px 60px rgba(0, 0, 0, 0.95)', color: '#fff'
             }}
           >
@@ -3631,92 +3632,94 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
                 background: 'rgba(22, 22, 34, 0.95)', backdropFilter: 'blur(6px)',
                 display: 'flex', flexDirection: 'column', alignItems: 'center',
-                justifyContent: 'center', gap: '14px', zIndex: 50, padding: '20px',
+                justifyContent: 'center', gap: '10px', zIndex: 50, padding: '16px',
                 textAlign: 'center'
               }}>
-                <Loader2 size={42} style={{ color: '#a78bfa' }} className="animate-spin" />
+                <Loader2 size={36} style={{ color: '#a78bfa' }} className="animate-spin" />
                 <div>
-                  <div style={{ fontSize: '14px', fontWeight: 'normal', color: '#fff', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 'normal', color: '#fff', marginBottom: '3px' }}>
                     {saveProgressText || '💾 에셋 처리 및 서버 저장 중...'}
                   </div>
-                  <div style={{ fontSize: '11px', color: '#aaa' }}>
+                  <div style={{ fontSize: '10px', color: '#aaa' }}>
                     이미지 업로드 및 DB 동기화가 진행 중입니다. 잠시만 기다려 주세요!
                   </div>
                 </div>
               </div>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               {/* Renamed Modal Title to "➕ 추가" */}
-              <div style={{ fontSize: '15px', fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '6px', color: '#a78bfa' }}>
-                <Plus size={18} /> 추가
+              <div style={{ fontSize: '14px', fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '6px', color: '#a78bfa' }}>
+                <Plus size={16} /> 추가
               </div>
               <button
                 disabled={isSavingAsset}
                 onClick={() => setShowUploadModal(false)}
                 style={{ background: 'none', border: 'none', color: '#888', cursor: isSavingAsset ? 'not-allowed' : 'pointer' }}
               >
-                <X size={16} />
+                <X size={15} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveCustomAsset} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div>
-                <label style={{ fontSize: '11px', color: '#aaa', display: 'block', marginBottom: '6px' }}>에셋 분류:</label>
-                {/* Category order: Character First, Map Second */}
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <button
-                    type="button"
-                    onClick={() => handleCategorySwitch('character')}
+            <form onSubmit={handleSaveCustomAsset} style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+              {/* Combine Category & Asset Name on 1 Row */}
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+                <div style={{ width: '140px', flexShrink: 0 }}>
+                  <label style={{ fontSize: '10px', color: '#aaa', display: 'block', marginBottom: '2px' }}>에셋 분류:</label>
+                  <div style={{ display: 'flex', gap: '3px' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleCategorySwitch('character')}
+                      disabled={isSavingAsset}
+                      style={{
+                        flex: 1, padding: '4px 2px', fontSize: '11px', borderRadius: 0,
+                        background: uploadCategory === 'character' ? '#252538' : '#14141e',
+                        color: uploadCategory === 'character' ? '#fff' : '#8a8a9e',
+                        border: uploadCategory === 'character' ? '1px solid #a78bfa' : '1px solid #28283a',
+                        cursor: isSavingAsset ? 'not-allowed' : 'pointer', fontWeight: 'normal', height: '28px'
+                      }}
+                    >
+                      👤 캐릭터
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCategorySwitch('map')}
+                      disabled={isSavingAsset}
+                      style={{
+                        flex: 1, padding: '4px 2px', fontSize: '11px', borderRadius: 0,
+                        background: uploadCategory === 'map' ? '#252538' : '#14141e',
+                        color: uploadCategory === 'map' ? '#fff' : '#8a8a9e',
+                        border: uploadCategory === 'map' ? '1px solid #a78bfa' : '1px solid #28283a',
+                        cursor: isSavingAsset ? 'not-allowed' : 'pointer', fontWeight: 'normal', height: '28px'
+                      }}
+                    >
+                      🗺️ 맵
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: '10px', color: '#aaa', display: 'block', marginBottom: '2px' }}>에셋 이름:</label>
+                  <input
+                    type="text"
+                    placeholder={uploadCategory === 'character' ? "예: 🐶 귀여운 강아지" : "예: 🎨 마법 던전 타일"}
+                    value={assetNameInput}
                     disabled={isSavingAsset}
+                    onChange={(e) => setAssetNameInput(e.target.value)}
+                    autoFocus
                     style={{
-                      flex: 1, padding: '8px', fontSize: '11px', borderRadius: 0,
-                      background: uploadCategory === 'character' ? '#252538' : '#14141e',
-                      color: uploadCategory === 'character' ? '#fff' : '#8a8a9e',
-                      border: uploadCategory === 'character' ? '1px solid #a78bfa' : '1px solid #28283a',
-                      cursor: isSavingAsset ? 'not-allowed' : 'pointer', fontWeight: 'normal'
+                      width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b',
+                      borderRadius: 0, padding: '4px 8px', color: '#fff', fontSize: '11px', outline: 'none',
+                      boxSizing: 'border-box', fontWeight: 'normal', height: '28px'
                     }}
-                  >
-                    👤 캐릭터
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleCategorySwitch('map')}
-                    disabled={isSavingAsset}
-                    style={{
-                      flex: 1, padding: '8px', fontSize: '11px', borderRadius: 0,
-                      background: uploadCategory === 'map' ? '#252538' : '#14141e',
-                      color: uploadCategory === 'map' ? '#fff' : '#8a8a9e',
-                      border: uploadCategory === 'map' ? '1px solid #a78bfa' : '1px solid #28283a',
-                      cursor: isSavingAsset ? 'not-allowed' : 'pointer', fontWeight: 'normal'
-                    }}
-                  >
-                    🗺️ 맵
-                  </button>
+                  />
                 </div>
               </div>
 
-              <div>
-                <label style={{ fontSize: '11px', color: '#aaa', display: 'block', marginBottom: '6px' }}>에셋 이름:</label>
-                <input
-                  type="text"
-                  placeholder={uploadCategory === 'character' ? "예: 🐶 귀여운 강아지" : "예: 🎨 마법 던전 타일"}
-                  value={assetNameInput}
-                  disabled={isSavingAsset}
-                  onChange={(e) => setAssetNameInput(e.target.value)}
-                  autoFocus
-                  style={{
-                    width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b',
-                    borderRadius: 0, padding: '8px 10px', color: '#fff', fontSize: '12px', outline: 'none',
-                    boxSizing: 'border-box', fontWeight: 'normal'
-                  }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '11px', color: '#aaa', display: 'block', marginBottom: '6px', whiteSpace: 'nowrap', height: '16px', lineHeight: '16px' }}>
-                    {uploadCategory === 'character' ? "프레임 1개 단위 크기 (px):" : "타일 1개 단위 크기 (px):"}
+                  <label style={{ fontSize: '10px', color: '#aaa', display: 'block', marginBottom: '2px', whiteSpace: 'nowrap' }}>
+                    {uploadCategory === 'character' ? "프레임 크기 (px):" : "타일 크기 (px):"}
                   </label>
                   <select
                     value={isCustomFrameSize ? 'custom' : tileSizeInput}
@@ -3734,21 +3737,21 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                     }}
                     style={{
                       width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b',
-                      borderRadius: 0, padding: '7px 10px', color: '#fff', fontSize: '12px', outline: 'none',
-                      fontWeight: 'normal', height: '34px', boxSizing: 'border-box'
+                      borderRadius: 0, padding: '4px 6px', color: '#fff', fontSize: '11px', outline: 'none',
+                      fontWeight: 'normal', height: '28px', boxSizing: 'border-box'
                     }}
                   >
-                    <option value={16}>16 x 16 px (레트로 / 도트 2D 타일 표준)</option>
+                    <option value={16}>16 x 16 px (레트로 / 도트 표준)</option>
                     <option value={32}>32 x 32 px (HD 픽셀 타일 규격)</option>
                     <option value={48}>48 x 48 px (RPG Maker 규격)</option>
                     <option value={64}>64 x 64 px (고해상도 HD 규격)</option>
-                    <option value="custom">✏️ 사용자 정의 규격 / 비정방형 (가로 x 세로 자유 지정)</option>
+                    <option value="custom">✏️ 사용자 정의 규격 (가로x세로)</option>
                   </select>
                 </div>
 
-                <div style={{ flex: 1, display: 'flex', gap: '6px' }}>
+                <div style={{ flex: 1, display: 'flex', gap: '4px' }}>
                   <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: '11px', color: '#a78bfa', display: 'block', marginBottom: '6px', whiteSpace: 'nowrap', height: '16px', lineHeight: '16px' }}>가로 열 수:</label>
+                    <label style={{ fontSize: '10px', color: '#a78bfa', display: 'block', marginBottom: '2px', whiteSpace: 'nowrap' }}>가로 열 수:</label>
                     <input
                       type="number"
                       min={1}
@@ -3767,12 +3770,12 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                       onBlur={() => {
                         if (customColsInput === '' || customColsInput <= 0) setCustomColsInput(4);
                       }}
-                      style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '7px 8px', color: '#fff', fontSize: '12px', textAlign: 'center', outline: 'none', fontWeight: 'normal', height: '34px', boxSizing: 'border-box' }}
+                      style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '4px 6px', color: '#fff', fontSize: '11px', textAlign: 'center', outline: 'none', fontWeight: 'normal', height: '28px', boxSizing: 'border-box' }}
                     />
                   </div>
 
                   <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: '11px', color: '#a78bfa', display: 'block', marginBottom: '6px', whiteSpace: 'nowrap', height: '16px', lineHeight: '16px' }}>세로 행 수:</label>
+                    <label style={{ fontSize: '10px', color: '#a78bfa', display: 'block', marginBottom: '2px', whiteSpace: 'nowrap' }}>세로 행 수:</label>
                     <input
                       type="number"
                       min={1}
@@ -3791,7 +3794,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                       onBlur={() => {
                         if (customRowsInput === '' || customRowsInput <= 0) setCustomRowsInput(7);
                       }}
-                      style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '7px 8px', color: '#fff', fontSize: '12px', textAlign: 'center', outline: 'none', fontWeight: 'normal', height: '34px', boxSizing: 'border-box' }}
+                      style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '4px 6px', color: '#fff', fontSize: '11px', textAlign: 'center', outline: 'none', fontWeight: 'normal', height: '28px', boxSizing: 'border-box' }}
                     />
                   </div>
                 </div>
@@ -3799,9 +3802,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
 
               {/* Custom Frame Size & Start Offsets (X, Y 시작점) Controls */}
               {(isCustomFrameSize || (uploadCategory === 'character' && fileDataUrl)) && (
-                <div style={{ background: '#101018', padding: '10px', border: '1px solid #3b3b54', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div style={{ fontSize: '11px', color: '#a78bfa', fontWeight: 'normal', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '4px' }}>
-                    <span>📐 프레임 해상도 & 시작 오프셋 (개별 자유 수정 가능)</span>
+                <div style={{ background: '#101018', padding: '6px 8px', border: '1px solid #3b3b54', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ fontSize: '10px', color: '#a78bfa', fontWeight: 'normal', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '4px' }}>
+                    <span>📐 프레임 해상도 & 시작 오프셋</span>
                     {imgWidth > 0 && (
                       <button
                         type="button"
@@ -3814,20 +3817,20 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                           setCustomFrameHeightInput(Math.max(1, Math.round((imgHeight - offY) / rows)));
                         }}
                         style={{
-                          fontSize: '10px', color: '#a78bfa', background: '#252538',
-                          border: '1px solid #4a4a6b', padding: '2px 6px', cursor: 'pointer',
+                          fontSize: '9px', color: '#a78bfa', background: '#252538',
+                          border: '1px solid #4a4a6b', padding: '1px 5px', cursor: 'pointer',
                           borderRadius: 0
                         }}
                       >
-                        ⚡ 이미지 크기 자동 맞춤
+                        ⚡ 자동 맞춤
                       </button>
                     )}
                   </div>
 
-                  <div style={{ display: 'flex', gap: '6px' }}>
+                  <div style={{ display: 'flex', gap: '4px' }}>
                     <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: '10px', color: '#ccc', display: 'block', marginBottom: '3px' }}>
-                        가로 프레임(px):
+                      <label style={{ fontSize: '9px', color: '#ccc', display: 'block', marginBottom: '1px' }}>
+                        가로(px):
                       </label>
                       <input
                         type="number"
@@ -3843,22 +3846,18 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                             return;
                           }
                           const w = parseInt(valStr, 10);
-                          if (!isNaN(w)) {
-                            setCustomFrameWidthInput(w);
-                          }
+                          if (!isNaN(w)) setCustomFrameWidthInput(w);
                         }}
                         onBlur={() => {
-                          if (customFrameWidthInput === '' || customFrameWidthInput <= 0) {
-                            setCustomFrameWidthInput(tileSizeInput || 32);
-                          }
+                          if (customFrameWidthInput === '' || customFrameWidthInput <= 0) setCustomFrameWidthInput(tileSizeInput || 32);
                         }}
-                        style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '4px 6px', color: '#fff', fontSize: '11px', textAlign: 'center' }}
+                        style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '3px 4px', color: '#fff', fontSize: '10px', textAlign: 'center', height: '24px', boxSizing: 'border-box' }}
                       />
                     </div>
 
                     <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: '10px', color: '#ccc', display: 'block', marginBottom: '3px' }}>
-                        세로 프레임(px):
+                      <label style={{ fontSize: '9px', color: '#ccc', display: 'block', marginBottom: '1px' }}>
+                        세로(px):
                       </label>
                       <input
                         type="number"
@@ -3874,22 +3873,18 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                             return;
                           }
                           const h = parseInt(valStr, 10);
-                          if (!isNaN(h)) {
-                            setCustomFrameHeightInput(h);
-                          }
+                          if (!isNaN(h)) setCustomFrameHeightInput(h);
                         }}
                         onBlur={() => {
-                          if (customFrameHeightInput === '' || customFrameHeightInput <= 0) {
-                            setCustomFrameHeightInput(tileSizeInput || 32);
-                          }
+                          if (customFrameHeightInput === '' || customFrameHeightInput <= 0) setCustomFrameHeightInput(tileSizeInput || 32);
                         }}
-                        style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '4px 6px', color: '#fff', fontSize: '11px', textAlign: 'center' }}
+                        style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '3px 4px', color: '#fff', fontSize: '10px', textAlign: 'center', height: '24px', boxSizing: 'border-box' }}
                       />
                     </div>
 
                     <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: '10px', color: '#ffd700', display: 'block', marginBottom: '3px' }}>
-                        📍 시작 X(px):
+                      <label style={{ fontSize: '9px', color: '#ffd700', display: 'block', marginBottom: '1px' }}>
+                        시작 X:
                       </label>
                       <input
                         type="number"
@@ -3904,22 +3899,18 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                             return;
                           }
                           const offX = parseInt(valStr, 10);
-                          if (!isNaN(offX)) {
-                            setCustomOffsetXInput(Math.max(0, offX));
-                          }
+                          if (!isNaN(offX)) setCustomOffsetXInput(Math.max(0, offX));
                         }}
                         onBlur={() => {
-                          if (customOffsetXInput === '') {
-                            setCustomOffsetXInput(0);
-                          }
+                          if (customOffsetXInput === '') setCustomOffsetXInput(0);
                         }}
-                        style={{ width: '100%', background: '#0d0d12', border: '1px solid #ffd700', borderRadius: 0, padding: '4px 6px', color: '#fff', fontSize: '11px', textAlign: 'center' }}
+                        style={{ width: '100%', background: '#0d0d12', border: '1px solid #ffd700', borderRadius: 0, padding: '3px 4px', color: '#fff', fontSize: '10px', textAlign: 'center', height: '24px', boxSizing: 'border-box' }}
                       />
                     </div>
 
                     <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: '10px', color: '#ffd700', display: 'block', marginBottom: '3px' }}>
-                        📍 시작 Y(px):
+                      <label style={{ fontSize: '9px', color: '#ffd700', display: 'block', marginBottom: '1px' }}>
+                        시작 Y:
                       </label>
                       <input
                         type="number"
@@ -3934,16 +3925,12 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                             return;
                           }
                           const offY = parseInt(valStr, 10);
-                          if (!isNaN(offY)) {
-                            setCustomOffsetYInput(Math.max(0, offY));
-                          }
+                          if (!isNaN(offY)) setCustomOffsetYInput(Math.max(0, offY));
                         }}
                         onBlur={() => {
-                          if (customOffsetYInput === '') {
-                            setCustomOffsetYInput(0);
-                          }
+                          if (customOffsetYInput === '') setCustomOffsetYInput(0);
                         }}
-                        style={{ width: '100%', background: '#0d0d12', border: '1px solid #ffd700', borderRadius: 0, padding: '4px 6px', color: '#fff', fontSize: '11px', textAlign: 'center' }}
+                        style={{ width: '100%', background: '#0d0d12', border: '1px solid #ffd700', borderRadius: 0, padding: '3px 4px', color: '#fff', fontSize: '10px', textAlign: 'center', height: '24px', boxSizing: 'border-box' }}
                       />
                     </div>
                   </div>
@@ -3952,10 +3939,10 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
 
               {/* Spacing & Margin Controls for Map Tilesets */}
               {uploadCategory === 'map' && (
-                <div style={{ display: 'flex', gap: '8px', background: '#101018', padding: '8px 10px', border: '1px solid #3b3b54' }}>
+                <div style={{ display: 'flex', gap: '6px', background: '#101018', padding: '6px 8px', border: '1px solid #3b3b54' }}>
                   <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: '10px', color: '#a78bfa', display: 'block', marginBottom: '3px', fontWeight: 'normal' }}>
-                      ✏️ 타일 간격 (Spacing/검은줄 px):
+                    <label style={{ fontSize: '9px', color: '#a78bfa', display: 'block', marginBottom: '1px', fontWeight: 'normal' }}>
+                      ✏️ 타일 간격 (Spacing px):
                     </label>
                     <input
                       type="number"
@@ -3975,13 +3962,12 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                       onBlur={() => {
                         if (customSpacingInput === '') setCustomSpacingInput(0);
                       }}
-                      placeholder="예: 1 (검은줄 1px)"
-                      style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '4px 8px', color: '#fff', fontSize: '11px', textAlign: 'center', fontWeight: 'normal' }}
+                      style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '3px 6px', color: '#fff', fontSize: '10px', textAlign: 'center', fontWeight: 'normal', height: '24px', boxSizing: 'border-box' }}
                     />
                   </div>
 
                   <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: '10px', color: '#aaa', display: 'block', marginBottom: '3px' }}>
+                    <label style={{ fontSize: '9px', color: '#aaa', display: 'block', marginBottom: '1px' }}>
                       외곽 여백 (Margin px):
                     </label>
                     <input
@@ -4002,15 +3988,14 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                       onBlur={() => {
                         if (customMarginInput === '') setCustomMarginInput(0);
                       }}
-                      placeholder="예: 0"
-                      style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '4px 8px', color: '#fff', fontSize: '11px', textAlign: 'center', fontWeight: 'normal' }}
+                      style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '3px 6px', color: '#fff', fontSize: '10px', textAlign: 'center', fontWeight: 'normal', height: '24px', boxSizing: 'border-box' }}
                     />
                   </div>
                 </div>
               )}
 
               <div>
-                <label style={{ fontSize: '11px', color: '#aaa', display: 'block', marginBottom: '6px' }}>
+                <label style={{ fontSize: '10px', color: '#aaa', display: 'block', marginBottom: '2px' }}>
                   {uploadCategory === 'character' ? "이미지 파일 선택 (선택 사항):" : "이미지 파일 선택 (필수):"}
                 </label>
                 <input
@@ -4019,30 +4004,30 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                   disabled={isSavingAsset}
                   onChange={handleFileChange}
                   style={{
-                    fontSize: '11px', color: '#ccc', background: '#101018',
-                    padding: '8px', borderRadius: 0, width: '100%', boxSizing: 'border-box',
+                    fontSize: '10px', color: '#ccc', background: '#101018',
+                    padding: '4px 6px', borderRadius: 0, width: '100%', boxSizing: 'border-box',
                     border: '1px dashed #4a4a6b'
                   }}
                 />
               </div>
 
               {uploadCategory === 'character' && !fileDataUrl && (
-                <div style={{ fontSize: '10px', color: '#888', background: '#101018', padding: '8px 10px', borderRadius: 0, border: '1px solid #28283a' }}>
+                <div style={{ fontSize: '10px', color: '#888', background: '#101018', padding: '5px 8px', borderRadius: 0, border: '1px solid #28283a' }}>
                   💡 이미지 파일 없이 에셋 이름만 입력하셔도 <strong>새로운 픽셀 캐릭터 에셋</strong>이 즉시 등록되어 에디터로 그리실 수 있습니다!
                 </div>
               )}
 
               {/* Interactive Live Grid Preview Overlay Box with Zoom Controls & Panning Viewport */}
               {fileDataUrl && (
-                <div style={{ background: '#101018', padding: '12px', borderRadius: 0, border: '1px solid #3b3b54', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
-                    <span style={{ fontSize: '11px', color: '#a78bfa', fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div style={{ background: '#101018', padding: '8px', borderRadius: 0, border: '1px solid #3b3b54', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
+                    <span style={{ fontSize: '10px', color: '#a78bfa', fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       👁️ 미리보기 격자 분할 확인 ({imgWidth}x{imgHeight}px)
                     </span>
 
                     {/* Preview Zoom Controls */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px', background: '#1c1c2b', padding: '2px 4px', border: '1px solid #4a4a6b' }}>
-                      <span style={{ fontSize: '10px', color: '#aaa', marginRight: '3px' }}>🔎 확대:</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px', background: '#1c1c2b', padding: '1px 3px', border: '1px solid #4a4a6b' }}>
+                      <span style={{ fontSize: '9px', color: '#aaa', marginRight: '2px' }}>🔎 확대:</span>
                       {[
                         { label: '맞춤', value: 1.0 },
                         { label: '1.5x', value: 1.5 },
@@ -4055,7 +4040,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                           type="button"
                           onClick={() => setPreviewZoom(zOpt.value)}
                           style={{
-                            padding: '2px 6px', fontSize: '10px', borderRadius: 0, border: 'none',
+                            padding: '1px 5px', fontSize: '9px', borderRadius: 0, border: 'none',
                             background: previewZoom === zOpt.value ? '#a78bfa' : 'transparent',
                             color: previewZoom === zOpt.value ? '#000' : '#ccc', cursor: 'pointer',
                             fontWeight: 'normal'
@@ -4067,16 +4052,18 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                     </div>
                   </div>
 
-                  {/* Grid Overlay Preview Canvas Container */}
+                  {/* Grid Overlay Preview Canvas Container - Clean Scrollbar Free in Fit Mode! */}
                   <div style={{
-                    position: 'relative', width: '100%', height: '260px', background: '#0a0a0f',
-                    borderRadius: 0, border: '1px solid #3b3b54', overflow: 'auto',
-                    display: 'block', padding: previewZoom > 1.0 ? '12px' : 0
+                    position: 'relative', width: '100%', height: '180px', background: '#0a0a0f',
+                    borderRadius: 0, border: '1px solid #3b3b54',
+                    overflow: previewZoom > 1.0 ? 'auto' : 'hidden',
+                    scrollbarWidth: 'none', msOverflowStyle: 'none',
+                    display: 'block', padding: previewZoom > 1.0 ? '8px' : 0
                   }}>
                     {previewZoom === 1.0 ? (
                       /* Fit Mode (Pixel-Exact Aspect Ratio Container & Scaled Overlay) */
                       (() => {
-                        const fitScale = Math.min(480 / (imgWidth || 1), 260 / (imgHeight || 1));
+                        const fitScale = Math.min(460 / (imgWidth || 1), 176 / (imgHeight || 1));
                         const fitW = imgWidth * fitScale;
                         const fitH = imgHeight * fitScale;
 
@@ -4179,7 +4166,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                   </div>
 
                   {/* Calculation summary badge */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#ccc', background: 'rgba(139, 92, 246, 0.12)', padding: '6px 10px', borderRadius: 0, border: '1px solid #4a4a6b' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '10px', color: '#ccc', background: 'rgba(139, 92, 246, 0.12)', padding: '4px 8px', borderRadius: 0, border: '1px solid #4a4a6b' }}>
                     <span>분할 결과: <span style={{ color: '#fff' }}>{customColsInput || 0}열 x {customRowsInput || 0}행</span></span>
                     <span className="pixel-text" style={{ color: '#a78bfa', fontWeight: 'normal' }}>
                       총 {(typeof customColsInput === 'number' ? customColsInput : 0) * (typeof customRowsInput === 'number' ? customRowsInput : 0)}개 프레임 ({typeof customFrameWidthInput === 'number' ? customFrameWidthInput : 0}x{typeof customFrameHeightInput === 'number' ? customFrameHeightInput : 0}px/프레임)
@@ -4193,21 +4180,21 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 type="submit"
                 disabled={isSavingAsset || (uploadCategory === 'character' ? !assetNameInput.trim() : !fileDataUrl)}
                 style={{
-                  marginTop: '8px', padding: '10px',
+                  marginTop: '4px', padding: '8px',
                   background: isSavingAsset ? '#e5c07b' : ((uploadCategory === 'character' ? assetNameInput.trim() : fileDataUrl) ? '#a78bfa' : '#333348'),
                   border: 'none', borderRadius: 0, color: isSavingAsset ? '#000' : '#111', fontSize: '12px',
                   fontWeight: 'normal', cursor: (isSavingAsset || (uploadCategory === 'character' ? !assetNameInput.trim() : !fileDataUrl)) ? 'not-allowed' : 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                  transition: 'all 0.2s ease'
+                  transition: 'all 0.2s ease', height: '32px'
                 }}
               >
                 {isSavingAsset ? (
                   <>
-                    <Loader2 size={15} className="animate-spin" /> {saveProgressText || '💾 에셋 저장 중...'}
+                    <Loader2 size={14} className="animate-spin" /> {saveProgressText || '💾 에셋 저장 중...'}
                   </>
                 ) : (
                   <>
-                    <Save size={15} /> 💾 저장하기
+                    <Save size={14} /> 💾 저장하기
                   </>
                 )}
               </button>
