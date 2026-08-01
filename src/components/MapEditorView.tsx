@@ -123,36 +123,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   const [paletteDragStart, setPaletteDragStart] = useState<{ col: number; row: number } | null>(null);
   const [paletteSelection, setPaletteSelection] = useState<{ startCol: number; startRow: number; cols: number; rows: number; tilesetKey: string } | null>(null);
 
-  // Brush History State
-  const [brushHistory, setBrushHistory] = useState<Array<{
-    selectedTile: number;
-    paletteSelection: { startCol: number; startRow: number; cols: number; rows: number; tilesetKey: string } | null;
-    activeTileset: string;
-  }>>([]);
 
-  useEffect(() => {
-    // Only track valid tiles (not eraser -1)
-    if (selectedTile === -1) return;
-    
-    setBrushHistory(prev => {
-      // Check if current brush is exactly the same as the most recent one in history
-      const isSameAsLatest = prev.length > 0 && 
-        prev[0].selectedTile === selectedTile &&
-        prev[0].activeTileset === activeTileset &&
-        JSON.stringify(prev[0].paletteSelection) === JSON.stringify(paletteSelection);
-      
-      if (isSameAsLatest) return prev;
-
-      // Filter out this exact combination if it exists elsewhere in the history, then add to front
-      const filtered = prev.filter(item => 
-        !(item.selectedTile === selectedTile && 
-          item.activeTileset === activeTileset && 
-          JSON.stringify(item.paletteSelection) === JSON.stringify(paletteSelection))
-      );
-      
-      return [{ selectedTile, paletteSelection, activeTileset }, ...filtered].slice(0, 10);
-    });
-  }, [selectedTile, paletteSelection, activeTileset]);
   // Object Selection & Smart Editing State (Step 3 & 4)
   const [selectedObjectIds, setSelectedObjectIds] = useState<string[]>([]);
   const selectedObjectId = selectedObjectIds[0] || null;
@@ -423,6 +394,37 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
   const [customMapTilesets, setCustomMapTilesets] = useState<TilesetOption[]>(getCustomMapTilesets);
   const [activeTileset, setActiveTileset] = useState<string>(localMap?.tileset || 'interior');
+
+  // Brush History State (Placed AFTER activeTileset to prevent TDZ ReferenceError)
+  const [brushHistory, setBrushHistory] = useState<Array<{
+    selectedTile: number;
+    paletteSelection: { startCol: number; startRow: number; cols: number; rows: number; tilesetKey: string } | null;
+    activeTileset: string;
+  }>>([]);
+
+  useEffect(() => {
+    // Only track valid tiles (not eraser -1)
+    if (selectedTile === -1) return;
+    
+    setBrushHistory(prev => {
+      // Check if current brush is exactly the same as the most recent one in history
+      const isSameAsLatest = prev.length > 0 && 
+        prev[0].selectedTile === selectedTile &&
+        prev[0].activeTileset === activeTileset &&
+        JSON.stringify(prev[0].paletteSelection) === JSON.stringify(paletteSelection);
+      
+      if (isSameAsLatest) return prev;
+
+      // Filter out this exact combination if it exists elsewhere in the history, then add to front
+      const filtered = prev.filter(item => 
+        !(item.selectedTile === selectedTile && 
+          item.activeTileset === activeTileset && 
+          JSON.stringify(item.paletteSelection) === JSON.stringify(paletteSelection))
+      );
+      
+      return [{ selectedTile, paletteSelection, activeTileset }, ...filtered].slice(0, 10);
+    });
+  }, [selectedTile, paletteSelection, activeTileset]);
 
   useEffect(() => {
     const syncCustomTilesets = () => {
