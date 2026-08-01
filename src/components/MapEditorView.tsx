@@ -401,6 +401,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     selectedTile: number;
     paletteSelection: { startCol: number; startRow: number; cols: number; rows: number; tilesetKey: string } | null;
     activeTileset: string;
+    brushSize?: number;
   }>>([]);
 
   useEffect(() => {
@@ -412,6 +413,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       const isSameAsLatest = prev.length > 0 && 
         prev[0].selectedTile === selectedTile &&
         prev[0].activeTileset === activeTileset &&
+        prev[0].brushSize === brushSize &&
         JSON.stringify(prev[0].paletteSelection) === JSON.stringify(paletteSelection);
       
       if (isSameAsLatest) return prev;
@@ -420,12 +422,13 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       const filtered = prev.filter(item => 
         !(item.selectedTile === selectedTile && 
           item.activeTileset === activeTileset && 
+          item.brushSize === brushSize &&
           JSON.stringify(item.paletteSelection) === JSON.stringify(paletteSelection))
       );
       
-      return [{ selectedTile, paletteSelection, activeTileset }, ...filtered].slice(0, 10);
+      return [{ selectedTile, paletteSelection, activeTileset, brushSize }, ...filtered].slice(0, 10);
     });
-  }, [selectedTile, paletteSelection, activeTileset]);
+  }, [selectedTile, paletteSelection, activeTileset, brushSize]);
 
   useEffect(() => {
     const syncCustomTilesets = () => {
@@ -1652,6 +1655,26 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               const lIdx = (decorObj.startRow + relR) * tsInfo.cols + (decorObj.startCol + relC);
               pickedIdx = getPrefixedIndex(lIdx, decorObj.tilesetKey);
             }
+          }
+
+          // If object has multi-tile dimensions, set paletteSelection & brushSize so history & brush gain the multi-tile object!
+          if (decorObj.width > 1 || decorObj.height > 1) {
+            const tsInfo = getTilesetInfoLocal(decorObj.tilesetKey);
+            if (tsInfo) {
+              const topLIdx = decorObj.startRow * tsInfo.cols + decorObj.startCol;
+              pickedIdx = getPrefixedIndex(topLIdx, decorObj.tilesetKey);
+            }
+            setSelectedTile(pickedIdx);
+            setActiveTileset(decorObj.tilesetKey);
+            setPaletteSelection({
+              startCol: decorObj.startCol,
+              startRow: decorObj.startRow,
+              cols: decorObj.width,
+              rows: decorObj.height,
+              tilesetKey: decorObj.tilesetKey
+            });
+            setBrushSize(Math.max(decorObj.width, decorObj.height));
+            return;
           }
         }
       }
@@ -3442,15 +3465,23 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                       
                       {/* Brush History Row */}
                       {brushHistory.length > 1 && (
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "4px", padding: "4px", background: "rgba(10, 10, 15, 0.4)", borderRadius: "4px" }}>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "4px", padding: "4px", background: "rgba(10, 10, 15, 0.4)", borderRadius: "4px", alignItems: "center" }}>
                           {brushHistory.slice(1).map((hist, idx) => {
                             const hSelInfo = getTileDrawInfo(hist.selectedTile, hist.activeTileset);
                             if (!hSelInfo) return null;
                             const hTsInfo = getTilesetInfoLocal(hSelInfo.tilesetKey);
                             if (!hTsInfo || !hTsInfo.cols) return null;
-                            const hCol = hSelInfo.localIdx % hTsInfo.cols;
-                            const hRow = Math.floor(hSelInfo.localIdx / hTsInfo.cols);
-                            
+                            const hTsCols = hTsInfo.cols;
+                            const hStartCol = hSelInfo.localIdx % hTsCols;
+                            const hStartRow = Math.floor(hSelInfo.localIdx / hTsCols);
+
+                            const hCols = (hist.paletteSelection && hist.paletteSelection.tilesetKey === hist.activeTileset) ? hist.paletteSelection.cols : (hist.brushSize || 1);
+                            const hRows = (hist.paletteSelection && hist.paletteSelection.tilesetKey === hist.activeTileset) ? hist.paletteSelection.rows : (hist.brushSize || 1);
+
+                            const isMultiTile = hCols > 1 || hRows > 1;
+                            const boxW = Math.max(26, Math.min(54, hCols * 14));
+                            const boxH = Math.max(26, Math.min(54, hRows * 14));
+
                             return (
                               <button
                                 key={idx}
@@ -3460,33 +3491,82 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                                   }
                                   setPaletteSelection(hist.paletteSelection);
                                   setSelectedTile(hist.selectedTile);
-                                  setTool('brush'); // Switch to brush tool automatically
+                                  const restoreSize = (hist.paletteSelection && hist.paletteSelection.tilesetKey === hist.activeTileset)
+                                    ? Math.max(hist.paletteSelection.cols, hist.paletteSelection.rows)
+                                    : (hist.brushSize || 1);
+                                  setBrushSize(restoreSize);
+                                  setTool('brush');
+                                  if (editLayer === 'collision') setEditLayer('decor');
                                 }}
-                                title="이전 브러시 다시 선택"
+                                title={`이전 브러시 다시 선택 (${hCols}x${hRows})`}
                                 style={{
-                                  width: "24px", height: "24px",
-                                  border: "1px solid var(--border-glass)",
-                                  borderRadius: "4px", background: "#000",
-                                  padding: 0, cursor: "pointer", flexShrink: 0,
-                                  overflow: "hidden", imageRendering: "pixelated",
-                                  opacity: 0.6, transition: "all 0.1s ease"
+                                  width: `${boxW}px`,
+                                  height: `${boxH}px`,
+                                  border: isMultiTile ? "1.5px solid var(--accent)" : "1px solid var(--border-glass)",
+                                  borderRadius: "4px",
+                                  background: "#000",
+                                  padding: "1px",
+                                  cursor: "pointer",
+                                  flexShrink: 0,
+                                  display: "grid",
+                                  gridTemplateColumns: `repeat(${hCols}, 1fr)`,
+                                  overflow: "hidden",
+                                  imageRendering: "pixelated",
+                                  position: "relative",
+                                  boxSizing: "border-box",
+                                  opacity: 0.85,
+                                  transition: "all 0.1s ease"
                                 }}
                                 onMouseOver={(e) => {
                                   e.currentTarget.style.opacity = "1";
                                   e.currentTarget.style.borderColor = "var(--accent)";
                                 }}
                                 onMouseOut={(e) => {
-                                  e.currentTarget.style.opacity = "0.6";
-                                  e.currentTarget.style.borderColor = "var(--border-glass)";
+                                  e.currentTarget.style.opacity = "0.85";
+                                  e.currentTarget.style.borderColor = isMultiTile ? "var(--accent)" : "var(--border-glass)";
                                 }}
                               >
-                                <div style={{
-                                  width: "100%", height: "100%",
-                                  backgroundImage: `url(${hTsInfo.url})`,
-                                  backgroundPosition: `-${hCol * 100}% -${hRow * 100}%`,
-                                  backgroundSize: `${hTsInfo.cols * 100}% ${hTsInfo.rows * 100}%`,
-                                  imageRendering: "pixelated"
-                                }} />
+                                {Array.from({ length: hCols * hRows }).map((_, cellIdx) => {
+                                  const dx = cellIdx % hCols;
+                                  const dy = Math.floor(cellIdx / hCols);
+                                  const cellCol = hStartCol + dx;
+                                  const cellRow = hStartRow + dy;
+                                  const cellLocalIdx = cellRow * hTsCols + cellCol;
+                                  const subTile = getPrefixedIndex(cellLocalIdx, hist.activeTileset);
+                                  const subInfo = getTileDrawInfo(subTile, hist.activeTileset);
+                                  if (!subInfo) return <div key={cellIdx} />;
+                                  const subTsInfo = getTilesetInfoLocal(subInfo.tilesetKey);
+                                  if (!subTsInfo || !subTsInfo.cols) return <div key={cellIdx} />;
+                                  const subCol = subInfo.localIdx % subTsInfo.cols;
+                                  const subRow = Math.floor(subInfo.localIdx / subTsInfo.cols);
+                                  return (
+                                    <div key={cellIdx} style={{
+                                      width: "100%",
+                                      height: "100%",
+                                      backgroundImage: `url(${subTsInfo.url})`,
+                                      backgroundPosition: `-${subCol * 100}% -${subRow * 100}%`,
+                                      backgroundSize: `${subTsInfo.cols * 100}% ${subTsInfo.rows * 100}%`,
+                                      imageRendering: "pixelated"
+                                    }} />
+                                  );
+                                })}
+                                {isMultiTile && (
+                                  <span style={{
+                                    position: "absolute",
+                                    bottom: 0,
+                                    right: 0,
+                                    fontSize: "8px",
+                                    color: "#fff",
+                                    background: "rgba(0,0,0,0.85)",
+                                    padding: "0 2px",
+                                    borderRadius: "2px 0 0 0",
+                                    pointerEvents: "none",
+                                    fontFamily: "var(--font-pixel)",
+                                    lineHeight: "1"
+                                  }}>
+                                    {hCols}x{hRows}
+                                  </span>
+                                )}
                               </button>
                             );
                           })}
