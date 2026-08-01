@@ -649,27 +649,20 @@ export const deleteHouseAssetFromDB = async (
   assetId: string
 ) => {
   try {
-    console.log(`[OnHouse Sync] Hard deleting asset '${assetId}' (${assetType}) from DB for house [${houseCode}]...`);
+    console.log(`[OnHouse Sync] Soft deleting (Tombstone) asset '${assetId}' (${assetType}) from DB for house [${houseCode}]...`);
 
-    // 1. Hard delete all asset rows matching assetId in house_assets
+    // Instead of a slow sequential scan delete, we insert an O(1) tombstone record.
+    // fetchHouseAssets will instantly hide this asset, and cleanupDatabaseTrash will hard-delete it in the background!
     await withTimeout(
       supabase
         .from('house_assets')
-        .delete()
-        .eq('house_code', houseCode)
-        .eq('asset_data->>id', assetId),
-      4000
+        .insert({
+          house_code: houseCode,
+          asset_type: 'char_delete',
+          asset_data: { id: assetId }
+        }),
+      3500
     );
-
-    // 2. Also delete any tombstone records
-    await withTimeout(
-      supabase
-        .from('house_assets')
-        .delete()
-        .eq('house_code', houseCode)
-        .eq('asset_type', 'char_delete'),
-      3000
-    ).catch(() => {});
 
     return { success: true };
   } catch (err: any) {
