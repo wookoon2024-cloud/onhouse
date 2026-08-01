@@ -1261,6 +1261,21 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     }
   };
 
+  // Helper to load image URL as fully-loaded HTMLImageElement (checking img.complete for Data URLs)
+  const loadLoadedImageElement = async (url: string): Promise<HTMLImageElement> => {
+    const cleanUrl = await loadImageAsCleanDataUrl(url);
+    return new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => resolve(img);
+      img.onerror = (err) => reject(err);
+      img.src = cleanUrl;
+      if (img.complete && (img.naturalWidth > 0 || img.width > 0)) {
+        resolve(img);
+      }
+    });
+  };
+
   // Delete an Action Motion Row
   const handleDeleteActionRow = async (rowIdx: number) => {
     if (currentOption.rows <= 1) {
@@ -1272,7 +1287,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     if (!window.confirm(`정말로 '${actionName}' (행 ${rowIdx + 1})을 삭제하시겠습니까?`)) return;
 
     try {
-      const img = await loadImageAsCleanDataUrl(currentOption.url);
+      const img = await loadLoadedImageElement(currentOption.url);
       const cols = currentOption.cols;
       const oldRows = currentOption.rows;
       const newRows = oldRows - 1;
@@ -1382,7 +1397,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   // Add a Column (Frame) to the right of a row
   const handleAddColumn = async (rowIdx?: number) => {
     try {
-      const img = await loadImageAsCleanDataUrl(currentOption.url);
+      const img = await loadLoadedImageElement(currentOption.url);
       const rows = currentOption.rows;
       const oldCols = currentOption.cols;
       const newCols = oldCols + 1;
@@ -1475,7 +1490,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     const actionName = newActionNameInput.trim() || `동작 ${currentOption.rows + 1}`;
 
     try {
-      const img = await loadImageAsCleanDataUrl(currentOption.url);
+      const img = await loadLoadedImageElement(currentOption.url);
       const oldRows = currentOption.rows;
       const newRows = oldRows + 1;
       const cols = currentOption.cols;
