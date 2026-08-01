@@ -55,6 +55,61 @@ import pigUrl from '../assets/pig.png';
 
 export type MainCategory = 'map' | 'character';
 
+const GridOverlayCanvas = ({
+  cols, rows, frameW, frameH, offX, offY, spacing, zoom, actualWidth, actualHeight
+}: {
+  cols: number; rows: number; frameW: number; frameH: number; offX: number; offY: number; spacing: number; zoom: number;
+  actualWidth: number; actualHeight: number;
+}) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    // Set exact pixel dimensions to avoid blur
+    canvas.width = actualWidth;
+    canvas.height = actualHeight;
+    ctx.clearRect(0, 0, actualWidth, actualHeight);
+
+    ctx.strokeStyle = 'rgba(255, 121, 198, 0.45)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    
+    for (let c = 0; c < cols; c++) {
+      for (let r = 0; r < rows; r++) {
+        const x = (offX + c * (frameW + spacing)) * zoom;
+        const y = (offY + r * (frameH + spacing)) * zoom;
+        const w = frameW * zoom;
+        const h = frameH * zoom;
+        
+        // Highlight first tile (spawn/origin)
+        if (c === 0 && r === 0) {
+          ctx.fillStyle = 'rgba(255, 121, 198, 0.3)';
+          ctx.fillRect(x, y, w, h);
+          ctx.save();
+          ctx.strokeStyle = '#ff79c6';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x, y, w, h);
+          ctx.restore();
+        } else {
+          ctx.rect(x, y, w, h);
+        }
+      }
+    }
+    ctx.stroke();
+  }, [cols, rows, frameW, frameH, offX, offY, spacing, zoom, actualWidth, actualHeight]);
+
+  return (
+    <canvas 
+      ref={canvasRef} 
+      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', imageRendering: 'pixelated' }} 
+    />
+  );
+};
+
 export interface TilesetOption {
   id: string;
   name: string;
@@ -4502,37 +4557,18 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                           }}>
                             {/* Grid Lines Overlay */}
                             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none' }}>
-                              {Array.from({ length: typeof customColsInput === 'number' ? customColsInput : 4 }).map((_, c) =>
-                                Array.from({ length: typeof customRowsInput === 'number' ? customRowsInput : 7 }).map((_, r) => {
-                                  const effFrameW = typeof customFrameWidthInput === 'number' && customFrameWidthInput > 0 ? customFrameWidthInput : (tileSizeInput || 32);
-                                  const effFrameH = typeof customFrameHeightInput === 'number' && customFrameHeightInput > 0 ? customFrameHeightInput : (tileSizeInput || 32);
-                                  const effOffX = typeof customOffsetXInput === 'number' ? customOffsetXInput : 0;
-                                  const effOffY = typeof customOffsetYInput === 'number' ? customOffsetYInput : 0;
-                                  const effSpacing = typeof customSpacingInput === 'number' ? customSpacingInput : 0;
-
-                                  const leftPx = (effOffX + c * (effFrameW + effSpacing)) * fitScale;
-                                  const topPx = (effOffY + r * (effFrameH + effSpacing)) * fitScale;
-                                  const widthPx = effFrameW * fitScale;
-                                  const heightPx = effFrameH * fitScale;
-                                  const isFirst = c === 0 && r === 0;
-
-                                  return (
-                                    <div
-                                      key={`${c}-${r}`}
-                                      style={{
-                                        position: 'absolute',
-                                        left: `${leftPx}px`,
-                                        top: `${topPx}px`,
-                                        width: `${widthPx}px`,
-                                        height: `${heightPx}px`,
-                                        border: isFirst ? '2px solid #ff79c6' : '1px solid rgba(255, 121, 198, 0.45)',
-                                        background: isFirst ? 'rgba(255, 121, 198, 0.3)' : 'transparent',
-                                        boxSizing: 'border-box'
-                                      }}
-                                    />
-                                  );
-                                })
-                              )}
+                              <GridOverlayCanvas
+                                cols={typeof customColsInput === 'number' ? customColsInput : 4}
+                                rows={typeof customRowsInput === 'number' ? customRowsInput : 7}
+                                frameW={typeof customFrameWidthInput === 'number' && customFrameWidthInput > 0 ? customFrameWidthInput : (tileSizeInput || 32)}
+                                frameH={typeof customFrameHeightInput === 'number' && customFrameHeightInput > 0 ? customFrameHeightInput : (tileSizeInput || 32)}
+                                offX={typeof customOffsetXInput === 'number' ? customOffsetXInput : 0}
+                                offY={typeof customOffsetYInput === 'number' ? customOffsetYInput : 0}
+                                spacing={typeof customSpacingInput === 'number' ? customSpacingInput : 0}
+                                zoom={fitScale}
+                                actualWidth={fitW}
+                                actualHeight={fitH}
+                              />
                             </div>
                           </div>
                         );
@@ -4550,39 +4586,18 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                         imageRendering: 'pixelated'
                       }}>
                         {/* Grid Lines Overlay */}
-                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none' }}>
-                          {Array.from({ length: typeof customColsInput === 'number' ? customColsInput : 4 }).map((_, c) =>
-                            Array.from({ length: typeof customRowsInput === 'number' ? customRowsInput : 7 }).map((_, r) => {
-                              const effFrameW = typeof customFrameWidthInput === 'number' ? customFrameWidthInput : tileSizeInput;
-                              const effFrameH = typeof customFrameHeightInput === 'number' ? customFrameHeightInput : tileSizeInput;
-                              const effOffX = typeof customOffsetXInput === 'number' ? customOffsetXInput : (typeof customMarginXInput === 'number' ? customMarginXInput : 0);
-                              const effOffY = typeof customOffsetYInput === 'number' ? customOffsetYInput : (typeof customMarginYInput === 'number' ? customMarginYInput : 0);
-                              const effSpacing = typeof customSpacingInput === 'number' ? customSpacingInput : 0;
-
-                              const leftPx = (effOffX + c * (effFrameW + effSpacing)) * previewZoom;
-                              const topPx = (effOffY + r * (effFrameH + effSpacing)) * previewZoom;
-                              const widthPx = effFrameW * previewZoom;
-                              const heightPx = effFrameH * previewZoom;
-                              const isFirst = c === 0 && r === 0;
-
-                              return (
-                                <div
-                                  key={`${c}-${r}`}
-                                  style={{
-                                    position: 'absolute',
-                                    left: `${leftPx}px`,
-                                    top: `${topPx}px`,
-                                    width: `${widthPx}px`,
-                                    height: `${heightPx}px`,
-                                    border: isFirst ? '2px solid #ff79c6' : '1px solid rgba(255, 121, 198, 0.5)',
-                                    background: isFirst ? 'rgba(255, 121, 198, 0.3)' : 'transparent',
-                                    boxSizing: 'border-box'
-                                  }}
-                                />
-                              );
-                            })
-                          )}
-                        </div>
+                        <GridOverlayCanvas
+                          cols={typeof customColsInput === 'number' ? customColsInput : 4}
+                          rows={typeof customRowsInput === 'number' ? customRowsInput : 7}
+                          frameW={typeof customFrameWidthInput === 'number' ? customFrameWidthInput : tileSizeInput}
+                          frameH={typeof customFrameHeightInput === 'number' ? customFrameHeightInput : tileSizeInput}
+                          offX={typeof customOffsetXInput === 'number' ? customOffsetXInput : (typeof customMarginXInput === 'number' ? customMarginXInput : 0)}
+                          offY={typeof customOffsetYInput === 'number' ? customOffsetYInput : (typeof customMarginYInput === 'number' ? customMarginYInput : 0)}
+                          spacing={typeof customSpacingInput === 'number' ? customSpacingInput : 0}
+                          zoom={previewZoom}
+                          actualWidth={imgWidth * previewZoom}
+                          actualHeight={imgHeight * previewZoom}
+                        />
                       </div>
                     )}
                   </div>
