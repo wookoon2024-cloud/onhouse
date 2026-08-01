@@ -9,6 +9,36 @@ import { DEFAULT_CHAR_ROW_ACTIONS, getCharRowActions } from '../game/MapData';
 import { saveHouseAssetToDB, deleteHouseAssetFromDB, getSavedHouseCode, publishItemToMarket } from '../services/HouseService';
 import { supabase } from '../lib/supabase';
 
+class AssetViewerErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null, info: any}> {
+  constructor(props: {children: React.ReactNode}) {
+    super(props);
+    this.state = { hasError: false, error: null, info: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, info: any) {
+    console.error("🔥 [AssetViewer] React Rendering Crash:", error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '20px', color: '#ff4444', background: '#111', height: '100vh', overflow: 'auto' }}>
+          <h2>❌ AssetViewer Render Crash</h2>
+          <p>{this.state.error?.toString()}</p>
+          <pre style={{ fontSize: '11px', color: '#ccc', whiteSpace: 'pre-wrap' }}>{this.state.error?.stack}</pre>
+          <pre style={{ fontSize: '11px', color: '#888', marginTop: '20px', whiteSpace: 'pre-wrap' }}>{this.state.info?.componentStack}</pre>
+          <button onClick={() => this.setState({ hasError: false, error: null, info: null })} style={{ marginTop: '20px', padding: '10px 20px', background: '#333', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+            다시 시도 (Retry Render)
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+
 import interiorTilesUrl from '../assets/interior_tiles.png';
 import outdoorTilesUrl from '../assets/outdoor_tiles.png';
 import villageTilesUrl from '../assets/village_tiles.png';
@@ -97,13 +127,16 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     const syncLocalAssets = () => {
       try {
         const savedMaps = localStorage.getItem('on_house_custom_map_tilesets');
-        if (savedMaps) setCustomMapTilesets(JSON.parse(savedMaps));
+        if (savedMaps) setCustomMapTilesets(prev => JSON.stringify(prev) === savedMaps ? prev : JSON.parse(savedMaps));
+        
         const savedChars = localStorage.getItem('on_house_custom_char_sprites');
-        if (savedChars) setCustomCharSprites(JSON.parse(savedChars));
+        if (savedChars) setCustomCharSprites(prev => JSON.stringify(prev) === savedChars ? prev : JSON.parse(savedChars));
+        
         const savedOverrides = localStorage.getItem('on_house_char_image_overrides');
-        if (savedOverrides) setCharImageOverrides(JSON.parse(savedOverrides));
+        if (savedOverrides) setCharImageOverrides(prev => JSON.stringify(prev) === savedOverrides ? prev : JSON.parse(savedOverrides));
+        
         const savedActions = localStorage.getItem('on_house_char_row_actions');
-        if (savedActions) setCharRowActions(JSON.parse(savedActions));
+        if (savedActions) setCharRowActions(prev => JSON.stringify(prev) === savedActions ? prev : JSON.parse(savedActions));
       } catch (e) {}
     };
 
@@ -214,6 +247,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   const [pixelGrid, setPixelGrid] = useState<string[][]>(Array.from({ length: 32 }, () => Array(32).fill('transparent')));
   const [selectedColor, setSelectedColor] = useState<string>('#ff0000');
   const [drawTool, setDrawTool] = useState<'pencil' | 'eraser'>('pencil');
+  const [brushSize, setBrushSize] = useState<number>(1);
   const [isMouseDown, setIsMouseDown] = useState<boolean>(false);
   const editorFileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -248,6 +282,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     }
   }, [customCharSprites]);
 
+  const prevOverridesRef = useRef(charImageOverrides);
   useEffect(() => {
     try {
       localStorage.setItem('on_house_char_image_overrides', JSON.stringify(charImageOverrides));
@@ -275,9 +310,13 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       });
 
       // Save each override to Cloud DB & Broadcast to House Realtime channel!
+      // Only save the items that actually changed to avoid DB request spam!
       const currentHouseCode = getSavedHouseCode();
+      const prevOverrides = prevOverridesRef.current;
+      
       Object.entries(charImageOverrides).forEach(([id, override]) => {
-        if (override && override.url) {
+        const prevOverride = prevOverrides[id];
+        if (override && override.url && (!prevOverride || prevOverride.url !== override.url || prevOverride.cols !== override.cols || prevOverride.rows !== override.rows)) {
           const foundOpt = customCharSprites.find((c) => c.id === id) || DEFAULT_CHARACTER_SPRITES.find((c) => c.id === id);
           const assetData = {
             id,
@@ -285,8 +324,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
             url: override.url,
             cols: override.cols || foundOpt?.cols || 4,
             rows: override.rows || foundOpt?.rows || 7,
-            size: override.size || 16,
-            isCustom: true
+            size: override.size || 32,
+            isCustom: foundOpt?.isCustom || false
           };
 
           // Save to Supabase DB
@@ -327,6 +366,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
         }
       });
 
+      prevOverridesRef.current = charImageOverrides;
+
       // Notify game canvas to reload sprites locally
       window.dispatchEvent(new Event('on_house_sprites_updated'));
     } catch (e) {
@@ -335,25 +376,34 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   }, [charImageOverrides]);
 
   // Persist charRowActions to localStorage & Supabase Cloud DB
+  const prevActionsRef = useRef(charRowActions);
   useEffect(() => {
     try {
       localStorage.setItem('on_house_char_row_actions', JSON.stringify(charRowActions));
 
       const currentHouseCode = getSavedHouseCode();
+      const prevActions = prevActionsRef.current;
+      
       Object.entries(charRowActions).forEach(([id, actions]) => {
-        const assetData = { id, actions };
-        saveHouseAssetToDB(currentHouseCode, 'char_row_actions', assetData);
-        try {
-          supabase.channel(`house:${currentHouseCode}`).send({
-            type: 'broadcast',
-            event: 'asset_update',
-            payload: {
-              assetType: 'char_row_actions',
-              assetData
-            }
-          });
-        } catch (e) {}
+        const prevActionList = prevActions[id];
+        // Only save to DB if the actions list actually changed (or is new)
+        if (actions && (!prevActionList || JSON.stringify(prevActionList) !== JSON.stringify(actions))) {
+          const assetData = { id, actions };
+          saveHouseAssetToDB(currentHouseCode, 'char_row_actions', assetData);
+          try {
+            supabase.channel(`house:${currentHouseCode}`).send({
+              type: 'broadcast',
+              event: 'asset_update',
+              payload: {
+                assetType: 'char_row_actions',
+                assetData
+              }
+            });
+          } catch (e) {}
+        }
       });
+      
+      prevActionsRef.current = charRowActions;
     } catch (e) {}
   }, [charRowActions]);
 
@@ -984,7 +1034,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
 
   // Step 1: Select image file -> Open Interactive Image Crop Modal (Default centered crop box matching active grid res!)
   const handleImportImageFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const target = e.target;
+    const file = target.files?.[0];
     if (!file) return;
 
     console.log(`[PixelEditor Import] 1/4 📁 File selected: name="${file.name}", size=${file.size} bytes, type="${file.type}"`);
@@ -1031,7 +1082,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       console.error('[PixelEditor Import] ❌ Failed to import image file:', err);
       alert('이미지 파일 로드 중 오류가 발생했습니다: ' + (err as any)?.message);
     } finally {
-      e.target.value = '';
+      if (target) target.value = '';
     }
   };
 
@@ -1635,6 +1686,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
 
       setShowAddRowModal(false);
       setNewActionNameInput('');
+      
+      alert(`✅ 새 동작 '${actionName}'이(가) 추가되었습니다!`);
     } catch (err) {
       console.error('[OnHouse ActionRow] ❌ Failed to add action row:', err);
       alert('동작 행 추가 중 오류가 발생했습니다. 다시 시도해 주세요.');
@@ -2366,6 +2419,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   const boardSize = Math.round(baseBoardSize * editorZoom);
 
   return (
+    <AssetViewerErrorBoundary>
     <div style={{
       position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
       width: '920px', maxWidth: '85vw', height: '72vh', maxHeight: '660px',
@@ -3135,7 +3189,10 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
               </button>
             </div>
 
-            <form onSubmit={handleAddActionRowSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <form onSubmit={(e) => {
+              handleAddActionRowSubmit(e);
+              setToastMessage("✅ 새로운 동작 행이 추가되었습니다!");
+            }} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
                 <label style={{ fontSize: '11px', color: '#aaa', display: 'block', marginBottom: '6px' }}>
                   추가할 동작 이름 (예: 점프, 스킬, 인사):
@@ -3187,7 +3244,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
             ref={editorFileInputRef}
             accept="image/png, image/jpeg, image/webp"
             style={{ display: 'none' }}
-            onChange={handleImportImageFileSelect}
+            onChange={(e) => handleImportImageFileSelect(e)}
           />
 
           <div style={{
@@ -3281,6 +3338,22 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                   >
                     <Eraser size={11} /> 지우개
                   </button>
+                  <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)', height: '24px', margin: '0 4px' }} />
+                  {[1, 2, 3, 4].map(size => (
+                    <button
+                      key={`brush-${size}`}
+                      onClick={() => setBrushSize(size)}
+                      style={{
+                        padding: '4px 6px', fontSize: '10px', borderRadius: '4px',
+                        background: brushSize === size ? 'var(--accent)' : 'transparent',
+                        color: brushSize === size ? '#000' : '#ccc', border: 'none', cursor: 'pointer', fontWeight: 'bold'
+                      }}
+                      title={`${size}px 브러시 크기`}
+                    >
+                      {size}px
+                    </button>
+                  ))}
+                  <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)', height: '24px', margin: '0 4px' }} />
                   <button
                     onClick={() => {
                       const newGrid = pixelGrid.map((row) => [...row].reverse());
@@ -3437,14 +3510,14 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                             key={`${y}-${x}`}
                             onMouseDown={() => {
                               const newGrid = pixelGrid.map((r, ry) =>
-                                r.map((c, cx) => (ry === y && cx === x ? (drawTool === 'pencil' ? selectedColor : 'transparent') : c))
+                                r.map((c, cx) => (cx >= x && cx < x + brushSize && ry >= y && ry < y + brushSize ? (drawTool === 'pencil' ? selectedColor : 'transparent') : c))
                               );
                               setPixelGrid(newGrid);
                             }}
                             onMouseEnter={() => {
                               if (isMouseDown) {
                                 const newGrid = pixelGrid.map((r, ry) =>
-                                  r.map((c, cx) => (ry === y && cx === x ? (drawTool === 'pencil' ? selectedColor : 'transparent') : c))
+                                  r.map((c, cx) => (cx >= x && cx < x + brushSize && ry >= y && ry < y + brushSize ? (drawTool === 'pencil' ? selectedColor : 'transparent') : c))
                                 );
                                 setPixelGrid(newGrid);
                               }
@@ -3788,7 +3861,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
             {/* Modal Actions */}
             <div style={{ display: 'flex', gap: '10px' }}>
               <button
-                onClick={handleConfirmCropAndApply}
+                onClick={handleConfirmCropImport}
                 style={{
                   flex: 1, padding: '10px', background: 'var(--primary)', border: 'none',
                   borderRadius: '6px', color: '#fff', fontSize: '12px', fontWeight: 'bold',
@@ -4489,5 +4562,6 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
         </div>
       )}
     </div>
-  );
+  </AssetViewerErrorBoundary>
+);
 };
