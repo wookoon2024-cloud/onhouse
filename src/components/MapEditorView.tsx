@@ -2458,6 +2458,9 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
     if (!isPainting.current || e.altKey || isAltPressed) return;
 
+    // Object tool should ONLY stamp once on click! Disable continuous drag-stamping for object tool to prevent accidental trail stamps!
+    if ((tool as string) === 'object') return;
+
     // Allow continuous drag-erasing and drag-painting for collision mode as well as brush tool!
     const isCollisionMode = tool === 'collision' || editLayer === 'collision';
     const isEraser = selectedTile === -1 || isCollisionMode;
@@ -4000,7 +4003,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                 ref={canvasRef}
                 onMouseDown={handleCanvasMouseDown}
                 onMouseMove={handleCanvasMouseMove}
-                onMouseUp={() => isPainting.current = false}
+                onMouseUp={handleCanvasMouseUp}
                 onMouseLeave={handleCanvasMouseLeave}
                 onWheel={handleCanvasWheel}
                 style={{
@@ -4148,7 +4151,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                         onMouseDown={(e) => {
                           e.preventDefault();
                           setPaletteDragStart({ col: c, row: r });
-                          setPaletteSelection({ startCol: c, startRow: r, cols: 1, rows: 1, tilesetKey: activeTileset });
+                          setPaletteSelection(null);
                           setBrushSize(1);
                           setSelectedTile(prefixedIdx);
                           setSelectedObjectId(null);
