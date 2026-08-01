@@ -3174,21 +3174,6 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 </div>
               )}
 
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#a0a0b8' }}>로컬 인덱스 ID:</span>
-                <span className="pixel-text" style={{ color: '#a78bfa', fontWeight: 'normal', fontSize: '13px' }}>
-                  {activeDisplayTile.index}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#a0a0b8' }}>열 (Column X):</span>
-                <span>{activeDisplayTile.col} / {currentOption.cols - 1}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#a0a0b8' }}>행 (Row Y):</span>
-                <span>{activeDisplayTile.row} / {currentOption.rows - 1}</span>
-              </div>
-
               {/* Character sprite frame details & Action Name Editor & Pixel Art Editor Launcher */}
               {activeTab === 'character' && (
                 <div style={{ borderTop: '1px solid #3b3b54', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -3206,7 +3191,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                   <div style={{ background: 'rgba(139, 92, 246, 0.12)', padding: '10px', borderRadius: 0, border: '1px solid #4a4a6b' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                       <span style={{ fontSize: '11px', color: '#a78bfa', fontWeight: 'normal' }}>
-                        ✏️ 행 {activeDisplayTile.row} 동작 이름:
+                        ✏️ 동작 이름:
                       </span>
                       <span style={{ fontSize: '10px', color: '#aaa' }}>
                         (같은 행 {currentOption.cols}개 프레임 공통)
