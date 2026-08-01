@@ -669,10 +669,18 @@ export default function App() {
         setDbCustomCharSprites(charSprites || []);
         
         try {
-          localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(mapTilesets || []));
-          localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(charSprites || []));
-          localStorage.setItem('on_house_char_image_overrides', JSON.stringify(charOverrides || {}));
-          localStorage.setItem('on_house_char_row_actions', JSON.stringify(charRowActions || {}));
+          if (mapTilesets && mapTilesets.length > 0) {
+            localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(mapTilesets));
+          }
+          if (charSprites && charSprites.length > 0) {
+            localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(charSprites));
+          }
+          if (charOverrides && Object.keys(charOverrides).length > 0) {
+            localStorage.setItem('on_house_char_image_overrides', JSON.stringify(charOverrides));
+          }
+          if (charRowActions && Object.keys(charRowActions).length > 0) {
+            localStorage.setItem('on_house_char_row_actions', JSON.stringify(charRowActions));
+          }
         } catch (e) {}
         setAssetVersion((v) => v + 1);
         window.dispatchEvent(new Event('on_house_sprites_updated'));
