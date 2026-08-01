@@ -4562,8 +4562,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                                 rows={typeof customRowsInput === 'number' ? customRowsInput : 7}
                                 frameW={typeof customFrameWidthInput === 'number' && customFrameWidthInput > 0 ? customFrameWidthInput : (tileSizeInput || 32)}
                                 frameH={typeof customFrameHeightInput === 'number' && customFrameHeightInput > 0 ? customFrameHeightInput : (tileSizeInput || 32)}
-                                offX={typeof customOffsetXInput === 'number' ? customOffsetXInput : (typeof customMarginXInput === 'number' ? customMarginXInput : 0)}
-                                offY={typeof customOffsetYInput === 'number' ? customOffsetYInput : (typeof customMarginYInput === 'number' ? customMarginYInput : 0)}
+                                offX={uploadCategory === 'character' ? (typeof customOffsetXInput === 'number' ? customOffsetXInput : 0) : (typeof customMarginXInput === 'number' ? customMarginXInput : 0)}
+                                offY={uploadCategory === 'character' ? (typeof customOffsetYInput === 'number' ? customOffsetYInput : 0) : (typeof customMarginYInput === 'number' ? customMarginYInput : 0)}
                                 spacing={typeof customSpacingInput === 'number' ? customSpacingInput : 0}
                                 zoom={fitScale}
                                 actualWidth={fitW}
@@ -4591,8 +4591,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                           rows={typeof customRowsInput === 'number' ? customRowsInput : 7}
                           frameW={typeof customFrameWidthInput === 'number' ? customFrameWidthInput : tileSizeInput}
                           frameH={typeof customFrameHeightInput === 'number' ? customFrameHeightInput : tileSizeInput}
-                          offX={typeof customOffsetXInput === 'number' ? customOffsetXInput : (typeof customMarginXInput === 'number' ? customMarginXInput : 0)}
-                          offY={typeof customOffsetYInput === 'number' ? customOffsetYInput : (typeof customMarginYInput === 'number' ? customMarginYInput : 0)}
+                          offX={uploadCategory === 'character' ? (typeof customOffsetXInput === 'number' ? customOffsetXInput : 0) : (typeof customMarginXInput === 'number' ? customMarginXInput : 0)}
+                          offY={uploadCategory === 'character' ? (typeof customOffsetYInput === 'number' ? customOffsetYInput : 0) : (typeof customMarginYInput === 'number' ? customMarginYInput : 0)}
                           spacing={typeof customSpacingInput === 'number' ? customSpacingInput : 0}
                           zoom={previewZoom}
                           actualWidth={imgWidth * previewZoom}
