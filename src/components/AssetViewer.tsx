@@ -1262,28 +1262,30 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   };
 
   // Delete an Action Motion Row
-  const handleDeleteActionRow = (rowIdx: number) => {
+  const handleDeleteActionRow = async (rowIdx: number) => {
     if (currentOption.rows <= 1) {
       alert("최소 1개의 행은 유지되어야 합니다!");
       return;
     }
 
     const actionName = currentCharRowActions[rowIdx] || `행 ${rowIdx + 1}`;
-    if (!window.confirm(`정말로 '${actionName}' (행 ${rowIdx})을 삭제하시겠습니까?`)) return;
+    if (!window.confirm(`정말로 '${actionName}' (행 ${rowIdx + 1})을 삭제하시겠습니까?`)) return;
 
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
+    try {
+      const img = await loadImageAsCleanDataUrl(currentOption.url);
       const cols = currentOption.cols;
       const oldRows = currentOption.rows;
       const newRows = oldRows - 1;
 
-      const tileW = Math.max(16, Math.floor(img.width / cols));
-      const tileH = Math.max(16, Math.floor(img.height / oldRows));
+      const naturalW = img.naturalWidth || img.width || (cols * 32);
+      const naturalH = img.naturalHeight || img.height || (oldRows * 32);
+
+      const tileW = Math.max(1, Math.floor(naturalW / cols));
+      const tileH = Math.max(1, Math.floor(naturalH / oldRows));
 
       const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = Math.round(newRows * tileH);
+      canvas.width = naturalW;
+      canvas.height = Math.max(1, Math.round(newRows * tileH));
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
       ctx.imageSmoothingEnabled = false;
@@ -1291,7 +1293,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       // Copy top part (rows above rowIdx)
       if (rowIdx > 0) {
         const topH = Math.round(rowIdx * tileH);
-        ctx.drawImage(img, 0, 0, img.width, topH, 0, 0, img.width, topH);
+        ctx.drawImage(img, 0, 0, naturalW, topH, 0, 0, naturalW, topH);
       }
 
       // Copy bottom part (rows below rowIdx)
@@ -1299,21 +1301,42 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
         const bottomSrcY = Math.round((rowIdx + 1) * tileH);
         const bottomDstY = Math.round(rowIdx * tileH);
         const bottomH = Math.round((oldRows - rowIdx - 1) * tileH);
-        ctx.drawImage(img, 0, bottomSrcY, img.width, bottomH, 0, bottomDstY, img.width, bottomH);
+        ctx.drawImage(img, 0, bottomSrcY, naturalW, bottomH, 0, bottomDstY, naturalW, bottomH);
       }
 
-      const updatedUrl = canvas.toDataURL();
-      setCharImageOverrides((prev) => ({
-        ...prev,
-        [currentSelectedId]: {
-          url: updatedUrl,
-          rows: newRows,
-          cols,
-          size: currentOption.size || 32,
-          frameWidth: currentOption.frameWidth,
-          frameHeight: currentOption.frameHeight
-        }
-      }));
+      const updatedUrl = canvas.toDataURL('image/png');
+
+      const newOverrideObj = {
+        url: updatedUrl,
+        rows: newRows,
+        cols,
+        size: currentOption.size || 32,
+        frameWidth: currentOption.frameWidth,
+        frameHeight: currentOption.frameHeight
+      };
+
+      const updatedOverrides = {
+        ...charImageOverrides,
+        [currentSelectedId]: newOverrideObj
+      };
+      setCharImageOverrides(updatedOverrides);
+      localStorage.setItem('on_house_char_image_overrides', JSON.stringify(updatedOverrides));
+
+      // Also update customCharSprites in state & localStorage
+      setCustomCharSprites((prev) => {
+        const next = prev.map((opt) => {
+          if (opt.id === currentSelectedId) {
+            return {
+              ...opt,
+              url: updatedUrl,
+              rows: newRows
+            };
+          }
+          return opt;
+        });
+        localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(next));
+        return next;
+      });
 
       // Update action row names list
       const updatedList = currentCharRowActions.filter((_, idx) => idx !== rowIdx);
@@ -1324,26 +1347,55 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       setCharRowActions(updatedRowActions);
       localStorage.setItem('on_house_char_row_actions', JSON.stringify(updatedRowActions));
 
+      // Save to Supabase DB
+      const currentHouseCode = getSavedHouseCode();
+      const foundOpt = customCharSprites.find((c) => c.id === currentSelectedId) || DEFAULT_CHARACTER_SPRITES.find((c) => c.id === currentSelectedId);
+      saveHouseAssetToDB(currentHouseCode, 'char_sprite', {
+        id: currentSelectedId,
+        name: foundOpt?.name || currentSelectedId,
+        url: updatedUrl,
+        cols,
+        rows: newRows,
+        size: currentOption.size || 32,
+        isCustom: true
+      }).catch(() => {});
+
+      saveHouseAssetToDB(currentHouseCode, 'char_image_override', {
+        id: currentSelectedId,
+        ...newOverrideObj
+      }).catch(() => {});
+
+      saveHouseAssetToDB(currentHouseCode, 'char_row_actions', {
+        id: currentSelectedId,
+        actions: updatedList
+      }).catch(() => {});
+
+      setBoardRenderKey((prev) => prev + 1);
+      window.dispatchEvent(new Event('on_house_sprites_updated'));
       setSelectedTileState(null);
-    };
-    img.src = currentOption.url;
+    } catch (err) {
+      console.error('Failed to delete action row:', err);
+      alert('동작 행 삭제 중 오류가 발생했습니다.');
+    }
   };
 
   // Add a Column (Frame) to the right of a row
-  const handleAddColumn = (rowIdx?: number) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
+  const handleAddColumn = async (rowIdx?: number) => {
+    try {
+      const img = await loadImageAsCleanDataUrl(currentOption.url);
       const rows = currentOption.rows;
       const oldCols = currentOption.cols;
       const newCols = oldCols + 1;
 
-      const tileW = Math.max(16, Math.floor(img.width / oldCols));
-      const tileH = Math.max(16, Math.floor(img.height / rows));
+      const naturalW = img.naturalWidth || img.width || (oldCols * 32);
+      const naturalH = img.naturalHeight || img.height || (rows * 32);
+
+      const tileW = Math.max(1, Math.floor(naturalW / oldCols));
+      const tileH = Math.max(1, Math.floor(naturalH / rows));
 
       const canvas = document.createElement('canvas');
       canvas.width = newCols * tileW;
-      canvas.height = img.height;
+      canvas.height = naturalH;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
       ctx.imageSmoothingEnabled = false;
@@ -1359,39 +1411,83 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
         oldCols * tileW, targetRow * tileH, tileW, tileH
       );
 
-      const updatedUrl = canvas.toDataURL();
-      setCharImageOverrides((prev) => ({
-        ...prev,
-        [currentSelectedId]: {
-          url: updatedUrl,
-          rows,
-          cols: newCols,
-          size: currentOption.size || 32,
-          frameWidth: currentOption.frameWidth,
-          frameHeight: currentOption.frameHeight
-        }
-      }));
-    };
-    img.src = currentOption.url;
+      const updatedUrl = canvas.toDataURL('image/png');
+
+      const newOverrideObj = {
+        url: updatedUrl,
+        rows,
+        cols: newCols,
+        size: currentOption.size || 32,
+        frameWidth: currentOption.frameWidth,
+        frameHeight: currentOption.frameHeight
+      };
+
+      const updatedOverrides = {
+        ...charImageOverrides,
+        [currentSelectedId]: newOverrideObj
+      };
+      setCharImageOverrides(updatedOverrides);
+      localStorage.setItem('on_house_char_image_overrides', JSON.stringify(updatedOverrides));
+
+      setCustomCharSprites((prev) => {
+        const next = prev.map((opt) => {
+          if (opt.id === currentSelectedId) {
+            return {
+              ...opt,
+              url: updatedUrl,
+              cols: newCols
+            };
+          }
+          return opt;
+        });
+        localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(next));
+        return next;
+      });
+
+      const currentHouseCode = getSavedHouseCode();
+      const foundOpt = customCharSprites.find((c) => c.id === currentSelectedId) || DEFAULT_CHARACTER_SPRITES.find((c) => c.id === currentSelectedId);
+      saveHouseAssetToDB(currentHouseCode, 'char_sprite', {
+        id: currentSelectedId,
+        name: foundOpt?.name || currentSelectedId,
+        url: updatedUrl,
+        cols: newCols,
+        rows,
+        size: currentOption.size || 32,
+        isCustom: true
+      }).catch(() => {});
+
+      saveHouseAssetToDB(currentHouseCode, 'char_image_override', {
+        id: currentSelectedId,
+        ...newOverrideObj
+      }).catch(() => {});
+
+      setBoardRenderKey((prev) => prev + 1);
+      window.dispatchEvent(new Event('on_house_sprites_updated'));
+    } catch (err) {
+      console.error('Failed to add column:', err);
+    }
   };
 
   // Add a new Action Motion Row to the character spritesheet
-  const handleAddActionRowSubmit = (e: React.FormEvent) => {
+  const handleAddActionRowSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!currentOption || !currentOption.url) return;
     const actionName = newActionNameInput.trim() || `동작 ${currentOption.rows + 1}`;
 
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
+    try {
+      const img = await loadImageAsCleanDataUrl(currentOption.url);
       const oldRows = currentOption.rows;
       const newRows = oldRows + 1;
       const cols = currentOption.cols;
 
-      const tileW = Math.max(16, Math.floor(img.width / cols));
-      const tileH = Math.max(16, Math.floor(img.height / oldRows));
+      const naturalW = img.naturalWidth || img.width || (cols * 32);
+      const naturalH = img.naturalHeight || img.height || (oldRows * 32);
+
+      const tileW = Math.max(1, Math.floor(naturalW / cols));
+      const tileH = Math.max(1, Math.floor(naturalH / oldRows));
 
       const canvas = document.createElement('canvas');
-      canvas.width = img.width;
+      canvas.width = naturalW;
       canvas.height = newRows * tileH;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
@@ -1401,22 +1497,42 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       ctx.drawImage(img, 0, 0);
 
       // Copy Row 0 (Idle frames) into the new bottom row as starting template
-      ctx.drawImage(img, 0, 0, img.width, tileH, 0, (newRows - 1) * tileH, img.width, tileH);
+      ctx.drawImage(img, 0, 0, naturalW, tileH, 0, (newRows - 1) * tileH, naturalW, tileH);
 
-      const updatedUrl = canvas.toDataURL();
+      const updatedUrl = canvas.toDataURL('image/png');
 
-      // Update image overrides
-      setCharImageOverrides((prev) => ({
-        ...prev,
-        [currentSelectedId]: {
-          url: updatedUrl,
-          rows: newRows,
-          cols,
-          size: currentOption.size || 32,
-          frameWidth: currentOption.frameWidth,
-          frameHeight: currentOption.frameHeight
-        }
-      }));
+      const newOverrideObj = {
+        url: updatedUrl,
+        rows: newRows,
+        cols,
+        size: currentOption.size || 32,
+        frameWidth: currentOption.frameWidth,
+        frameHeight: currentOption.frameHeight
+      };
+
+      // Update image overrides state
+      const updatedOverrides = {
+        ...charImageOverrides,
+        [currentSelectedId]: newOverrideObj
+      };
+      setCharImageOverrides(updatedOverrides);
+      localStorage.setItem('on_house_char_image_overrides', JSON.stringify(updatedOverrides));
+
+      // Also update customCharSprites list in localStorage so custom sprites have the latest rows!
+      setCustomCharSprites((prev) => {
+        const next = prev.map((opt) => {
+          if (opt.id === currentSelectedId) {
+            return {
+              ...opt,
+              url: updatedUrl,
+              rows: newRows
+            };
+          }
+          return opt;
+        });
+        localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(next));
+        return next;
+      });
 
       // Update action row names list
       const currentList = charRowActions[currentSelectedId] || getCharRowActions(currentSelectedId);
@@ -1428,13 +1544,42 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       setCharRowActions(updatedRowActions);
       localStorage.setItem('on_house_char_row_actions', JSON.stringify(updatedRowActions));
 
+      // Save updated asset & override to Supabase DB!
+      const currentHouseCode = getSavedHouseCode();
+      const foundOpt = customCharSprites.find((c) => c.id === currentSelectedId) || DEFAULT_CHARACTER_SPRITES.find((c) => c.id === currentSelectedId);
+      saveHouseAssetToDB(currentHouseCode, 'char_sprite', {
+        id: currentSelectedId,
+        name: foundOpt?.name || currentSelectedId,
+        url: updatedUrl,
+        cols,
+        rows: newRows,
+        size: currentOption.size || 32,
+        isCustom: true
+      }).catch(() => {});
+
+      saveHouseAssetToDB(currentHouseCode, 'char_image_override', {
+        id: currentSelectedId,
+        ...newOverrideObj
+      }).catch(() => {});
+
+      saveHouseAssetToDB(currentHouseCode, 'char_row_actions', {
+        id: currentSelectedId,
+        actions: updatedList
+      }).catch(() => {});
+
+      // Force instant DOM re-render & canvas game cache refresh
+      setBoardRenderKey((prev) => prev + 1);
+      window.dispatchEvent(new Event('on_house_sprites_updated'));
+
       // Lock selection to first frame of the newly created row
       setSelectedTileState({ col: 0, row: newRows - 1, index: (newRows - 1) * cols });
 
       setShowAddRowModal(false);
       setNewActionNameInput('');
-    };
-    img.src = currentOption.url;
+    } catch (err) {
+      console.error('Failed to add action row:', err);
+      alert('동작 행 추가 중 오류가 발생했습니다. 다시 시도해 주세요.');
+    }
   };
 
   // Image file select handler with auto-detection for cols and rows
