@@ -316,7 +316,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       
       Object.entries(charImageOverrides).forEach(([id, override]) => {
         const prevOverride = prevOverrides[id];
-        if (override && override.url && (!prevOverride || prevOverride.url !== override.url || prevOverride.cols !== override.cols || prevOverride.rows !== override.rows)) {
+        if (override && override.url && (!prevOverride || prevOverride.url !== override.url || prevOverride.cols !== override.cols || prevOverride.rows !== override.rows || prevOverride.size !== override.size)) {
           const foundOpt = customCharSprites.find((c) => c.id === id) || DEFAULT_CHARACTER_SPRITES.find((c) => c.id === id);
           const assetData = {
             id,
@@ -2081,10 +2081,24 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     });
 
     const currentHouse = getSavedHouseCode();
-    saveHouseAssetToDB(currentHouse, 'char_sprite', {
+    
+    const updatedOption = {
       ...currentOption,
       size: newSize
-    });
+    };
+    
+    saveHouseAssetToDB(currentHouse, 'char_sprite', updatedOption);
+    
+    try {
+      supabase.channel(`house:${currentHouse}`).send({
+        type: 'broadcast',
+        event: 'asset_update',
+        payload: {
+          assetType: 'char_sprite',
+          assetData: updatedOption
+        }
+      });
+    } catch (e) {}
 
     window.dispatchEvent(new Event('on_house_sprites_updated'));
     setToastMessage(`📏 [${currentOption.name}] 맵 출력 크기가 ${newSize}px로 설정되었습니다!`);
