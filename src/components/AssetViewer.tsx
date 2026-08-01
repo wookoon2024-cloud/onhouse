@@ -48,6 +48,16 @@ import natureTilesUrl from '../assets/nature_tiles.png';
 import waterTilesUrl from '../assets/water_tiles.png';
 import fieldTilesUrl from '../assets/field_tiles.png';
 
+const safeLocalStorageSetItem = (key: string, value: string): boolean => {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (err) {
+    console.warn(`[Storage Warning] LocalStorage quota limit reached for "${key}". Continuing in-memory & cloud DB save.`, err);
+    return false;
+  }
+};
+
 import ninjaBlueUrl from '../assets/ninja_blue.png';
 import samuraiBlueUrl from '../assets/samurai_blue.png';
 import samuraiGreenUrl from '../assets/samurai_green.png';
@@ -1965,7 +1975,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
             );
           }
         }
-        resolve(canvas.toDataURL('image/png'));
+        const outWebP = canvas.toDataURL('image/webp', 0.9);
+        resolve(outWebP && outWebP.startsWith('data:image/webp') ? outWebP : canvas.toDataURL('image/png'));
       };
       img.onerror = () => resolve(sourceUrl);
       img.src = sourceUrl;
@@ -2424,7 +2435,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
         const existingStr = localStorage.getItem('on_house_custom_map_tilesets');
         const existing: TilesetOption[] = existingStr ? JSON.parse(existingStr) : customMapTilesets;
         const next = [...existing, ...generatedOptions];
-        localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(next));
+        safeLocalStorageSetItem('on_house_custom_map_tilesets', JSON.stringify(next));
         setCustomMapTilesets(next);
         setActiveTab('map');
         setSelectedMapId(generatedOptions[0].id);
@@ -2432,7 +2443,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
         const existingStr = localStorage.getItem('on_house_custom_char_sprites');
         const existing: TilesetOption[] = existingStr ? JSON.parse(existingStr) : customCharSprites;
         const next = [...existing, ...generatedOptions];
-        localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(next));
+        safeLocalStorageSetItem('on_house_custom_char_sprites', JSON.stringify(next));
         setCustomCharSprites(next);
         setActiveTab('character');
         setSelectedCharId(generatedOptions[0].id);
@@ -2553,7 +2564,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     if (activeTab === 'map') {
       setCustomMapTilesets((prev) => {
         const next = prev.filter((opt) => opt.id !== id);
-        localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(next));
+        safeLocalStorageSetItem('on_house_custom_map_tilesets', JSON.stringify(next));
         return next;
       });
       setSelectedMapId('interior');
@@ -2568,13 +2579,13 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     } else {
       setCustomCharSprites((prev) => {
         const next = prev.filter((opt) => opt.id !== id);
-        localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(next));
+        safeLocalStorageSetItem('on_house_custom_char_sprites', JSON.stringify(next));
         return next;
       });
       setCharImageOverrides((prev) => {
         const next = { ...prev };
         delete next[id];
-        localStorage.setItem('on_house_char_image_overrides', JSON.stringify(next));
+        safeLocalStorageSetItem('on_house_char_image_overrides', JSON.stringify(next));
         return next;
       });
       setSelectedCharId('samurai_blue');
