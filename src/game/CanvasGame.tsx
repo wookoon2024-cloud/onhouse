@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { type MapDefinition, type MapObjectInstance, cleanDuplicateObjects, getCharRowActions, getCharGridDimensions, getCharDisplaySize, getCustomCharSpriteInfo, getNormalizedLayers } from './MapData';
+import { type MapDefinition, type MapObjectInstance, cleanDuplicateObjects, getCharRowActions, getCharGridDimensions, getCharDisplaySize, getCustomCharSpriteInfo, getNormalizedLayers, findValidSpawnPosition, isPlayerCollidingAt } from './MapData';
 import type { PlayerState } from './syncManager';
 import { getDyedSprite } from './spriteDyer';
 
@@ -828,9 +828,10 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
       }
 
       // NORMAL PLAYER MOVEMENT PHYSICS
-      const spawnX = (map.spawnPoints[0]?.x ?? Math.floor(map.width / 2)) * 16;
-      const spawnY = (map.spawnPoints[0]?.y ?? Math.floor(map.height / 2)) * 16;
-      if (p.x < 0 || p.x > (map.width - 1) * 16 || p.y < 0 || p.y > (map.height - 1) * 16) {
+      const validSpawn = findValidSpawnPosition(map);
+      const spawnX = validSpawn.x * 16;
+      const spawnY = validSpawn.y * 16;
+      if (p.x < 0 || p.x > (map.width - 1) * 16 || p.y < 0 || p.y > (map.height - 1) * 16 || (!p.isMoving && isPlayerCollidingAt(map, p.x, p.y))) {
         onMove(spawnX, spawnY, 'down', false);
         return;
       }

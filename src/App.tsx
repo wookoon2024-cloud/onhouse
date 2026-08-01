@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { CanvasGame } from './game/CanvasGame';
-import { type MapDefinition, maps, PRESET_MAP_TEMPLATES, createCustomMap, getCharRowActions, getCharDisplaySize } from './game/MapData';
+import { type MapDefinition, maps, PRESET_MAP_TEMPLATES, createCustomMap, getCharRowActions, getCharDisplaySize, findValidSpawnPosition, isPlayerCollidingAt } from './game/MapData';
 import {
   type PlayerState,
   getOrCreateDeviceId,
@@ -136,9 +136,7 @@ export default function App() {
     if (finalOrder.length > 0) {
       const firstMapId = finalOrder[0];
       const targetMap = mapsData[firstMapId] || maps[firstMapId];
-      const spawn = (targetMap && targetMap.spawnPoints && targetMap.spawnPoints[0])
-        ? targetMap.spawnPoints[0]
-        : { x: 10, y: 10 };
+      const spawn = findValidSpawnPosition(targetMap);
 
       setLocalPlayer((p) => {
         // If player is not already in a valid map within this house, or on initial load, snap to firstMapId
@@ -197,9 +195,7 @@ export default function App() {
     const initialMapIds = getInitialAvailableMapIds();
     const firstMapId = initialMapIds[0] || 'room';
     const firstMapObj = activeMaps[firstMapId] || maps.room || maps[firstMapId];
-    const firstSpawn = (firstMapObj && firstMapObj.spawnPoints && firstMapObj.spawnPoints[0])
-      ? firstMapObj.spawnPoints[0]
-      : { x: 10, y: 10 };
+    const firstSpawn = findValidSpawnPosition(firstMapObj);
 
     return {
       id: deviceId.current,
@@ -1284,8 +1280,8 @@ export default function App() {
     if (currentMap) {
       const maxX = (currentMap.width - 1) * 16;
       const maxY = (currentMap.height - 1) * 16;
-      if (localPlayer.x < 0 || localPlayer.x > maxX || localPlayer.y < 0 || localPlayer.y > maxY) {
-        const spawn = currentMap.spawnPoints[0] || { x: Math.floor(currentMap.width / 2), y: Math.floor(currentMap.height / 2) };
+      if (localPlayer.x < 0 || localPlayer.x > maxX || localPlayer.y < 0 || localPlayer.y > maxY || isPlayerCollidingAt(currentMap, localPlayer.x, localPlayer.y)) {
+        const spawn = findValidSpawnPosition(currentMap);
         setLocalPlayer((p) => ({
           ...p,
           x: spawn.x * 16,
@@ -1666,7 +1662,7 @@ export default function App() {
   // 2. Map transitioner
   const handleMapChange = (mapId: string) => {
     const targetMap = activeMaps[mapId] || maps[mapId];
-    const spawn = targetMap?.spawnPoints?.[0] || { x: 20, y: 15 };
+    const spawn = findValidSpawnPosition(targetMap);
     const newX = spawn.x * 16;
     const newY = spawn.y * 16;
 

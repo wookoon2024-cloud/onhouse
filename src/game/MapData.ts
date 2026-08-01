@@ -459,3 +459,92 @@ export const maps: Record<string, MapDefinition> = {
   water: buildWater(),
   forest: buildForest()
 };
+
+export const isCellCollision = (map: MapDefinition, tx: number, ty: number): boolean => {
+  if (!map || tx < 0 || tx >= map.width || ty < 0 || ty >= map.height) return true;
+  if (map.collision && map.collision[ty] && map.collision[ty][tx]) return true;
+  return false;
+};
+
+// Check if a player at pixel position (px, py) collides with map bounds or collision cells
+export const isPlayerCollidingAt = (map: MapDefinition, px: number, py: number): boolean => {
+  if (!map) return true;
+  const box = {
+    left: px + 3,
+    right: px + 13,
+    top: py + 10,
+    bottom: py + 16
+  };
+
+  const tileLeft = Math.floor(box.left / 16);
+  const tileRight = Math.floor(box.right / 16);
+  const tileTop = Math.floor(box.top / 16);
+  const tileBottom = Math.floor(box.bottom / 16);
+
+  if (tileLeft < 0 || tileRight >= map.width || tileTop < 0 || tileBottom >= map.height) {
+    return true;
+  }
+
+  for (let ty = tileTop; ty <= tileBottom; ty++) {
+    for (let tx = tileLeft; tx <= tileRight; tx++) {
+      if (isCellCollision(map, tx, ty)) {
+        return true;
+      }
+    }
+  }
+  return false;
+};
+
+export const findValidSpawnPosition = (map: MapDefinition): { x: number; y: number } => {
+  if (!map) return { x: 10, y: 10 };
+
+  // 1. Try pre-configured spawn points first
+  if (map.spawnPoints && map.spawnPoints.length > 0) {
+    for (const sp of map.spawnPoints) {
+      if (!isPlayerCollidingAt(map, sp.x * 16, sp.y * 16)) {
+        return { x: sp.x, y: sp.y };
+      }
+    }
+  }
+
+  // 2. Try map center
+  const cx = Math.floor(map.width / 2);
+  const cy = Math.floor(map.height / 2);
+  if (!isPlayerCollidingAt(map, cx * 16, cy * 16)) {
+    return { x: cx, y: cy };
+  }
+
+  // 3. BFS search from center/spawnPoint to find nearest non-collision tile
+  const visited = new Set<string>();
+  const queue: { x: number; y: number }[] = [];
+
+  const startX = map.spawnPoints?.[0]?.x ?? cx;
+  const startY = map.spawnPoints?.[0]?.y ?? cy;
+  queue.push({ x: startX, y: startY });
+  visited.add(`${startX},${startY}`);
+
+  const directions = [
+    { x: 0, y: 1 }, { x: 0, y: -1 }, { x: 1, y: 0 }, { x: -1, y: 0 },
+    { x: 1, y: 1 }, { x: -1, y: -1 }, { x: 1, y: -1 }, { x: -1, y: 1 }
+  ];
+
+  while (queue.length > 0) {
+    const curr = queue.shift()!;
+    if (!isPlayerCollidingAt(map, curr.x * 16, curr.y * 16)) {
+      return { x: curr.x, y: curr.y };
+    }
+
+    for (const d of directions) {
+      const nx = curr.x + d.x;
+      const ny = curr.y + d.y;
+      const key = `${nx},${ny}`;
+      if (nx >= 0 && nx < map.width && ny >= 0 && ny < map.height && !visited.has(key)) {
+        visited.add(key);
+        queue.push({ x: nx, y: ny });
+      }
+    }
+  }
+
+  // Fallback if map is 100% collision
+  return { x: startX, y: startY };
+};
