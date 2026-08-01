@@ -414,9 +414,11 @@ export const deleteHouseMapFromDB = async (
   }
 };
 
-// Fetch custom assets (map tilesets, character sprites, image overrides & action rows) for house code
 export const fetchHouseAssets = async (houseCode: string) => {
   try {
+    // Trigger automatic DB trash cleanup in background to free storage space!
+    cleanupDatabaseTrash(houseCode).catch(() => {});
+
     // 1. Fetch map_tileset specifically (targeted & fast, ~0.5s)
     const mapTilesetsPromise = withTimeout(
       supabase
@@ -550,13 +552,28 @@ export const fetchHouseAssets = async (houseCode: string) => {
   }
 };
 
-// Save custom asset to Supabase (Fast insert without slow unindexed JSON filter scan)
+// Save custom asset to Supabase (Overwrites existing older rows for same asset ID to save DB space)
 export const saveHouseAssetToDB = async (
   houseCode: string,
   assetType: 'map_tileset' | 'char_sprite' | 'char_image_override' | 'char_row_actions',
   assetData: any
 ) => {
   try {
+    // Delete older rows for the same asset ID to prevent DB space accumulation
+    if (assetData && assetData.id) {
+      try {
+        await withTimeout(
+          supabase
+            .from('house_assets')
+            .delete()
+            .eq('house_code', houseCode)
+            .eq('asset_type', assetType)
+            .filter('asset_data->>id', 'eq', assetData.id),
+          3000
+        );
+      } catch (e) {}
+    }
+
     const res = await withTimeout(
       supabase
         .from('house_assets')
@@ -580,29 +597,116 @@ export const saveHouseAssetToDB = async (
   }
 };
 
-// Delete custom asset from Supabase DB (Fast tombstone insert)
+// Delete custom asset from Supabase DB (Hard Delete: Permanently wipes matching rows to free DB space!)
 export const deleteHouseAssetFromDB = async (
   houseCode: string,
   assetType: 'map_tileset' | 'char_sprite' | 'char_image_override' | 'char_row_actions',
   assetId: string
 ) => {
   try {
+    console.log(`[OnHouse Sync] Hard deleting asset '${assetId}' (${assetType}) from DB for house [${houseCode}]...`);
+
+    // 1. Hard delete all asset rows matching assetId in house_assets
     await withTimeout(
       supabase
         .from('house_assets')
-        .insert({
-          house_code: houseCode,
-          asset_type: 'char_delete',
-          asset_data: { id: assetId },
-          updated_at: new Date().toISOString()
-        }),
-      3500
+        .delete()
+        .eq('house_code', houseCode)
+        .filter('asset_data->>id', 'eq', assetId),
+      4000
     );
+
+    // 2. Also delete any tombstone records
+    await withTimeout(
+      supabase
+        .from('house_assets')
+        .delete()
+        .eq('house_code', houseCode)
+        .eq('asset_type', 'char_delete'),
+      3000
+    ).catch(() => {});
 
     return { success: true };
   } catch (err: any) {
     console.error('Error in deleteHouseAssetFromDB:', err);
     return { success: false };
+  }
+};
+
+// Clean up all obsolete duplicate rows and tombstone delete records from Supabase DB to free storage space
+export const cleanupDatabaseTrash = async (houseCode: string) => {
+  try {
+    console.log(`[OnHouse Cleanup] Running DB trash cleanup for houseCode: ${houseCode}...`);
+
+    const { data: rows, error } = await supabase
+      .from('house_assets')
+      .select('id, asset_type, asset_data, updated_at')
+      .eq('house_code', houseCode);
+
+    if (error || !rows || rows.length === 0) {
+      console.log('[OnHouse Cleanup] No rows to clean or query error');
+      return;
+    }
+
+    const deletedIds = new Set<string>();
+    rows.forEach((row: any) => {
+      if (row.asset_type === 'char_delete' && row.asset_data?.id) {
+        deletedIds.add(row.asset_data.id);
+      }
+    });
+
+    const rowIdsToDelete: (string | number)[] = [];
+    const latestRowMap = new Map<string, { dbRowId: string | number; updatedAt: string }>();
+
+    rows.forEach((row: any) => {
+      const assetId = row.asset_data?.id;
+
+      if (row.asset_type === 'char_delete') {
+        rowIdsToDelete.push(row.id);
+        return;
+      }
+
+      if (assetId && deletedIds.has(assetId)) {
+        rowIdsToDelete.push(row.id);
+        return;
+      }
+
+      if (assetId && (row.asset_type === 'char_sprite' || row.asset_type === 'char_image_override' || row.asset_type === 'map_tileset')) {
+        const groupKey = `${row.asset_type}:${assetId}`;
+        const existing = latestRowMap.get(groupKey);
+
+        if (!existing) {
+          latestRowMap.set(groupKey, { dbRowId: row.id, updatedAt: row.updated_at || '' });
+        } else {
+          const timeExisting = new Date(existing.updatedAt).getTime() || 0;
+          const timeCurrent = new Date(row.updated_at || 0).getTime() || 0;
+
+          if (timeCurrent > timeExisting) {
+            rowIdsToDelete.push(existing.dbRowId);
+            latestRowMap.set(groupKey, { dbRowId: row.id, updatedAt: row.updated_at || '' });
+          } else {
+            rowIdsToDelete.push(row.id);
+          }
+        }
+      }
+    });
+
+    if (rowIdsToDelete.length > 0) {
+      console.log(`[OnHouse Cleanup] Found ${rowIdsToDelete.length} trash/obsolete rows to hard-delete from DB:`, rowIdsToDelete);
+      
+      for (let i = 0; i < rowIdsToDelete.length; i += 50) {
+        const chunk = rowIdsToDelete.slice(i, i + 50);
+        await supabase
+          .from('house_assets')
+          .delete()
+          .in('id', chunk);
+      }
+      console.log(`[OnHouse Cleanup] ✅ Successfully hard-deleted ${rowIdsToDelete.length} trash rows from Supabase DB!`);
+    } else {
+      console.log('[OnHouse Cleanup] DB is already clean. No trash rows found.');
+    }
+  } catch (err) {
+    console.warn('[OnHouse Cleanup] Error cleaning DB trash:', err);
   }
 };
 
