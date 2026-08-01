@@ -2498,7 +2498,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
             >
               {/* Background Sprite Image with onError fallback & dynamic key for instant re-mount */}
               <img
-                key={`board-img-${currentSelectedId}-${boardRenderKey}-${(currentOption.url || '').slice(-20)}`}
+                key={`board-img-${currentSelectedId}-${boardRenderKey}-${Date.now()}`}
                 src={currentOption.url}
                 alt={currentOption.name}
                 onError={(e) => {

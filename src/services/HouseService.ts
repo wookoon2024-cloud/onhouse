@@ -544,7 +544,7 @@ export const saveHouseAssetToDB = async (
             .delete()
             .eq('house_code', houseCode)
             .eq('asset_type', assetType)
-            .filter('asset_data->>id', 'eq', assetData.id),
+            .eq('asset_data->>id', assetData.id),
           3000
         );
       } catch (e) {}
@@ -588,7 +588,7 @@ export const deleteHouseAssetFromDB = async (
         .from('house_assets')
         .delete()
         .eq('house_code', houseCode)
-        .filter('asset_data->>id', 'eq', assetId),
+        .eq('asset_data->>id', assetId),
       4000
     );
 
