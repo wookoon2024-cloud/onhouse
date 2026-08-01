@@ -488,23 +488,54 @@ export const fetchHouseAssets = async (houseCode: string) => {
       });
     }
 
-    // Supabase Cloud DB is the authoritative source of truth for this house!
-    // Overwrite localStorage caches directly with Cloud DB assets (no stale local merging!)
+    // Merge DB assets with existing local assets (preserving locally created assets that aren't tombstoned)
+    const finalCharSprites = [...charSprites];
     try {
-      localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(mapTilesets));
-      localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(charSprites));
+      const savedLocalStr = localStorage.getItem('on_house_custom_char_sprites');
+      if (savedLocalStr) {
+        const savedLocal: any[] = JSON.parse(savedLocalStr);
+        savedLocal.forEach((loc) => {
+          if (loc && loc.id && !deletedAssetIds.has(loc.id) && !seenCharSpriteIds.has(loc.id)) {
+            seenCharSpriteIds.add(loc.id);
+            finalCharSprites.push(loc);
+            // Re-sync un-saved local asset to Supabase DB asynchronously
+            saveHouseAssetToDB(houseCode, 'char_sprite', loc).catch(() => {});
+          }
+        });
+      }
+    } catch (e) {}
+
+    const finalMapTilesets = [...mapTilesets];
+    try {
+      const savedLocalMapStr = localStorage.getItem('on_house_custom_map_tilesets');
+      if (savedLocalMapStr) {
+        const savedLocalMaps: any[] = JSON.parse(savedLocalMapStr);
+        savedLocalMaps.forEach((loc) => {
+          if (loc && loc.id && !deletedAssetIds.has(loc.id) && !seenMapTilesetIds.has(loc.id)) {
+            seenMapTilesetIds.add(loc.id);
+            finalMapTilesets.push(loc);
+            // Re-sync un-saved local asset to Supabase DB asynchronously
+            saveHouseAssetToDB(houseCode, 'map_tileset', loc).catch(() => {});
+          }
+        });
+      }
+    } catch (e) {}
+
+    try {
+      localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(finalMapTilesets));
+      localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(finalCharSprites));
       localStorage.setItem('on_house_char_image_overrides', JSON.stringify(charOverrides));
       localStorage.setItem('on_house_char_row_actions', JSON.stringify(charRowActions));
 
-      localStorage.setItem(`on_house_custom_map_tilesets_${houseCode}`, JSON.stringify(mapTilesets));
-      localStorage.setItem(`on_house_custom_char_sprites_${houseCode}`, JSON.stringify(charSprites));
+      localStorage.setItem(`on_house_custom_map_tilesets_${houseCode}`, JSON.stringify(finalMapTilesets));
+      localStorage.setItem(`on_house_custom_char_sprites_${houseCode}`, JSON.stringify(finalCharSprites));
       localStorage.setItem(`on_house_char_image_overrides_${houseCode}`, JSON.stringify(charOverrides));
       localStorage.setItem(`on_house_char_row_actions_${houseCode}`, JSON.stringify(charRowActions));
     } catch (e) {}
 
     return {
-      mapTilesets,
-      charSprites,
+      mapTilesets: finalMapTilesets,
+      charSprites: finalCharSprites,
       charOverrides,
       charRowActions
     };
