@@ -1956,9 +1956,15 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
+        // Cap max frame dimensions to 64x64px for standard 2D game resolution!
+        const maxDim = 64;
+        const scale = Math.min(1, maxDim / Math.max(frameW, frameH));
+        const destFrameW = Math.max(1, Math.round(frameW * scale));
+        const destFrameH = Math.max(1, Math.round(frameH * scale));
+
         const canvas = document.createElement('canvas');
-        canvas.width = Math.max(1, cols * frameW);
-        canvas.height = Math.max(1, rows * frameH);
+        canvas.width = Math.max(1, cols * destFrameW);
+        canvas.height = Math.max(1, rows * destFrameH);
         const ctx = canvas.getContext('2d');
         if (!ctx) {
           resolve(sourceUrl);
@@ -1971,8 +1977,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
           for (let c = 0; c < cols; c++) {
             const sx = offX + c * (frameW + spacing);
             const sy = offY + r * (frameH + spacing);
-            const dx = c * frameW;
-            const dy = r * frameH;
+            const dx = c * destFrameW;
+            const dy = r * destFrameH;
 
             ctx.drawImage(
               img,
@@ -1982,12 +1988,12 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
               frameH,
               dx,
               dy,
-              frameW,
-              frameH
+              destFrameW,
+              destFrameH
             );
           }
         }
-        const outWebP = canvas.toDataURL('image/webp', 0.9);
+        const outWebP = canvas.toDataURL('image/webp', 0.85);
         resolve(outWebP && outWebP.startsWith('data:image/webp') ? outWebP : canvas.toDataURL('image/png'));
       };
       img.onerror = () => resolve(sourceUrl);

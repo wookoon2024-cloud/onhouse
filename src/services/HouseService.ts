@@ -406,22 +406,33 @@ export const fetchHouseAssets = async (houseCode: string) => {
       .from('house_assets')
       .select('asset_type, asset_data')
       .eq('house_code', houseCode)
-      .eq('asset_type', 'map_tileset');
+      .eq('asset_type', 'map_tileset')
+      .limit(100);
 
-    // 2. Fetch char_sprites, overrides, actions, deletes in parallel
+    // 2. Fetch char_sprite specifically
+    const charSpritesPromise = supabase
+      .from('house_assets')
+      .select('asset_type, asset_data')
+      .eq('house_code', houseCode)
+      .eq('asset_type', 'char_sprite')
+      .order('id', { ascending: false })
+      .limit(100);
+
+    // 3. Fetch overrides, actions, deletes
     const otherAssetsPromise = supabase
       .from('house_assets')
       .select('asset_type, asset_data')
       .eq('house_code', houseCode)
-      .in('asset_type', ['char_sprite', 'char_image_override', 'char_row_actions', 'char_delete'])
+      .in('asset_type', ['char_image_override', 'char_row_actions', 'char_delete'])
       .order('id', { ascending: false })
-      .limit(300);
+      .limit(100);
 
-    const [mapRes, otherRes] = await Promise.all([mapTilesetsPromise, otherAssetsPromise]);
+    const [mapRes, charRes, otherRes] = await Promise.all([mapTilesetsPromise, charSpritesPromise, otherAssetsPromise]);
     if (mapRes.error) console.error('[OnHouse DB Sync Error] Map tilesets fetch error:', mapRes.error);
-    if (otherRes.error) console.error('[OnHouse DB Sync Error] Char assets fetch error:', otherRes.error);
+    if (charRes.error) console.error('[OnHouse DB Sync Error] Char sprites fetch error:', charRes.error);
+    if (otherRes.error) console.error('[OnHouse DB Sync Error] Other assets fetch error:', otherRes.error);
 
-    const combinedData = [...(mapRes.data || []), ...(otherRes.data || [])];
+    const combinedData = [...(mapRes.data || []), ...(charRes.data || []), ...(otherRes.data || [])];
     console.log(`[OnHouse DB Sync] 📦 Total asset rows returned from Supabase DB: ${combinedData.length}`);
 
     const mapTilesets: any[] = [];
