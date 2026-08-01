@@ -2455,7 +2455,14 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       setSaveProgressText('☁️ 하우스 서버(Supabase) 업로드 저장 중...');
       
       for (const opt of generatedOptions) {
-        await saveHouseAssetToDB(currentHouse, assetType, opt);
+        const dbRes = await saveHouseAssetToDB(currentHouse, assetType, opt);
+        if (!dbRes.success) {
+          console.error('[Asset DB Save Error]', dbRes.error);
+          alert(`서버 저장 중 오류가 발생했습니다: ${dbRes.error || '네트워크 응답 지연'}`);
+          setIsSavingAsset(false);
+          setSaveProgressText('');
+          return;
+        }
         try {
           supabase.channel(`house:${currentHouse}`).send({
             type: 'broadcast',

@@ -536,7 +536,7 @@ export const saveHouseAssetToDB = async (
           asset_data: assetData,
           updated_at: new Date().toISOString()
         }),
-      3500
+      20000
     );
 
     if (res.error) {
