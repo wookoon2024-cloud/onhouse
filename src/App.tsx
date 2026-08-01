@@ -1048,34 +1048,10 @@ export default function App() {
         if (!payload || payload.toId !== deviceId.current) return;
         const partnerName = payload.fromName || '상대방';
 
-        // Save DM close notice to DM history
-        saveDM({
-          id: 'dm_close_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-          fromId: payload.fromId,
-          fromName: partnerName,
-          toId: deviceId.current,
-          text: `🚨 [${partnerName}] 님이 1:1 놀기를 종료하였습니다.`,
-          timestamp: Date.now(),
-          read: true
-        });
-
-        // Mark partner as closed to show red warning banner inside Messenger
+        // Mark partner as closed to display single clean red warning banner inside Messenger
         setClosedDMPartners((prev) => ({ ...prev, [payload.fromId]: true }));
-
-        // Log to main chat log
-        setChatLogs((logs) => [
-          ...logs,
-          {
-            id: 'sys_dm_close_' + Date.now() + Math.random(),
-            senderName: '🚀 시스템',
-            text: `🚨 [${partnerName}] 님이 1:1 놀기를 종료하였습니다.`,
-            time: Date.now()
-          }
-        ]);
-
         showToast(`🚨 [${partnerName}] 님이 1:1 놀기를 종료했습니다.`);
         updateUnreadCount();
-        window.dispatchEvent(new Event('on_house_dm_read'));
       })
       .on('broadcast', { event: 'memo_add' }, ({ payload }) => {
         if (payload && payload.mapId === localPlayerRef.current.mapId) {
@@ -1503,18 +1479,9 @@ export default function App() {
         case 'dm_close':
           if (msg.toId === deviceId.current) {
             const partnerName = msg.fromName || '상대방';
-            saveDM({
-              id: 'dm_close_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-              fromId: msg.fromId,
-              fromName: partnerName,
-              toId: deviceId.current,
-              text: `🚨 [${partnerName}] 님이 1:1 놀기를 종료하였습니다.`,
-              timestamp: Date.now(),
-              read: true
-            });
             setClosedDMPartners((prev) => ({ ...prev, [msg.fromId]: true }));
+            showToast(`🚨 [${partnerName}] 님이 1:1 놀기를 종료했습니다.`);
             updateUnreadCount();
-            window.dispatchEvent(new Event('on_house_dm_read'));
           }
           break;
 

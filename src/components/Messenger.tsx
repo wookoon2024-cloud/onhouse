@@ -331,31 +331,6 @@ export const Messenger: React.FC<MessengerProps> = ({
           </div>
         ) : (
           messages.map((msg, index) => {
-            if (msg.text.startsWith('🚨')) {
-              return (
-                <div
-                  key={msg.id}
-                  style={{
-                    alignSelf: 'center',
-                    maxWidth: '90%',
-                    margin: '10px 0',
-                    padding: '8px 14px',
-                    background: 'rgba(239, 68, 68, 0.18)',
-                    border: '1px solid rgba(239, 68, 68, 0.4)',
-                    borderRadius: '8px',
-                    color: '#ff6b6b',
-                    fontSize: '11px',
-                    fontFamily: 'var(--font-pixel)',
-                    textAlign: 'center',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-                    lineHeight: '1.4'
-                  }}
-                >
-                  {msg.text}
-                </div>
-              );
-            }
-
             const isMe = msg.fromId === localPlayer.id;
             const ytId = extractYouTubeId(msg.text);
             const webUrl = extractGeneralUrl(msg.text);
