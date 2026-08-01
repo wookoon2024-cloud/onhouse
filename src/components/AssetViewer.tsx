@@ -2111,7 +2111,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
         }
       }
 
-      const normalizedDataUrl = normCanvas.toDataURL();
+      // Use webp to heavily compress the preview data URL while preserving transparency
+      // This prevents Supabase 500 errors caused by extremely large base64 PNG payloads
+      const normalizedDataUrl = normCanvas.toDataURL('image/webp', 0.8);
       setFileDataUrl(normalizedDataUrl);
       setOriginalFileDataUrl(normalizedDataUrl);
       setIsChromaMode(false);
