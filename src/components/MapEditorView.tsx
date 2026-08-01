@@ -178,9 +178,10 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
   const [paletteZoom, setPaletteZoom] = useState<number>(2.0);
   const isResizingPalette = useRef<boolean>(false);
 
-  // Map dimensions local input
+  // Map dimensions local input & Photoshop Anchor
   const [widthInput, setWidthInput] = useState<string>('40');
   const [heightInput, setHeightInput] = useState<string>('30');
+  const [canvasAnchor, setCanvasAnchor] = useState<'nw' | 'n' | 'ne' | 'w' | 'c' | 'e' | 'sw' | 's' | 'se'>('c');
 
   const sanitizeMapIfEmptyCustom = (map: MapDefinition, mId: string): MapDefinition => {
     if (!map) return map;
@@ -2514,41 +2515,6 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     }
   };
 
-  // Map Resize Handler
-  // Map Resize Handler
-  // Clear All Map Contents Handler (Reset map to 100% empty black canvas)
-  const handleClearAllMapContents = () => {
-    if (!window.confirm("정말 지도의 모든 타일과 오브젝트를 삭제하고 빈 화면(검은색)으로 초기화하시겠습니까?")) {
-      return;
-    }
-    setHistory(prev => [...prev, localMap]);
-    setRedoHistory([]);
-
-    const emptyBase = Array.from({ length: localMap.height }, () => Array.from({ length: localMap.width }, () => -1));
-    const emptyDecor = Array.from({ length: localMap.height }, () => Array.from({ length: localMap.width }, () => -1));
-    const emptyCollision = Array.from({ length: localMap.height }, () => Array.from({ length: localMap.width }, () => false));
-
-    const resetLayers: CustomTileLayer[] = [
-      { id: 'layer_base', name: '1단계(배경)', visible: true, grid: emptyBase, type: 'base' },
-      { id: 'layer_decor', name: '2단계(오브젝트)', visible: true, grid: emptyDecor, type: 'decor' }
-    ];
-
-    setLocalMap(prev => ({
-      ...prev,
-      baseLayer: emptyBase,
-      decorLayer: emptyDecor,
-      layers: resetLayers,
-      collision: emptyCollision,
-      objects: []
-    }));
-
-    setActiveLayerId('layer_base');
-    setSelectedObjectId(null);
-    setMapBoxSelection(null);
-    setMapBoxSelectStart(null);
-    alert("지도의 모든 내역이 초기화되어 빈 화면(검은색)이 되었습니다.");
-  };
-
   const handleResizeMap = () => {
     const newW = parseInt(widthInput, 10);
     const newH = parseInt(heightInput, 10);
@@ -2561,42 +2527,97 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     setHistory(prev => [...prev, localMap]);
     setRedoHistory([]);
 
+    const deltaW = newW - localMap.width;
+    const deltaH = newH - localMap.height;
+
+    // Calculate tile offsets according to selected Photoshop 3x3 anchor
+    let offsetX = 0;
+    if (['nw', 'w', 'sw'].includes(canvasAnchor)) {
+      offsetX = 0;
+    } else if (['n', 'c', 's'].includes(canvasAnchor)) {
+      offsetX = Math.floor(deltaW / 2);
+    } else if (['ne', 'e', 'se'].includes(canvasAnchor)) {
+      offsetX = deltaW;
+    }
+
+    let offsetY = 0;
+    if (['nw', 'n', 'ne'].includes(canvasAnchor)) {
+      offsetY = 0;
+    } else if (['w', 'c', 'e'].includes(canvasAnchor)) {
+      offsetY = Math.floor(deltaH / 2);
+    } else if (['sw', 's', 'se'].includes(canvasAnchor)) {
+      offsetY = deltaH;
+    }
+
     const newBase = Array.from({ length: newH }, (_, y) =>
-      Array.from({ length: newW }, (_, x) =>
-        y < localMap.height && x < localMap.width ? localMap.baseLayer[y][x] : -1
-      )
+      Array.from({ length: newW }, (_, x) => {
+        const oldX = x - offsetX;
+        const oldY = y - offsetY;
+        if (oldY >= 0 && oldY < localMap.height && oldX >= 0 && oldX < localMap.width) {
+          return localMap.baseLayer[oldY][oldX];
+        }
+        return -1;
+      })
     );
 
     const newDecor = Array.from({ length: newH }, (_, y) =>
-      Array.from({ length: newW }, (_, x) =>
-        y < localMap.height && x < localMap.width ? localMap.decorLayer[y][x] : -1
-      )
+      Array.from({ length: newW }, (_, x) => {
+        const oldX = x - offsetX;
+        const oldY = y - offsetY;
+        if (oldY >= 0 && oldY < localMap.height && oldX >= 0 && oldX < localMap.width) {
+          return localMap.decorLayer[oldY][oldX];
+        }
+        return -1;
+      })
     );
 
     const currentNormLayers = getNormalizedLayers(localMap);
     const updatedLayers = currentNormLayers.map(l => ({
       ...l,
       grid: Array.from({ length: newH }, (_, y) =>
-        Array.from({ length: newW }, (_, x) =>
-          y < localMap.height && x < localMap.width && l.grid[y] && l.grid[y][x] !== undefined
-            ? l.grid[y][x]
-            : -1
-        )
+        Array.from({ length: newW }, (_, x) => {
+          const oldX = x - offsetX;
+          const oldY = y - offsetY;
+          if (oldY >= 0 && oldY < localMap.height && oldX >= 0 && oldX < localMap.width) {
+            return l.grid[oldY] && l.grid[oldY][oldX] !== undefined ? l.grid[oldY][oldX] : -1;
+          }
+          return -1;
+        })
       )
     }));
 
     const newCollision = Array.from({ length: newH }, (_, y) =>
       Array.from({ length: newW }, (_, x) => {
         if (x === 0 || x === newW - 1 || y === 0 || y === newH - 1) return true;
-        if (y < localMap.height && x < localMap.width) return localMap.collision[y][x];
+        const oldX = x - offsetX;
+        const oldY = y - offsetY;
+        if (oldY >= 0 && oldY < localMap.height && oldX >= 0 && oldX < localMap.width) {
+          return localMap.collision[oldY][oldX];
+        }
         return false;
       })
     );
 
+    // Shift map objects according to anchor offset
+    const shiftedObjects = (localMap.objects || []).map(obj => ({
+      ...obj,
+      x: obj.x + offsetX,
+      y: obj.y + offsetY
+    })).filter(obj =>
+      obj.x + obj.width > 0 && obj.x < newW &&
+      obj.y + obj.height > 0 && obj.y < newH
+    );
+
     const boundedSpawns = localMap.spawnPoints.map(p => ({
-      x: Math.min(p.x, newW - 2),
-      y: Math.min(p.y, newH - 2)
+      x: Math.max(1, Math.min(newW - 2, p.x + offsetX)),
+      y: Math.max(1, Math.min(newH - 2, p.y + offsetY))
     }));
+
+    const anchorNames: Record<string, string> = {
+      nw: '좌측 상단 ↖', n: '상단 중앙 ⬆', ne: '우측 상단 ↗',
+      w: '좌측 중앙 ⬅', c: '중앙 🎯', e: '우측 중앙 ➡',
+      sw: '좌측 하단 ↙', s: '하단 중앙 ⬇', se: '우측 하단 ↘'
+    };
 
     const updated: MapDefinition = {
       ...localMap,
@@ -2606,11 +2627,12 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       decorLayer: newDecor,
       layers: updatedLayers,
       collision: newCollision,
+      objects: shiftedObjects,
       spawnPoints: boundedSpawns
     };
 
     setLocalMap(updated);
-    alert(`지도 크기가 ${newW}x${newH}로 변경되었습니다! (저장을 눌러야 최종 반영됩니다)`);
+    alert(`지도 크기가 ${newW}x${newH}로 변경되었습니다! (기준: ${anchorNames[canvasAnchor] || '중앙'})`);
   };
 
   const getSelectedTileDetails = () => {
@@ -3515,6 +3537,61 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                     </div>
                   </div>
                 </div>
+
+                {/* Photoshop Style 3x3 Canvas Anchor Selector */}
+                <div style={{ marginTop: '6px', background: '#1c1c1e', padding: '8px', borderRadius: '6px', border: '1px solid #38383c' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>기준 위치 (Anchor)</span>
+                    <span style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 'bold' }}>
+                      {canvasAnchor === 'c' ? '중앙 🎯' :
+                       canvasAnchor === 'nw' ? '좌측 상단 ↖' :
+                       canvasAnchor === 'n' ? '상단 중앙 ⬆' :
+                       canvasAnchor === 'ne' ? '우측 상단 ↗' :
+                       canvasAnchor === 'w' ? '좌측 중앙 ⬅' :
+                       canvasAnchor === 'e' ? '우측 중앙 ➡' :
+                       canvasAnchor === 'sw' ? '좌측 하단 ↙' :
+                       canvasAnchor === 's' ? '하단 중앙 ⬇' : '우측 하단 ↘'}
+                    </span>
+                  </div>
+                  
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: '4px',
+                    width: '130px',
+                    margin: '0 auto'
+                  }}>
+                    {([
+                      { id: 'nw', icon: '↖' }, { id: 'n', icon: '⬆' }, { id: 'ne', icon: '↗' },
+                      { id: 'w', icon: '⬅' },  { id: 'c', icon: '🎯' }, { id: 'e', icon: '➡' },
+                      { id: 'sw', icon: '↙' }, { id: 's', icon: '⬇' }, { id: 'se', icon: '↘' }
+                    ] as const).map((anc) => (
+                      <button
+                        key={anc.id}
+                        type="button"
+                        onClick={() => setCanvasAnchor(anc.id)}
+                        style={{
+                          height: '32px',
+                          background: canvasAnchor === anc.id ? 'var(--accent)' : '#2a2a2e',
+                          color: canvasAnchor === anc.id ? '#000' : '#ccc',
+                          border: canvasAnchor === anc.id ? '1px solid #fff' : '1px solid #444',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          fontWeight: canvasAnchor === anc.id ? 'bold' : 'normal',
+                          transition: 'all 0.15s ease'
+                        }}
+                        title={anc.id}
+                      >
+                        {anc.icon}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <button
                   onClick={handleResizeMap}
                   style={{
