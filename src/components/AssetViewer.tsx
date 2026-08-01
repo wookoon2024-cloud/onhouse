@@ -987,24 +987,33 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     const file = e.target.files?.[0];
     if (!file) return;
 
+    console.log(`[PixelEditor Import] 1/4 📁 File selected: name="${file.name}", size=${file.size} bytes, type="${file.type}"`);
+
     try {
       const reader = new FileReader();
       const dataUrl = await new Promise<string>((resolve, reject) => {
         reader.onload = (ev) => resolve((ev.target?.result as string) || '');
-        reader.onerror = reject;
+        reader.onerror = (err) => reject(err);
         reader.readAsDataURL(file);
       });
 
-      if (!dataUrl) return;
+      if (!dataUrl) {
+        console.warn('[PixelEditor Import] ⚠️ Empty dataUrl returned from FileReader');
+        return;
+      }
+
+      console.log(`[PixelEditor Import] 2/4 🖼️ FileReader dataUrl generated (len: ${dataUrl.length}). Loading HTMLImageElement...`);
 
       const img = await loadLoadedImageElement(dataUrl);
-      const w = img.naturalWidth || img.width || 32;
-      const h = img.naturalHeight || img.height || 32;
+      const w = Math.max(1, img.naturalWidth || img.width || 32);
+      const h = Math.max(1, img.naturalHeight || img.height || 32);
+
+      console.log(`[PixelEditor Import] 3/4 📐 Image element loaded successfully. Dimensions: ${w}x${h}px (Editor grid res: ${editorGridResW}x${editorGridResH})`);
 
       setCropImgWidth(w);
       setCropImgHeight(h);
 
-      const defaultSize = Math.min(w, h, editorGridResW || 32);
+      const defaultSize = Math.max(1, Math.min(w, h, editorGridResW || 32));
       const centerX = Math.max(0, Math.floor((w - defaultSize) / 2));
       const centerY = Math.max(0, Math.floor((h - defaultSize) / 2));
 
@@ -1016,9 +1025,11 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       });
       setCropZoom(1.0);
       setCropModalImage(dataUrl);
+
+      console.log(`[PixelEditor Import] 4/4 ✂️ Crop Modal opened successfully with initial crop rect:`, { x: centerX, y: centerY, w: defaultSize, h: defaultSize });
     } catch (err) {
-      console.error('Failed to import image file:', err);
-      alert('이미지 파일 로드 중 오류가 발생했습니다.');
+      console.error('[PixelEditor Import] ❌ Failed to import image file:', err);
+      alert('이미지 파일 로드 중 오류가 발생했습니다: ' + (err as any)?.message);
     } finally {
       e.target.value = '';
     }
@@ -1052,6 +1063,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   // Step 2: Confirm Crop -> Replace current pixelGrid with cropped frame region
   const handleConfirmCropImport = async () => {
     if (!cropModalImage) return;
+
+    console.log(`[PixelEditor Import] ✂️ Confirming crop for rect:`, cropRect, `Target grid res: ${editorGridResW}x${editorGridResH}`);
 
     try {
       const img = await loadLoadedImageElement(cropModalImage);
@@ -1092,9 +1105,10 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       setPixelGrid(grid);
       setCropModalImage(null);
       setToastMessage('✂️ 선택 영역 도트 크롭 불러오기가 완료되었습니다!');
+      console.log(`[PixelEditor Import] ✅ Cropped image successfully transferred to pixel grid board (${resW}x${resH})`);
     } catch (err) {
-      console.error('Failed to confirm crop import:', err);
-      alert('크롭 이미지 반영 중 오류가 발생했습니다.');
+      console.error('[PixelEditor Import] ❌ Failed to confirm crop import:', err);
+      alert('크롭 이미지 반영 중 오류가 발생했습니다: ' + (err as any)?.message);
     }
   };
 
@@ -1277,9 +1291,17 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     const cleanUrl = await loadImageAsCleanDataUrl(url);
     return new Promise<HTMLImageElement>((resolve, reject) => {
       const img = new Image();
-      img.crossOrigin = 'anonymous';
+      if (!cleanUrl.startsWith('data:')) {
+        img.crossOrigin = 'anonymous';
+      }
       img.onload = () => resolve(img);
-      img.onerror = (err) => reject(err);
+      img.onerror = (err) => {
+        console.warn('[OnHouse ImageLoader] Warning: Primary image load error, attempting retry without crossOrigin:', err);
+        const retryImg = new Image();
+        retryImg.onload = () => resolve(retryImg);
+        retryImg.onerror = (e) => reject(e);
+        retryImg.src = cleanUrl;
+      };
       img.src = cleanUrl;
       if (img.complete && (img.naturalWidth > 0 || img.width > 0)) {
         resolve(img);
