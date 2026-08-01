@@ -29,7 +29,7 @@ import { getSavedHouseCode, setSavedHouseCode, fetchHouseMaps, saveHouseMapToDB,
 import { supabase } from './lib/supabase';
 import { APP_VERSION } from './config/version';
 import type { MapMemo, InventoryItem } from './types/memo';
-import { fetchHouseMemos, saveMemoToDB, deleteMemoFromDB, getLocalInventory, saveLocalInventory } from './services/MemoService';
+import { fetchHouseMemos, saveMemoToDB, deleteMemoFromDB, deleteLocalMemo, getLocalMemos, saveLocalMemos, getLocalInventory, saveLocalInventory } from './services/MemoService';
 import { CreateMemoModal } from './components/CreateMemoModal';
 import { ViewMemoModal } from './components/ViewMemoModal';
 import { InventoryModal } from './components/InventoryModal';
@@ -197,6 +197,18 @@ export default function App() {
     const firstMapObj = activeMaps[firstMapId] || maps.room || maps[firstMapId];
     const firstSpawn = findValidSpawnPosition(firstMapObj);
 
+    let savedPersonalSize: number | null = null;
+    try {
+      const pSize = localStorage.getItem('on_house_personal_char_size');
+      if (pSize) {
+        const parsed = parseInt(pSize, 10);
+        if (!isNaN(parsed) && parsed >= 8) savedPersonalSize = parsed;
+      }
+    } catch (e) {}
+
+    const baseSize = getCharDisplaySize(savedSprite);
+    const effectiveCharSize = savedPersonalSize || baseSize;
+
     return {
       id: deviceId.current,
       nickname: savedName,
@@ -211,7 +223,8 @@ export default function App() {
       isMobile: isMobileDevice,
       statusMessage: savedStatus,
       lastActive: Date.now(),
-      charSize: getCharDisplaySize(savedSprite)
+      charSize: effectiveCharSize,
+      personalCharSize: savedPersonalSize
     };
   });
 
@@ -350,29 +363,9 @@ export default function App() {
   const [showInventoryModal, setShowInventoryModal] = useState<boolean>(false);
   const memoChannelRef = useRef<any>(null);
 
-  // Load & Realtime Sync Memos
+  // Load Memos from DB per map
   useEffect(() => {
     fetchHouseMemos(houseCode, localPlayer.mapId).then(setMemos);
-
-    const channel = supabase.channel(`house_memos_${houseCode}_${localPlayer.mapId}`)
-      .on('broadcast', { event: 'memo_add' }, ({ payload }) => {
-        if (payload && payload.mapId === localPlayer.mapId) {
-          setMemos(prev => [...prev.filter(m => m.id !== payload.id), payload]);
-        }
-      })
-      .on('broadcast', { event: 'memo_delete' }, ({ payload }) => {
-        if (payload && payload.id) {
-          setMemos(prev => prev.filter(m => m.id !== payload.id));
-        }
-      })
-      .subscribe();
-
-    memoChannelRef.current = channel;
-
-    return () => {
-      supabase.removeChannel(channel);
-      memoChannelRef.current = null;
-    };
   }, [houseCode, localPlayer.mapId]);
 
   // Handle Create Memo Submission
@@ -385,13 +378,7 @@ export default function App() {
     saveMemoToDB(houseCode, newMemo);
 
     // 3. Instant Realtime broadcast to online players via connected channel
-    if (memoChannelRef.current) {
-      memoChannelRef.current.send({
-        type: 'broadcast',
-        event: 'memo_add',
-        payload: newMemo
-      }).catch(() => {});
-    }
+    safeBroadcastChannel('memo_add', newMemo);
   };
 
   // Handle Pickup One-Time Memo to Inventory (🎒 장비함)
@@ -402,13 +389,7 @@ export default function App() {
     setActiveViewMemo(null);
 
     // Broadcast deletion to other players via connected channel
-    if (memoChannelRef.current) {
-      memoChannelRef.current.send({
-        type: 'broadcast',
-        event: 'memo_delete',
-        payload: { id: memo.id }
-      }).catch(() => {});
-    }
+    safeBroadcastChannel('memo_delete', { id: memo.id, mapId: memo.mapId });
 
     // Add to Inventory
     const now = new Date();
@@ -461,13 +442,7 @@ export default function App() {
     saveLocalInventory(updatedInv);
 
     // Broadcast addition to other players via connected channel
-    if (memoChannelRef.current) {
-      memoChannelRef.current.send({
-        type: 'broadcast',
-        event: 'memo_add',
-        payload: newMemo
-      }).catch(() => {});
-    }
+    safeBroadcastChannel('memo_add', newMemo);
   };
 
   // Handle Delete Inventory Item
@@ -617,30 +592,27 @@ export default function App() {
 
   const channelRef = useRef<RealtimeChannel | null>(null);
 
+  const safeBroadcastChannel = (event: string, payload: any) => {
+    if (channelRef.current) {
+      try {
+        channelRef.current.send({
+          type: 'broadcast',
+          event,
+          payload
+        });
+      } catch (e) {}
+    }
+  };
+
   const sendPlayerSync = (playerData: PlayerState) => {
     try {
       const customData = getCustomCharData(playerData.spriteType);
 
       // 1. Broadcast over active Supabase Realtime channel
-      if (channelRef.current) {
-        channelRef.current.send({
-          type: 'broadcast',
-          event: 'player_sync',
-          payload: {
-            ...playerData,
-            customCharData: customData
-          }
-        });
-      } else {
-        supabase.channel(`house:${houseCode}`).send({
-          type: 'broadcast',
-          event: 'player_sync',
-          payload: {
-            ...playerData,
-            customCharData: customData
-          }
-        });
-      }
+      safeBroadcastChannel('player_sync', {
+        ...playerData,
+        customCharData: customData
+      });
 
       // 2. Broadcast over BroadcastChannel for tabs on same device
       if (bcRef.current) {
@@ -1075,6 +1047,21 @@ export default function App() {
         updateUnreadCount();
         showToast(`[${payload.fromName}] 님이 1:1 놀기를 종료했습니다.`);
       })
+      .on('broadcast', { event: 'memo_add' }, ({ payload }) => {
+        if (payload && payload.mapId === localPlayerRef.current.mapId) {
+          setMemos((prev) => [...prev.filter((m) => m.id !== payload.id), payload]);
+          const currentLocal = getLocalMemos(houseCode, payload.mapId);
+          saveLocalMemos(houseCode, payload.mapId, [...currentLocal.filter((m) => m.id !== payload.id), payload]);
+        }
+      })
+      .on('broadcast', { event: 'memo_delete' }, ({ payload }) => {
+        if (payload && payload.id) {
+          setMemos((prev) => prev.filter((m) => m.id !== payload.id));
+          if (payload.mapId) {
+            deleteLocalMemo(houseCode, payload.mapId, payload.id);
+          }
+        }
+      })
       .on('broadcast', { event: 'dm_read' }, ({ payload }) => {
         if (!payload || payload.toId !== deviceId.current) return;
         markMySentDMsAsRead(payload.toId, payload.fromId);
@@ -1302,6 +1289,14 @@ export default function App() {
   useEffect(() => {
     const handleSpriteUpdate = () => {
       setLocalPlayer((prev) => {
+        // If user has set a personalCharSize in Customizer, personalCharSize ALWAYS TAKES PRIORITY!
+        if (prev.personalCharSize) {
+          if (prev.charSize === prev.personalCharSize) return prev;
+          const updated = { ...prev, charSize: prev.personalCharSize };
+          sendPlayerSync(updated);
+          return updated;
+        }
+        // Otherwise, use default base size configured for this character in Pixel Editor
         const nextSize = getCharDisplaySize(prev.spriteType);
         if (prev.charSize === nextSize) return prev;
         const updated = { ...prev, charSize: nextSize };
@@ -1704,17 +1699,11 @@ export default function App() {
     ]);
 
     // 2. Broadcast system message to all connected players in the House via Supabase Realtime
-    try {
-      supabase.channel(`house:${houseCode}`).send({
-        type: 'broadcast',
-        event: 'chat',
-        payload: {
-          id: deviceId.current,
-          senderName: '🚀 시스템',
-          text: moveMsgText
-        }
-      });
-    } catch (e) {}
+    safeBroadcastChannel('chat', {
+      id: deviceId.current,
+      senderName: '🚀 시스템',
+      text: moveMsgText
+    });
 
     // 3. Broadcast system message to other local tabs
     bcRef.current?.postMessage({
@@ -1754,13 +1743,7 @@ export default function App() {
     saveHouseMapToDB(houseCode, newMapId, newMapObj);
 
     // Broadcast new map to all players in H-1002!
-    try {
-      supabase.channel(`house:${houseCode}`).send({
-        type: 'broadcast',
-        event: 'map_update',
-        payload: { mapId: newMapId, mapData: newMapObj }
-      });
-    } catch (e) {}
+    safeBroadcastChannel('map_update', { mapId: newMapId, mapData: newMapObj });
 
     handleMapChange(newMapId);
     return newMapId;
@@ -1788,13 +1771,7 @@ export default function App() {
     await deleteHouseMapFromDB(houseCode, mapId);
 
     // 2. Broadcast map_delete event to all connected players in the House
-    try {
-      supabase.channel(`house:${houseCode}`).send({
-        type: 'broadcast',
-        event: 'map_delete',
-        payload: { mapId }
-      });
-    } catch (e) {}
+    safeBroadcastChannel('map_delete', { mapId });
 
     if (localPlayer.mapId === mapId) {
       handleMapChange(nextAvailable[0]);
@@ -1815,13 +1792,7 @@ export default function App() {
       saveHouseMapToDB(houseCode, mapId, updatedMap);
 
       // 3. Broadcast map_update to all connected players
-      try {
-        supabase.channel(`house:${houseCode}`).send({
-          type: 'broadcast',
-          event: 'map_update',
-          payload: { mapId, mapData: updatedMap }
-        });
-      } catch (e) {}
+      safeBroadcastChannel('map_update', { mapId, mapData: updatedMap });
 
       return { ...prev, [mapId]: updatedMap };
     });
@@ -1845,20 +1816,14 @@ export default function App() {
       isOnline: !isOfflineMode
     });
 
-    try {
-      supabase.channel(`house:${houseCode}`).send({
-        type: 'broadcast',
-        event: 'player_sync',
-        payload: {
-          id: deviceId.current,
-          player: {
-            ...localPlayerRef.current,
-            statusMessage,
-            isOnline: !isOfflineMode
-          }
-        }
-      });
-    } catch (e) {}
+    safeBroadcastChannel('player_sync', {
+      id: deviceId.current,
+      player: {
+        ...localPlayerRef.current,
+        statusMessage,
+        isOnline: !isOfflineMode
+      }
+    });
 
     if (isOfflineMode) {
       showToast('상태가 💤 오프라인(비활성화)으로 변경되었습니다.');
@@ -1919,21 +1884,15 @@ export default function App() {
     ]);
 
     // Broadcast chat via Supabase Realtime channel for cross-device users
-    try {
-      supabase.channel(`house:${houseCode}`).send({
-        type: 'broadcast',
-        event: 'chat',
-        payload: {
-          id: deviceId.current,
-          senderName: formattedSenderName,
-          text,
-          channel: chatChannel,
-          mapId: localPlayer.mapId,
-          mapName: mapName,
-          timestamp: Date.now()
-        }
-      });
-    } catch (e) {}
+    safeBroadcastChannel('chat', {
+      id: deviceId.current,
+      senderName: formattedSenderName,
+      text,
+      channel: chatChannel,
+      mapId: localPlayer.mapId,
+      mapName: mapName,
+      timestamp: Date.now()
+    });
 
     // Broadcast chat to other local tabs
     bcRef.current?.postMessage({
@@ -1961,32 +1920,20 @@ export default function App() {
       timestamp: Date.now()
     });
 
-    try {
-      supabase.channel(`house:${houseCode}`).send({
-        type: 'broadcast',
-        event: 'dm_msg',
-        payload: {
-          fromId: localPlayer.id,
-          fromName: localPlayer.nickname,
-          toId,
-          text,
-          timestamp: Date.now()
-        }
-      });
-    } catch (e) {}
+    safeBroadcastChannel('dm_msg', {
+      fromId: localPlayer.id,
+      fromName: localPlayer.nickname,
+      toId,
+      text,
+      timestamp: Date.now()
+    });
   };
 
   const handleReadDM = (toId: string) => {
-    try {
-      supabase.channel(`house:${houseCode}`).send({
-        type: 'broadcast',
-        event: 'dm_read',
-        payload: {
-          fromId: localPlayer.id,
-          toId
-        }
-      });
-    } catch (e) {}
+    safeBroadcastChannel('dm_read', {
+      fromId: localPlayer.id,
+      toId
+    });
   };
 
   // 3-Tier AFK/Tab-Safe Online Verification (Instant 0ms for active/presence, 2.5s fallback ping)
@@ -2088,36 +2035,24 @@ export default function App() {
 
   // Send 1:1 DM Request to target player
   const handleRequestDMChat = (target: PlayerState) => {
-    try {
-      supabase.channel(`house:${houseCode}`).send({
-        type: 'broadcast',
-        event: 'dm_request',
-        payload: {
-          fromId: localPlayer.id,
-          fromName: localPlayer.nickname,
-          fromPlayer: localPlayer,
-          toId: target.id
-        }
-      });
-      showToast(`[${target.nickname}] 님에게 1:1 놀기를 신청했습니다. 응답 대기 중...`);
-    } catch (e) {}
+    safeBroadcastChannel('dm_request', {
+      fromId: localPlayer.id,
+      fromName: localPlayer.nickname,
+      fromPlayer: localPlayer,
+      toId: target.id
+    });
+    showToast(`[${target.nickname}] 님에게 1:1 놀기를 신청했습니다. 응답 대기 중...`);
   };
 
   // Accept incoming 1:1 DM Request
   const handleAcceptDMRequest = () => {
     if (!incomingDMRequest) return;
-    try {
-      supabase.channel(`house:${houseCode}`).send({
-        type: 'broadcast',
-        event: 'dm_accept',
-        payload: {
-          fromId: localPlayer.id,
-          fromName: localPlayer.nickname,
-          accepterPlayer: localPlayer,
-          toId: incomingDMRequest.requesterId
-        }
-      });
-    } catch (e) {}
+    safeBroadcastChannel('dm_accept', {
+      fromId: localPlayer.id,
+      fromName: localPlayer.nickname,
+      accepterPlayer: localPlayer,
+      toId: incomingDMRequest.requesterId
+    });
 
     setActiveDMTarget(incomingDMRequest.requesterPlayer);
     setIncomingDMRequest(null);
@@ -2126,34 +2061,22 @@ export default function App() {
   // Decline incoming 1:1 DM Request
   const handleDeclineDMRequest = () => {
     if (!incomingDMRequest) return;
-    try {
-      supabase.channel(`house:${houseCode}`).send({
-        type: 'broadcast',
-        event: 'dm_decline',
-        payload: {
-          fromId: localPlayer.id,
-          fromName: localPlayer.nickname,
-          toId: incomingDMRequest.requesterId
-        }
-      });
-    } catch (e) {}
+    safeBroadcastChannel('dm_decline', {
+      fromId: localPlayer.id,
+      fromName: localPlayer.nickname,
+      toId: incomingDMRequest.requesterId
+    });
     setIncomingDMRequest(null);
   };
 
   // Close 1:1 DM Chat session and notify partner
   const handleCloseDMChat = () => {
     if (activeDMTarget) {
-      try {
-        supabase.channel(`house:${houseCode}`).send({
-          type: 'broadcast',
-          event: 'dm_close',
-          payload: {
-            fromId: localPlayer.id,
-            fromName: localPlayer.nickname,
-            toId: activeDMTarget.id
-          }
-        });
-      } catch (e) {}
+      safeBroadcastChannel('dm_close', {
+        fromId: localPlayer.id,
+        fromName: localPlayer.nickname,
+        toId: activeDMTarget.id
+      });
     }
     setActiveDMTarget(null);
     updateUnreadCount();
@@ -2196,23 +2119,13 @@ export default function App() {
         payload
       });
 
-      try {
-        supabase.channel(`house:${houseCode}`).send({
-          type: 'broadcast',
-          event: 'reaction_anim',
-          payload
-        });
-        supabase.channel(`house:${houseCode}`).send({
-          type: 'broadcast',
-          event: 'reaction',
-          payload: {
-            fromId: deviceId.current,
-            fromName: localPlayer.nickname,
-            toId: targetId,
-            emoji: '❤️'
-          }
-        });
-      } catch (e) {}
+      safeBroadcastChannel('reaction_anim', payload);
+      safeBroadcastChannel('reaction', {
+        fromId: deviceId.current,
+        fromName: localPlayer.nickname,
+        toId: targetId,
+        emoji: '❤️'
+      });
 
       showToast(`[${targetPlayer.nickname}] 님에게 ❤️ 하트를 날렸습니다!`);
     } else if (emoji === '👋' || emoji === '인사하기') {
@@ -2255,22 +2168,12 @@ export default function App() {
                 toPos: { x: targetPlayer.x, y: targetPlayer.y }
               };
 
-              try {
-                supabase.channel(`house:${houseCode}`).send({
-                  type: 'broadcast',
-                  event: 'reaction_anim',
-                  payload
-                });
-                supabase.channel(`house:${houseCode}`).send({
-                  type: 'broadcast',
-                  event: 'chat',
-                  payload: {
-                    id: deviceId.current,
-                    senderName: localPlayer.nickname,
-                    text: '안녕하세요! 👋'
-                  }
-                });
-              } catch (e) {}
+              safeBroadcastChannel('reaction_anim', payload);
+              safeBroadcastChannel('chat', {
+                id: deviceId.current,
+                senderName: localPlayer.nickname,
+                text: '안녕하세요! 👋'
+              });
 
               showToast(`[${targetPlayer.nickname}] 님에게 "안녕하세요! 👋" 하고 인사를 건넸습니다!`);
             }
@@ -2290,13 +2193,7 @@ export default function App() {
 
       window.dispatchEvent(new CustomEvent('on_house_spawn_particle', { detail: payload }));
 
-      try {
-        supabase.channel(`house:${houseCode}`).send({
-          type: 'broadcast',
-          event: 'reaction_anim',
-          payload
-        });
-      } catch (e) {}
+      safeBroadcastChannel('reaction_anim', payload);
 
       showToast(`[${targetPlayer?.nickname || '친구'}] 님을 👏 열렬히 응원했습니다!`);
     } else if (emoji === '🎉' || emoji === '축하하기') {
@@ -2313,13 +2210,7 @@ export default function App() {
 
       window.dispatchEvent(new CustomEvent('on_house_spawn_particle', { detail: payload }));
 
-      try {
-        supabase.channel(`house:${houseCode}`).send({
-          type: 'broadcast',
-          event: 'reaction_anim',
-          payload
-        });
-      } catch (e) {}
+      safeBroadcastChannel('reaction_anim', payload);
 
       showToast(`[${targetPlayer?.nickname || '친구'}] 님을 🎉 화려하게 축하해 주었습니다!`);
     } else if (emoji === '🔥' || emoji === '불타오름') {
@@ -2333,13 +2224,7 @@ export default function App() {
 
       window.dispatchEvent(new CustomEvent('on_house_spawn_particle', { detail: payload }));
 
-      try {
-        supabase.channel(`house:${houseCode}`).send({
-          type: 'broadcast',
-          event: 'reaction_anim',
-          payload
-        });
-      } catch (e) {}
+      safeBroadcastChannel('reaction_anim', payload);
 
       showToast(`🔥 [${localPlayerRef.current.nickname}] 캐릭터 뒤에 이글이글 불꽃이 타오릅니다!`);
     } else if (emoji === '☕' || emoji === '커피한잔') {
@@ -2385,26 +2270,16 @@ export default function App() {
                 toPos: { x: targetPlayer.x, y: targetPlayer.y }
               };
 
-              try {
-                supabase.channel(`house:${houseCode}`).send({
-                  type: 'broadcast',
-                  event: 'reaction_anim',
-                  payload
-                });
-                supabase.channel(`house:${houseCode}`).send({
-                  type: 'broadcast',
-                  event: 'chat',
-                  payload: {
-                    id: deviceId.current,
-                    senderName: localPlayer.nickname,
-                    text: '커피 한 잔 하실래요? ☕',
-                    channel: chatChannel,
-                    mapId: localPlayer.mapId,
-                    mapName: mapName,
-                    timestamp: Date.now()
-                  }
-                });
-              } catch (e) {}
+              safeBroadcastChannel('reaction_anim', payload);
+              safeBroadcastChannel('chat', {
+                id: deviceId.current,
+                senderName: localPlayer.nickname,
+                text: '커피 한 잔 하실래요? ☕',
+                channel: chatChannel,
+                mapId: localPlayer.mapId,
+                mapName: mapName,
+                timestamp: Date.now()
+              });
 
               showToast(`[${targetPlayer.nickname}] 님에게 "커피 한 잔 하실래요? ☕" 라고 물었습니다!`);
             }
@@ -2413,18 +2288,12 @@ export default function App() {
       }
     } else {
       // Standard emote fallback
-      try {
-        supabase.channel(`house:${houseCode}`).send({
-          type: 'broadcast',
-          event: 'reaction',
-          payload: {
-            fromId: localPlayer.id,
-            fromName: localPlayer.nickname,
-            toId: targetId,
-            emoji
-          }
-        });
-      } catch (e) {}
+      safeBroadcastChannel('reaction', {
+        fromId: localPlayer.id,
+        fromName: localPlayer.nickname,
+        toId: targetId,
+        emoji
+      });
     }
   };
 
@@ -2621,8 +2490,14 @@ export default function App() {
           onChange={(updates) => {
             setLocalPlayer((prev) => {
               const nextSprite = updates.spriteType || prev.spriteType;
-              const nextSize = getCharDisplaySize(nextSprite);
-              const updated = { ...prev, ...updates, charSize: nextSize };
+              const hasPersonalSize = updates.personalCharSize !== undefined ? updates.personalCharSize : prev.personalCharSize;
+              const nextSize = hasPersonalSize || getCharDisplaySize(nextSprite);
+              const updated = {
+                ...prev,
+                ...updates,
+                personalCharSize: hasPersonalSize,
+                charSize: nextSize
+              };
               sendPlayerSync(updated);
               return updated;
             });
@@ -3157,21 +3032,7 @@ export default function App() {
             });
 
             // Broadcast to all devices in real-time via active channel!
-            try {
-              if (channelRef.current) {
-                channelRef.current.send({
-                  type: 'broadcast',
-                  event: 'map_update',
-                  payload: { mapId, mapData: updatedMap }
-                });
-              } else {
-                supabase.channel(`house:${houseCode}`).send({
-                  type: 'broadcast',
-                  event: 'map_update',
-                  payload: { mapId, mapData: updatedMap }
-                });
-              }
-            } catch (e) {}
+            safeBroadcastChannel('map_update', { mapId, mapData: updatedMap });
 
             // Broadcast full map update to other local tabs!
             if (bcRef.current) {

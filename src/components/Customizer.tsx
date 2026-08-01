@@ -3,6 +3,7 @@ import type { PlayerState } from '../game/syncManager';
 import { User, Trash2 } from 'lucide-react';
 import { deleteHouseAssetFromDB, getSavedHouseCode } from '../services/HouseService';
 import { supabase } from '../lib/supabase';
+import { getCharDisplaySize } from '../game/MapData';
 
 interface CustomizerProps {
   player: PlayerState;
@@ -195,6 +196,119 @@ export const Customizer: React.FC<CustomizerProps> = ({ player, customCharSprite
               </button>
             )}
           </div>
+        </div>
+
+        {/* Personal Map Display Size Setting */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid #28283a', paddingTop: '12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label style={{ fontSize: '11px', color: '#ccc', fontWeight: 'normal', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              📏 개인 맵 출력 크기 설정:
+            </label>
+            <span style={{ fontSize: '10px', color: player.personalCharSize ? '#a78bfa' : '#888', fontWeight: 'normal' }}>
+              {player.personalCharSize ? `⭐ 개인 크기 (${player.charSize || player.personalCharSize}px)` : `캐릭터 기본값 (${getCharDisplaySize(player.spriteType)}px)`}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={() => {
+                const currentSize = player.charSize || getCharDisplaySize(player.spriteType);
+                const nextSize = Math.max(8, currentSize - 2);
+                onChange({
+                  personalCharSize: nextSize,
+                  charSize: nextSize
+                });
+                try {
+                  localStorage.setItem('on_house_personal_char_size', String(nextSize));
+                } catch (e) {}
+              }}
+              style={{
+                width: '26px', height: '26px', background: '#252538', border: '1px solid #4a4a6b',
+                color: '#fff', fontSize: '13px', cursor: 'pointer', fontWeight: 'bold',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 0
+              }}
+              title="크기 줄이기 (-2px)"
+            >
+              -
+            </button>
+
+            <input
+              type="number"
+              min={8}
+              max={128}
+              value={player.charSize || getCharDisplaySize(player.spriteType)}
+              onChange={(e) => {
+                const val = parseInt(e.target.value, 10);
+                if (!isNaN(val) && val >= 8 && val <= 128) {
+                  onChange({
+                    personalCharSize: val,
+                    charSize: val
+                  });
+                  try {
+                    localStorage.setItem('on_house_personal_char_size', String(val));
+                  } catch (err) {}
+                }
+              }}
+              style={{
+                width: '50px', textAlign: 'center', padding: '4px', fontSize: '12px',
+                background: '#09090f', border: '1px solid #4a4a6b', color: '#fff',
+                outline: 'none', borderRadius: 0
+              }}
+            />
+            <span style={{ fontSize: '11px', color: '#aaa' }}>px</span>
+
+            <button
+              type="button"
+              onClick={() => {
+                const currentSize = player.charSize || getCharDisplaySize(player.spriteType);
+                const nextSize = Math.min(128, currentSize + 2);
+                onChange({
+                  personalCharSize: nextSize,
+                  charSize: nextSize
+                });
+                try {
+                  localStorage.setItem('on_house_personal_char_size', String(nextSize));
+                } catch (e) {}
+              }}
+              style={{
+                width: '26px', height: '26px', background: '#252538', border: '1px solid #4a4a6b',
+                color: '#fff', fontSize: '13px', cursor: 'pointer', fontWeight: 'bold',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 0
+              }}
+              title="크기 늘리기 (+2px)"
+            >
+              +
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                const baseSize = getCharDisplaySize(player.spriteType);
+                onChange({
+                  personalCharSize: null,
+                  charSize: baseSize
+                });
+                try {
+                  localStorage.removeItem('on_house_personal_char_size');
+                } catch (e) {}
+              }}
+              style={{
+                marginLeft: 'auto', padding: '4px 8px', background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid #4a4a6b', color: '#aaa', fontSize: '10px', cursor: 'pointer',
+                borderRadius: 0
+              }}
+              title="캐릭터 기본 맵 출력 크기로 복원"
+            >
+              🔄 기본값 복원
+            </button>
+          </div>
+
+          <p style={{ margin: '4px 0 0 0', fontSize: '10px', color: '#7a7a9a', lineHeight: '1.4' }}>
+            {player.personalCharSize
+              ? '⭐ 개인별 크기가 설정되어 픽셀에디터 변경보다 본인 개인 크기가 항상 우선 적용됩니다.'
+              : '💡 픽셀에디터에서 맵 출력 크기를 지정한 캐릭터 기본값을 사용 중입니다.'}
+          </p>
         </div>
       </div>
     </div>

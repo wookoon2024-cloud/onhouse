@@ -2515,6 +2515,39 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     }
   };
 
+  // Clear All Map Contents Handler (Reset map to 100% empty black canvas)
+  const handleClearAllMapContents = () => {
+    if (!window.confirm("정말 지도의 모든 타일과 오브젝트를 삭제하고 빈 화면(검은색)으로 초기화하시겠습니까?")) {
+      return;
+    }
+    setHistory(prev => [...prev, localMap]);
+    setRedoHistory([]);
+
+    const emptyBase = Array.from({ length: localMap.height }, () => Array.from({ length: localMap.width }, () => -1));
+    const emptyDecor = Array.from({ length: localMap.height }, () => Array.from({ length: localMap.width }, () => -1));
+    const emptyCollision = Array.from({ length: localMap.height }, () => Array.from({ length: localMap.width }, () => false));
+
+    const resetLayers: CustomTileLayer[] = [
+      { id: 'layer_base', name: '1단계(배경)', visible: true, grid: emptyBase, type: 'base' },
+      { id: 'layer_decor', name: '2단계(오브젝트)', visible: true, grid: emptyDecor, type: 'decor' }
+    ];
+
+    setLocalMap(prev => ({
+      ...prev,
+      baseLayer: emptyBase,
+      decorLayer: emptyDecor,
+      layers: resetLayers,
+      collision: emptyCollision,
+      objects: []
+    }));
+
+    setActiveLayerId('layer_base');
+    setSelectedObjectId(null);
+    setMapBoxSelection(null);
+    setMapBoxSelectStart(null);
+    alert("지도의 모든 내역이 초기화되어 빈 화면(검은색)이 되었습니다.");
+  };
+
   const handleResizeMap = () => {
     const newW = parseInt(widthInput, 10);
     const newH = parseInt(heightInput, 10);

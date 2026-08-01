@@ -17,7 +17,14 @@ export const saveLocalMemos = (houseCode: string, mapId: string, memos: MapMemo[
   } catch {}
 };
 
-// Fetch Memos from Supabase DB
+// Helper to remove a single memo from local storage
+export const deleteLocalMemo = (houseCode: string, mapId: string, memoId: string) => {
+  const current = getLocalMemos(houseCode, mapId);
+  const updated = current.filter(m => m.id !== memoId);
+  saveLocalMemos(houseCode, mapId, updated);
+};
+
+// Fetch Memos from Supabase DB (DB is single source of truth)
 export const fetchHouseMemos = async (houseCode: string, mapId: string): Promise<MapMemo[]> => {
   const local = getLocalMemos(houseCode, mapId);
   try {
@@ -30,13 +37,8 @@ export const fetchHouseMemos = async (houseCode: string, mapId: string): Promise
     if (error || !data) return local;
 
     const dbMemos: MapMemo[] = data.map((row) => row.asset_data).filter(Boolean);
-    const mergedMap = new Map<string, MapMemo>();
-    local.forEach(m => mergedMap.set(m.id, m));
-    dbMemos.forEach(m => mergedMap.set(m.id, m));
-
-    const result = Array.from(mergedMap.values());
-    saveLocalMemos(houseCode, mapId, result);
-    return result;
+    saveLocalMemos(houseCode, mapId, dbMemos);
+    return dbMemos;
   } catch {
     return local;
   }
@@ -60,9 +62,7 @@ export const saveMemoToDB = async (houseCode: string, memo: MapMemo) => {
 
 // Delete a Memo from DB & LocalStorage
 export const deleteMemoFromDB = async (houseCode: string, mapId: string, memoId: string) => {
-  const current = getLocalMemos(houseCode, mapId);
-  const updated = current.filter(m => m.id !== memoId);
-  saveLocalMemos(houseCode, mapId, updated);
+  deleteLocalMemo(houseCode, mapId, memoId);
 
   try {
     await supabase
