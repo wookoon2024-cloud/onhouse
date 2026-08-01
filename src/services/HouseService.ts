@@ -532,17 +532,38 @@ export const fetchHouseAssets = async (houseCode: string) => {
   }
 };
 
-// Save custom asset to Supabase (Overwrites existing older rows for same asset ID to save DB space)
+// Save custom asset to Supabase (Hard Deletes existing older rows for same asset ID to prevent duplicates)
 export const saveHouseAssetToDB = async (
   houseCode: string,
   assetType: 'map_tileset' | 'char_sprite' | 'char_image_override' | 'char_row_actions',
   assetData: any
 ) => {
   try {
-    const assetName = assetData?.name || assetData?.id || 'Unknown';
+    const assetId = assetData?.id;
+    const assetName = assetData?.name || assetId || 'Unknown';
     const payloadSizeKb = assetData ? Math.round(JSON.stringify(assetData).length / 1024) : 0;
-    console.log(`[OnHouse DB Save] 📤 Inserting asset "${assetName}" (${assetType}, size: ~${payloadSizeKb}KB) into house_assets table for house [${houseCode}]...`);
+    console.log(`[OnHouse DB Save] 📤 Saving asset "${assetName}" (${assetType}, size: ~${payloadSizeKb}KB) into house_assets table for house [${houseCode}]...`);
 
+    // 1. Delete older rows for the same asset ID to keep DB 100% clean without duplicate accumulation
+    if (assetId) {
+      const { data: existingRows } = await supabase
+        .from('house_assets')
+        .select('id, asset_type, asset_data')
+        .eq('house_code', houseCode);
+
+      if (existingRows && existingRows.length > 0) {
+        const oldRowIds = existingRows
+          .filter(r => r.asset_type === assetType && r.asset_data?.id === assetId)
+          .map(r => r.id);
+
+        if (oldRowIds.length > 0) {
+          await supabase.from('house_assets').delete().in('id', oldRowIds);
+          console.log(`[OnHouse DB Save] 🧹 Hard deleted ${oldRowIds.length} old duplicate rows for asset "${assetId}"`);
+        }
+      }
+    }
+
+    // 2. Insert single clean new row
     const { data, error } = await supabase
       .from('house_assets')
       .insert({
@@ -565,25 +586,39 @@ export const saveHouseAssetToDB = async (
   }
 };
 
-// Delete custom asset from Supabase DB (Hard Delete: Permanently wipes matching rows to free DB space!)
+// Delete custom asset from Supabase DB (REAL Hard Delete: Permanently wipes matching rows from DB!)
 export const deleteHouseAssetFromDB = async (
   houseCode: string,
   assetType: 'map_tileset' | 'char_sprite' | 'char_image_override' | 'char_row_actions',
   assetId: string
 ) => {
   try {
-    const { error } = await supabase
-      .from('house_assets')
-      .insert({
-        house_code: houseCode,
-        asset_type: 'char_delete',
-        asset_data: { id: assetId }
-      });
+    console.log(`[OnHouse DB Delete] 🗑️ Real hard-deleting asset "${assetId}" (${assetType}) from house_assets...`);
 
-    if (error) {
-      console.error('Failed to delete asset from Supabase:', error.message);
-      return { success: false, error: error.message };
+    const { data: rows } = await supabase
+      .from('house_assets')
+      .select('id, asset_type, asset_data')
+      .eq('house_code', houseCode);
+
+    if (rows && rows.length > 0) {
+      const idsToDelete = rows
+        .filter(r => (r.asset_type === assetType || r.asset_type === 'char_sprite' || r.asset_type === 'char_image_override') && r.asset_data?.id === assetId)
+        .map(r => r.id);
+
+      if (idsToDelete.length > 0) {
+        const { error } = await supabase
+          .from('house_assets')
+          .delete()
+          .in('id', idsToDelete);
+
+        if (error) {
+          console.error('[OnHouse DB Delete Error] Hard delete failed:', error.message);
+          return { success: false, error: error.message };
+        }
+        console.log(`[OnHouse DB Delete SUCCESS] ✅ Permanently deleted ${idsToDelete.length} rows from DB for asset "${assetId}"`);
+      }
     }
+
     return { success: true };
   } catch (err: any) {
     console.error('Error in deleteHouseAssetFromDB:', err);
