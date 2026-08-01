@@ -328,6 +328,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   const [drawTool, setDrawTool] = useState<'pencil' | 'eraser'>('pencil');
   const [brushSize, setBrushSize] = useState<number>(1);
   const [isMouseDown, setIsMouseDown] = useState<boolean>(false);
+  const [editorPan, setEditorPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isEditorPanning, setIsEditorPanning] = useState<boolean>(false);
+  const editorPanStartRef = useRef<{ startX: number; startY: number; initPanX: number; initPanY: number } | null>(null);
   const editorFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Image Crop Modal State for Pixel Editor Import (With Drag, Zoom & Keyboard Nudge)
@@ -1116,6 +1119,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
 
     setEditorGridResW(defaultW);
     setEditorGridResH(defaultH);
+    setEditorPan({ x: 0, y: 0 });
     loadPixelGridForRes(defaultW, defaultH, col, row, currentOption.url);
     setEditingTile({ charId: currentSelectedId, col, row });
   };
@@ -3448,7 +3452,13 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
           background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)',
           zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center'
         }}
-        onMouseUp={() => setIsMouseDown(false)}
+        onMouseUp={() => {
+          setIsMouseDown(false);
+          if (isEditorPanning) {
+            setIsEditorPanning(false);
+            editorPanStartRef.current = null;
+          }
+        }}
         >
           {/* Hidden File Input for Importing Image into Pixel Grid */}
           <input
@@ -3684,7 +3694,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 </div>
               </div>
 
-              {/* Fit-to-Container Cell Grid Container (Scrollbars Completely Removed!) */}
+              {/* Fit-to-Container Cell Grid Container with Space + Drag Panning */}
               {(() => {
                 const maxW = 300;
                 const maxH = 300;
@@ -3697,14 +3707,76 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 const showBorders = editorGridResW <= 48 && editorGridResH <= 48;
 
                 return (
-                  <div style={{
-                    width: '320px', height: '320px', overflow: 'hidden',
-                    background: '#0a0a0f', borderRadius: '8px', border: '1px solid var(--border-glass)',
-                    padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.8)', margin: '0 auto', boxSizing: 'border-box'
-                  }}>
+                  <div
+                    onMouseDown={(e) => {
+                      if (isSpaceDown || e.button === 1) {
+                        e.preventDefault();
+                        setIsEditorPanning(true);
+                        editorPanStartRef.current = {
+                          startX: e.clientX,
+                          startY: e.clientY,
+                          initPanX: editorPan.x,
+                          initPanY: editorPan.y
+                        };
+                      }
+                    }}
+                    onMouseMove={(e) => {
+                      if (isEditorPanning && editorPanStartRef.current) {
+                        const dx = e.clientX - editorPanStartRef.current.startX;
+                        const dy = e.clientY - editorPanStartRef.current.startY;
+                        setEditorPan({
+                          x: editorPanStartRef.current.initPanX + dx,
+                          y: editorPanStartRef.current.initPanY + dy
+                        });
+                      }
+                    }}
+                    onMouseUp={() => {
+                      if (isEditorPanning) {
+                        setIsEditorPanning(false);
+                        editorPanStartRef.current = null;
+                      }
+                    }}
+                    style={{
+                      width: '320px', height: '320px', overflow: 'hidden',
+                      background: '#0a0a0f', borderRadius: '8px', border: '1px solid var(--border-glass)',
+                      padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.8)', margin: '0 auto', boxSizing: 'border-box',
+                      cursor: isSpaceDown ? (isEditorPanning ? 'grabbing' : 'grab') : 'default',
+                      position: 'relative', userSelect: 'none'
+                    }}
+                  >
+                    {/* Space + Drag Panning Hint Badge & Quick Reset Button */}
+                    {(isSpaceDown || editorZoom > 1.0 || editorPan.x !== 0 || editorPan.y !== 0) && (
+                      <div style={{
+                        position: 'absolute', top: '6px', left: '6px', zIndex: 10,
+                        background: 'rgba(0,0,0,0.8)', color: '#89b4fa', fontSize: '9px',
+                        padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(137, 180, 250, 0.3)',
+                        display: 'flex', alignItems: 'center', gap: '6px'
+                      }}>
+                        <span>💡 Space + 드래그: 캔버스 이동</span>
+                        {(editorPan.x !== 0 || editorPan.y !== 0) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditorPan({ x: 0, y: 0 });
+                            }}
+                            style={{
+                              background: 'rgba(139, 92, 246, 0.4)', color: '#fff',
+                              border: 'none', borderRadius: '2px', padding: '1px 4px',
+                              fontSize: '9px', cursor: 'pointer', fontWeight: 'bold'
+                            }}
+                            title="캔버스 위치 중앙 리셋"
+                          >
+                            🎯 리셋
+                          </button>
+                        )}
+                      </div>
+                    )}
+
                     <div
-                      onMouseDown={() => setIsMouseDown(true)}
+                      onMouseDown={() => {
+                        if (!isSpaceDown && !isEditorPanning) setIsMouseDown(true);
+                      }}
                       onMouseLeave={() => setIsMouseDown(false)}
                       style={{
                         width: `${boardW}px`, height: `${boardH}px`,
@@ -3712,22 +3784,26 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                         gridTemplateColumns: `repeat(${editorGridResW}, ${cellSizePx}px)`,
                         gridTemplateRows: `repeat(${editorGridResH}, ${cellSizePx}px)`,
                         background: '#222', border: '2px solid var(--accent)',
-                        borderRadius: '4px', boxShadow: '0 8px 24px rgba(0,0,0,0.6)', cursor: 'crosshair',
-                        overflow: 'hidden', flexShrink: 0
+                        borderRadius: '4px', boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+                        cursor: isSpaceDown ? (isEditorPanning ? 'grabbing' : 'grab') : 'crosshair',
+                        overflow: 'hidden', flexShrink: 0,
+                        transform: `translate(${editorPan.x}px, ${editorPan.y}px)`,
+                        transition: isEditorPanning ? 'none' : 'transform 0.05s ease-out'
                       }}
                     >
                       {pixelGrid.map((row, y) =>
                         row.map((color, x) => (
                           <div
                             key={`${y}-${x}`}
-                            onMouseDown={() => {
+                            onMouseDown={(e) => {
+                              if (isSpaceDown || isEditorPanning || e.button === 1) return;
                               const newGrid = pixelGrid.map((r, ry) =>
                                 r.map((c, cx) => (cx >= x && cx < x + brushSize && ry >= y && ry < y + brushSize ? (drawTool === 'pencil' ? selectedColor : 'transparent') : c))
                               );
                               setPixelGrid(newGrid);
                             }}
                             onMouseEnter={() => {
-                              if (isMouseDown) {
+                              if (isMouseDown && !isSpaceDown && !isEditorPanning) {
                                 const newGrid = pixelGrid.map((r, ry) =>
                                   r.map((c, cx) => (cx >= x && cx < x + brushSize && ry >= y && ry < y + brushSize ? (drawTool === 'pencil' ? selectedColor : 'transparent') : c))
                                 );
