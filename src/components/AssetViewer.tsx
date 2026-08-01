@@ -2162,27 +2162,73 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
         return;
       }
 
-      const newId = (uploadCategory === 'map' ? 'custom_map_' : 'custom_char_') + Date.now();
+      let generatedOptions: TilesetOption[] = [];
+      let nextMapPrefix = customMapTilesets.reduce((max, item) => Math.max(max, item.prefix || 8000), 8000);
 
-      const maxPrefix = customMapTilesets.reduce((max, item) => Math.max(max, item.prefix || 8000), 8000);
-      const nextPrefix = maxPrefix >= 9000 ? maxPrefix + 1000 : 9000;
+      if (uploadCategory === 'map' && rows > 64) {
+        setSaveProgressText(`✂️ 세로 행이 64개를 초과하여 에셋을 자동 분할 중입니다...`);
+        const img = await loadLoadedImageElement(finalUrl!);
+        let remainingRows = rows;
+        let currentRow = 0;
+        let partIndex = 1;
 
-      const newOption: TilesetOption = {
-        id: newId,
-        name,
-        url: finalUrl!,
-        cols,
-        rows,
-        size: tSize || 32,
-        frameWidth: frameW,
-        frameHeight: frameH,
-        offsetX: offX,
-        offsetY: offY,
-        spacingX: customSpacingInput || 0,
-        spacingY: customSpacingInput || 0,
-        prefix: uploadCategory === 'map' ? nextPrefix : undefined,
-        isCustom: true
-      };
+        while (remainingRows > 0) {
+          const chunkRows = Math.min(64, remainingRows);
+          const canvas = document.createElement('canvas');
+          canvas.width = cols * frameW;
+          canvas.height = chunkRows * frameH;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(img, 0, currentRow * frameH, cols * frameW, chunkRows * frameH, 0, 0, cols * frameW, chunkRows * frameH);
+            const chunkUrl = canvas.toDataURL('image/png');
+            
+            const maxPrefix = nextMapPrefix;
+            nextMapPrefix = maxPrefix >= 9000 ? maxPrefix + 1000 : 9000;
+
+            generatedOptions.push({
+              id: 'custom_map_' + Date.now() + '_p' + partIndex,
+              name: `${name} (분할 ${partIndex})`,
+              url: chunkUrl,
+              cols,
+              rows: chunkRows,
+              size: tSize || 32,
+              frameWidth: frameW,
+              frameHeight: frameH,
+              offsetX: offX,
+              offsetY: offY,
+              spacingX: customSpacingInput || 0,
+              spacingY: customSpacingInput || 0,
+              prefix: nextMapPrefix,
+              isCustom: true
+            });
+          }
+          remainingRows -= chunkRows;
+          currentRow += chunkRows;
+          partIndex++;
+        }
+      } else {
+        const newId = (uploadCategory === 'map' ? 'custom_map_' : 'custom_char_') + Date.now();
+        const maxPrefix = customMapTilesets.reduce((max, item) => Math.max(max, item.prefix || 8000), 8000);
+        const nextPrefix = maxPrefix >= 9000 ? maxPrefix + 1000 : 9000;
+
+        generatedOptions.push({
+          id: newId,
+          name,
+          url: finalUrl!,
+          cols,
+          rows,
+          size: tSize || 32,
+          frameWidth: frameW,
+          frameHeight: frameH,
+          offsetX: offX,
+          offsetY: offY,
+          spacingX: customSpacingInput || 0,
+          spacingY: customSpacingInput || 0,
+          prefix: uploadCategory === 'map' ? nextPrefix : undefined,
+          isCustom: true
+        });
+      }
 
       const currentHouse = getSavedHouseCode();
       const assetType = uploadCategory === 'map' ? 'map_tileset' : 'char_sprite';
@@ -2192,39 +2238,36 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       if (uploadCategory === 'map') {
         const existingStr = localStorage.getItem('on_house_custom_map_tilesets');
         const existing: TilesetOption[] = existingStr ? JSON.parse(existingStr) : customMapTilesets;
-        const next = [...existing.filter((m) => m.id !== newId), newOption];
+        const next = [...existing, ...generatedOptions];
         localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(next));
         setCustomMapTilesets(next);
         setActiveTab('map');
-        setSelectedMapId(newId);
+        setSelectedMapId(generatedOptions[0].id);
       } else {
         const existingStr = localStorage.getItem('on_house_custom_char_sprites');
         const existing: TilesetOption[] = existingStr ? JSON.parse(existingStr) : customCharSprites;
-        const next = [...existing.filter((c) => c.id !== newId), newOption];
+        const next = [...existing, ...generatedOptions];
         localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(next));
         setCustomCharSprites(next);
         setActiveTab('character');
-        setSelectedCharId(newId);
+        setSelectedCharId(generatedOptions[0].id);
       }
 
       // Notify window to update CanvasGame image caches immediately
       window.dispatchEvent(new Event('on_house_sprites_updated'));
 
       setSaveProgressText('☁️ 하우스 서버(Supabase) 업로드 저장 중...');
-      // Save to Supabase DB for this House
-      await saveHouseAssetToDB(currentHouse, assetType, newOption);
-
-      // Broadcast asset_update to all players in the same House
-      try {
-        supabase.channel(`house:${currentHouse}`).send({
-          type: 'broadcast',
-          event: 'asset_update',
-          payload: {
-            assetType,
-            assetData: newOption
-          }
-        });
-      } catch (e) {}
+      
+      for (const opt of generatedOptions) {
+        await saveHouseAssetToDB(currentHouse, assetType, opt);
+        try {
+          supabase.channel(`house:${currentHouse}`).send({
+            type: 'broadcast',
+            event: 'asset_update',
+            payload: { assetType, assetData: opt }
+          });
+        } catch (e) {}
+      }
 
       setSaveProgressText('✅ 에셋 저장 완료!');
       window.dispatchEvent(new Event('on_house_sprites_updated'));
@@ -2237,8 +2280,11 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
         setShowUploadModal(false);
         setIsSavingAsset(false);
         setSaveProgressText('');
+        
+        if (generatedOptions.length > 1) {
+          alert(`맵이 너무 길어서(64행 초과) 안전하게 ${generatedOptions.length}개로 자동 분할되어 저장되었습니다!\n\n(생성된 에셋: ${generatedOptions.map(o => o.name).join(', ')})`);
+        }
       }, 500);
-
     } catch (err) {
       console.error('Error saving asset:', err);
       alert('에셋 저장 중 오류가 발생했습니다. 다시 시도해 주세요.');
@@ -4035,7 +4081,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                     <input
                       type="number"
                       min={1}
-                      max={64}
+                      max={256}
                       value={customColsInput}
                       disabled={isSavingAsset}
                       onChange={(e) => {
@@ -4059,7 +4105,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                     <input
                       type="number"
                       min={1}
-                      max={64}
+                      max={256}
                       value={customRowsInput}
                       disabled={isSavingAsset}
                       onChange={(e) => {
