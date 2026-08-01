@@ -2438,7 +2438,7 @@ export default function App() {
 
 
   return (
-    <div style={{ position: 'relative', width: '100vw', height: '100dvh', overflow: 'hidden' }}>
+    <div style={{ position: 'relative', width: '100vw', height: '100dvh', overflow: 'hidden', background: '#09090f' }}>
       {/* App Version Badge (Bottom Left) */}
       <div style={{
         position: 'absolute', left: '10px', bottom: isMobile ? '4px' : '8px', zIndex: 99,
@@ -2449,28 +2449,55 @@ export default function App() {
         {APP_VERSION}
       </div>
 
-      {/* 1. Main Canvas Game */}
-      <CanvasGame
-        localPlayer={localPlayer}
-        otherPlayers={otherPlayers}
-        offlinePlayers={offlinePlayers}
-        currentMapId={localPlayer.mapId}
-        chatBubbles={chatBubbles}
-        onMove={handleMove}
-        onPlayerClick={handlePlayerClick}
-        memos={memos}
-        onInteractMemo={(memo) => setActiveViewMemo(memo)}
-        onCreateMemoRequest={(x, y) => setActiveCreateMemoPos({ x, y })}
-        isEditMode={false}
-        selectedTile={0}
-        editLayer="base"
-        onPaintTile={() => {}}
-        mapData={activeMaps[localPlayer.mapId] || activeMaps[availableMapIds[0]] || maps.room}
-        brushSize={1}
-        assetVersion={assetVersion}
-        isHouseLoaded={isHouseLoaded}
-        reactionPrompt={reactionPrompt}
-      />
+      {/* House Loading Overlay: Prevents premature rendering/flashing of old preset maps */}
+      {!isHouseLoaded && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: '#09090f', zIndex: 9999,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          gap: '14px', color: '#fff', fontFamily: 'var(--font-pixel)'
+        }}>
+          <div style={{
+            width: '36px', height: '36px', border: '3px solid rgba(167, 139, 250, 0.2)',
+            borderTopColor: '#a78bfa', borderRadius: '50%',
+            animation: 'on_house_spin 0.8s linear infinite'
+          }} />
+          <style>{`
+            @keyframes on_house_spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
+          <span style={{ fontSize: '13px', color: '#a78bfa', letterSpacing: '0px' }}>
+            🏠 온하우스 맵 및 픽셀 에셋 불러오는 중...
+          </span>
+        </div>
+      )}
+
+      {/* 1. Main Canvas Game (Rendered ONLY after house maps & assets finish loading from DB!) */}
+      {isHouseLoaded && (
+        <CanvasGame
+          localPlayer={localPlayer}
+          otherPlayers={otherPlayers}
+          offlinePlayers={offlinePlayers}
+          currentMapId={localPlayer.mapId}
+          chatBubbles={chatBubbles}
+          onMove={handleMove}
+          onPlayerClick={handlePlayerClick}
+          memos={memos}
+          onInteractMemo={(memo) => setActiveViewMemo(memo)}
+          onCreateMemoRequest={(x, y) => setActiveCreateMemoPos({ x, y })}
+          isEditMode={false}
+          selectedTile={0}
+          editLayer="base"
+          onPaintTile={() => {}}
+          mapData={activeMaps[localPlayer.mapId] || activeMaps[availableMapIds[0]] || maps.room}
+          brushSize={1}
+          assetVersion={assetVersion}
+          isHouseLoaded={isHouseLoaded}
+          reactionPrompt={reactionPrompt}
+        />
+      )}
 
       {/* 2. Map Selector (Top Left - Only rendered after house loading completes!) */}
       {isHouseLoaded && (
