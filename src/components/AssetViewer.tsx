@@ -2633,10 +2633,13 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                 title="맨 아래에 새로운 동작 행 추가"
                 style={{
                   position: 'absolute',
-                  left: '0px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
                   top: `${currentOption.rows * visualCellHeight + 10}px`,
-                  width: `${currentOption.cols * visualCellWidth}px`,
+                  minWidth: `${Math.max(130, currentOption.cols * visualCellWidth)}px`,
                   height: '32px',
+                  padding: '0 12px',
+                  whiteSpace: 'nowrap',
                   background: 'rgba(245, 194, 231, 0.2)',
                   border: '1px dashed #f5c2e7',
                   color: '#f5c2e7',
