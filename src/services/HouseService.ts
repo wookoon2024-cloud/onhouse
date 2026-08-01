@@ -488,49 +488,25 @@ export const fetchHouseAssets = async (houseCode: string) => {
       });
     }
 
-    // Save house-scoped custom asset caches with non-destructive merge
-    let finalMapTilesets = mapTilesets;
-    let finalCharSprites = charSprites;
-    let mergedOverrides = charOverrides;
-    let mergedActions = charRowActions;
-
+    // Supabase Cloud DB is the authoritative source of truth for this house!
+    // Overwrite localStorage caches directly with Cloud DB assets (no stale local merging!)
     try {
-      const existingMapsStr = localStorage.getItem('on_house_custom_map_tilesets');
-      if (existingMapsStr) {
-        const existingMaps: any[] = JSON.parse(existingMapsStr);
-        const mapMap = new Map<string, any>();
-        existingMaps.forEach((m: any) => { if (m && m.id && !deletedAssetIds.has(m.id)) mapMap.set(m.id, m); });
-        mapTilesets.forEach((m: any) => { if (m && m.id && !deletedAssetIds.has(m.id)) mapMap.set(m.id, m); });
-        finalMapTilesets = Array.from(mapMap.values());
-      }
-      localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(finalMapTilesets));
+      localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(mapTilesets));
+      localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(charSprites));
+      localStorage.setItem('on_house_char_image_overrides', JSON.stringify(charOverrides));
+      localStorage.setItem('on_house_char_row_actions', JSON.stringify(charRowActions));
 
-      const existingCharsStr = localStorage.getItem('on_house_custom_char_sprites');
-      if (existingCharsStr) {
-        const existingChars: any[] = JSON.parse(existingCharsStr);
-        const charMap = new Map<string, any>();
-        existingChars.forEach((c: any) => { if (c && c.id && !deletedAssetIds.has(c.id)) charMap.set(c.id, c); });
-        charSprites.forEach((c: any) => { if (c && c.id && !deletedAssetIds.has(c.id)) charMap.set(c.id, c); });
-        finalCharSprites = Array.from(charMap.values());
-      }
-      localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(finalCharSprites));
-
-      const existingOverridesStr = localStorage.getItem('on_house_char_image_overrides');
-      const existingOverrides = existingOverridesStr ? JSON.parse(existingOverridesStr) : {};
-      mergedOverrides = { ...existingOverrides, ...charOverrides };
-      localStorage.setItem('on_house_char_image_overrides', JSON.stringify(mergedOverrides));
-
-      const existingActionsStr = localStorage.getItem('on_house_char_row_actions');
-      const existingActions = existingActionsStr ? JSON.parse(existingActionsStr) : {};
-      mergedActions = { ...existingActions, ...charRowActions };
-      localStorage.setItem('on_house_char_row_actions', JSON.stringify(mergedActions));
+      localStorage.setItem(`on_house_custom_map_tilesets_${houseCode}`, JSON.stringify(mapTilesets));
+      localStorage.setItem(`on_house_custom_char_sprites_${houseCode}`, JSON.stringify(charSprites));
+      localStorage.setItem(`on_house_char_image_overrides_${houseCode}`, JSON.stringify(charOverrides));
+      localStorage.setItem(`on_house_char_row_actions_${houseCode}`, JSON.stringify(charRowActions));
     } catch (e) {}
 
     return {
-      mapTilesets: finalMapTilesets,
-      charSprites: finalCharSprites,
-      charOverrides: mergedOverrides,
-      charRowActions: mergedActions
+      mapTilesets,
+      charSprites,
+      charOverrides,
+      charRowActions
     };
   } catch (err) {
     console.warn('Supabase fetchHouseAssets warning/timeout:', err);
