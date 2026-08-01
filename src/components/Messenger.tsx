@@ -199,12 +199,36 @@ export const Messenger: React.FC<MessengerProps> = ({
     return () => window.removeEventListener('on_house_dm_read', handleReadEvent);
   }, []);
 
-  // Scroll to bottom ONLY if user is not actively scrolling up to read history
+  // Scroll to bottom whenever messages arrive or partner closes 1:1 session
   useEffect(() => {
-    if (!isUserScrolledUpRef.current) {
+    if (!isUserScrolledUpRef.current || isPartnerClosed) {
+      if (messagesContainerRef.current) {
+        messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+      }
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages]);
+  }, [messages, isPartnerClosed]);
+
+  // Guaranteed bottom scroll when partner closes 1:1 play mode
+  useEffect(() => {
+    if (isPartnerClosed) {
+      isUserScrolledUpRef.current = false;
+      const scrollToBottomNow = () => {
+        if (messagesContainerRef.current) {
+          messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+        }
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      };
+
+      scrollToBottomNow();
+      const t1 = setTimeout(scrollToBottomNow, 50);
+      const t2 = setTimeout(scrollToBottomNow, 200);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
+    }
+  }, [isPartnerClosed]);
 
   const handleSend = () => {
     if (!inputText.trim() || !activeTarget) return;
