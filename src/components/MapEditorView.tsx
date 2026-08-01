@@ -404,31 +404,34 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     brushSize?: number;
   }>>([]);
 
-  useEffect(() => {
-    // Only track valid tiles (not eraser -1)
-    if (selectedTile === -1) return;
-    
+  const addCurrentBrushToHistory = (
+    tile: number = selectedTile,
+    palSel: typeof paletteSelection = paletteSelection,
+    tsKey: string = activeTileset,
+    bSize: number = brushSize
+  ) => {
+    if (tile === -1) return; // Do not add eraser (-1) to history
+
     setBrushHistory(prev => {
-      // Check if current brush is exactly the same as the most recent one in history
+      // Check if current brush is identical to latest item in history
       const isSameAsLatest = prev.length > 0 && 
-        prev[0].selectedTile === selectedTile &&
-        prev[0].activeTileset === activeTileset &&
-        prev[0].brushSize === brushSize &&
-        JSON.stringify(prev[0].paletteSelection) === JSON.stringify(paletteSelection);
+        prev[0].selectedTile === tile &&
+        prev[0].activeTileset === tsKey &&
+        prev[0].brushSize === bSize &&
+        JSON.stringify(prev[0].paletteSelection) === JSON.stringify(palSel);
       
       if (isSameAsLatest) return prev;
 
-      // Filter out this exact combination if it exists elsewhere in the history, then add to front
       const filtered = prev.filter(item => 
-        !(item.selectedTile === selectedTile && 
-          item.activeTileset === activeTileset && 
-          item.brushSize === brushSize &&
-          JSON.stringify(item.paletteSelection) === JSON.stringify(paletteSelection))
+        !(item.selectedTile === tile && 
+          item.activeTileset === tsKey && 
+          item.brushSize === bSize &&
+          JSON.stringify(item.paletteSelection) === JSON.stringify(palSel))
       );
       
-      return [{ selectedTile, paletteSelection, activeTileset, brushSize }, ...filtered].slice(0, 10);
+      return [{ selectedTile: tile, paletteSelection: palSel, activeTileset: tsKey, brushSize: bSize }, ...filtered].slice(0, 10);
     });
-  }, [selectedTile, paletteSelection, activeTileset, brushSize]);
+  };
 
   useEffect(() => {
     const syncCustomTilesets = () => {
@@ -1706,6 +1709,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
   const performFloodFill = (startX: number, startY: number, fillVal: number) => {
     if (editLayer === 'collision') return;
+    addCurrentBrushToHistory();
     
     setLocalMap(prev => {
       const normLayers = getNormalizedLayers(prev);
@@ -1824,6 +1828,9 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
   const handlePaint = (tx: number, ty: number) => {
     if (tx < 0 || tx >= localMap.width || ty < 0 || ty >= localMap.height) return;
+
+    // Only add brush to history when user actually paints/stamps tiles on the map canvas!
+    addCurrentBrushToHistory();
 
     setLocalMap(prev => {
       const normLayers = getNormalizedLayers(prev);
