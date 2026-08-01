@@ -1856,10 +1856,18 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
               if (targetIndex !== 0 && autoCollision) {
                 newCollision[pty][ptx] = false;
               }
-              // Erase 1x1 standalone objects at eraser position
+              // Erase 1x1 standalone objects at eraser position ONLY if they belong to the active layer!
+              const targetLayerId = normLayers[targetIndex]?.id;
               nextObjects = nextObjects.filter(o => {
                 const isOverlapped = ptx >= o.x && ptx < o.x + o.width && pty >= o.y && pty < o.y + o.height;
                 if (!isOverlapped) return true;
+                
+                const isActiveLayerObj = o.layerId 
+                  ? o.layerId === targetLayerId 
+                  : o.layer === (targetIndex === 0 ? 'base' : 'decor');
+                  
+                if (!isActiveLayerObj) return true;
+                
                 return !(o.width === 1 && o.height === 1);
               });
             } else {
