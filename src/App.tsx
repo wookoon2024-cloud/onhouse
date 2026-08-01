@@ -264,6 +264,9 @@ export default function App() {
   const [activeWebUrl, setActiveWebUrl] = useState<string | null>(null);
   const [partnerViewingState, setPartnerViewingState] = useState<{ videoId?: string; webUrl?: string; syncEnabled?: boolean } | null>(null);
   const [isWebSyncActive, setIsWebSyncActive] = useState<boolean>(false);
+  const [closedDMPartners, setClosedDMPartners] = useState<Record<string, boolean>>({});
+  const activeDMTargetRef = useRef<PlayerState | null>(null);
+  activeDMTargetRef.current = activeDMTarget;
 
   // Broadcast media viewing updates whenever state changes
   useEffect(() => {
@@ -1043,9 +1046,36 @@ export default function App() {
       })
       .on('broadcast', { event: 'dm_close' }, ({ payload }) => {
         if (!payload || payload.toId !== deviceId.current) return;
-        setActiveDMTarget(null);
+        const partnerName = payload.fromName || '상대방';
+
+        // Save DM close notice to DM history
+        saveDM({
+          id: 'dm_close_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+          fromId: payload.fromId,
+          fromName: partnerName,
+          toId: deviceId.current,
+          text: `🚨 [${partnerName}] 님이 1:1 놀기를 종료하였습니다.`,
+          timestamp: Date.now(),
+          read: true
+        });
+
+        // Mark partner as closed to show red warning banner inside Messenger
+        setClosedDMPartners((prev) => ({ ...prev, [payload.fromId]: true }));
+
+        // Log to main chat log
+        setChatLogs((logs) => [
+          ...logs,
+          {
+            id: 'sys_dm_close_' + Date.now() + Math.random(),
+            senderName: '🚀 시스템',
+            text: `🚨 [${partnerName}] 님이 1:1 놀기를 종료하였습니다.`,
+            time: Date.now()
+          }
+        ]);
+
+        showToast(`🚨 [${partnerName}] 님이 1:1 놀기를 종료했습니다.`);
         updateUnreadCount();
-        showToast(`[${payload.fromName}] 님이 1:1 놀기를 종료했습니다.`);
+        window.dispatchEvent(new Event('on_house_dm_read'));
       })
       .on('broadcast', { event: 'memo_add' }, ({ payload }) => {
         if (payload && payload.mapId === localPlayerRef.current.mapId) {
@@ -1206,8 +1236,15 @@ export default function App() {
         }
       });
 
-    // Window unload / tab close listener to broadcast player_leave event
+    // Window unload / tab close listener to broadcast player_leave & dm_close events
     const handleUnload = () => {
+      if (activeDMTargetRef.current) {
+        safeBroadcastChannel('dm_close', {
+          fromId: localPlayerRef.current.id,
+          fromName: localPlayerRef.current.nickname,
+          toId: activeDMTargetRef.current.id
+        });
+      }
       try {
         channel.send({
           type: 'broadcast',
@@ -1460,6 +1497,24 @@ export default function App() {
                 }
               };
             });
+          }
+          break;
+
+        case 'dm_close':
+          if (msg.toId === deviceId.current) {
+            const partnerName = msg.fromName || '상대방';
+            saveDM({
+              id: 'dm_close_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+              fromId: msg.fromId,
+              fromName: partnerName,
+              toId: deviceId.current,
+              text: `🚨 [${partnerName}] 님이 1:1 놀기를 종료하였습니다.`,
+              timestamp: Date.now(),
+              read: true
+            });
+            setClosedDMPartners((prev) => ({ ...prev, [msg.fromId]: true }));
+            updateUnreadCount();
+            window.dispatchEvent(new Event('on_house_dm_read'));
           }
           break;
 
@@ -2077,6 +2132,19 @@ export default function App() {
         fromName: localPlayer.nickname,
         toId: activeDMTarget.id
       });
+      if (bcRef.current) {
+        bcRef.current.postMessage({
+          type: 'dm_close',
+          fromId: localPlayer.id,
+          fromName: localPlayer.nickname,
+          toId: activeDMTarget.id
+        });
+      }
+      setClosedDMPartners((prev) => {
+        const copy = { ...prev };
+        delete copy[activeDMTarget.id];
+        return copy;
+      });
     }
     setActiveDMTarget(null);
     updateUnreadCount();
@@ -2519,6 +2587,7 @@ export default function App() {
           partnerViewingState={partnerViewingState}
           activeYouTubeVideoId={activeYouTubeVideoId}
           activeWebUrl={activeWebUrl}
+          isPartnerClosed={!!closedDMPartners[activeDMTarget.id]}
         />
       )}
 

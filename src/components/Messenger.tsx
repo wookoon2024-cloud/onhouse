@@ -13,6 +13,7 @@ interface MessengerProps {
   partnerViewingState?: { videoId?: string; webUrl?: string; syncEnabled?: boolean } | null;
   activeYouTubeVideoId?: string | null;
   activeWebUrl?: string | null;
+  isPartnerClosed?: boolean;
 }
 
 const extractYouTubeId = (text: string): string | null => {
@@ -60,7 +61,8 @@ export const Messenger: React.FC<MessengerProps> = ({
   onOpenWebUrl,
   partnerViewingState,
   activeYouTubeVideoId,
-  activeWebUrl
+  activeWebUrl,
+  isPartnerClosed
 }) => {
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
   const [messages, setMessages] = useState<DirectMessage[]>([]);
@@ -329,6 +331,31 @@ export const Messenger: React.FC<MessengerProps> = ({
           </div>
         ) : (
           messages.map((msg, index) => {
+            if (msg.text.startsWith('🚨')) {
+              return (
+                <div
+                  key={msg.id}
+                  style={{
+                    alignSelf: 'center',
+                    maxWidth: '90%',
+                    margin: '10px 0',
+                    padding: '8px 14px',
+                    background: 'rgba(239, 68, 68, 0.18)',
+                    border: '1px solid rgba(239, 68, 68, 0.4)',
+                    borderRadius: '8px',
+                    color: '#ff6b6b',
+                    fontSize: '11px',
+                    fontFamily: 'var(--font-pixel)',
+                    textAlign: 'center',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                    lineHeight: '1.4'
+                  }}
+                >
+                  {msg.text}
+                </div>
+              );
+            }
+
             const isMe = msg.fromId === localPlayer.id;
             const ytId = extractYouTubeId(msg.text);
             const webUrl = extractGeneralUrl(msg.text);
@@ -525,7 +552,33 @@ export const Messenger: React.FC<MessengerProps> = ({
             );
           })
         )}
-        {!activeTarget.isOnline && (
+        {isPartnerClosed && (
+          <div style={{
+            display: 'flex', gap: '8px', background: 'rgba(239, 68, 68, 0.15)',
+            padding: '10px 14px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.4)',
+            marginTop: 'auto', marginBottom: '8px', fontFamily: 'var(--font-pixel)', letterSpacing: '0px',
+            alignItems: 'center', justifyContent: 'space-between'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ShieldAlert size={16} style={{ color: '#ef4444', flexShrink: 0 }} />
+              <span style={{ fontSize: '11px', color: '#ff6b6b', lineHeight: '1.4' }}>
+                🚨 상대방 [{activeTarget?.nickname || '상대'}] 님이 1:1 놀기를 종료하였습니다.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                background: '#ef4444', color: '#fff', border: 'none',
+                padding: '4px 10px', borderRadius: '4px', fontSize: '10px',
+                cursor: 'pointer', fontWeight: 'bold', whiteSpace: 'nowrap'
+              }}
+            >
+              창 닫기
+            </button>
+          </div>
+        )}
+        {!activeTarget?.isOnline && !isPartnerClosed && (
           <div style={{
             display: 'flex', gap: '8px', background: 'rgba(243, 139, 168, 0.1)',
             padding: '10px', borderRadius: '8px', border: '1px solid rgba(243, 139, 168, 0.2)',
@@ -547,25 +600,29 @@ export const Messenger: React.FC<MessengerProps> = ({
       }}>
         <input
           type="text"
-          placeholder="메시지를 입력하세요..."
+          placeholder={isPartnerClosed ? "상대방이 1:1 놀기를 종료하였습니다." : "메시지를 입력하세요..."}
+          disabled={isPartnerClosed}
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           onKeyDown={handleKeyPress}
           style={{
             flex: 1, padding: '10px 14px', borderRadius: '8px',
-            background: 'rgba(255, 255, 255, 0.05)', border: '1px solid var(--border-glass)',
-            color: '#fff', fontSize: '12px', fontFamily: 'var(--font-pixel)', letterSpacing: '0px', outline: 'none'
+            background: isPartnerClosed ? 'rgba(239, 68, 68, 0.08)' : 'rgba(255, 255, 255, 0.05)',
+            border: isPartnerClosed ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid var(--border-glass)',
+            color: isPartnerClosed ? '#ff8888' : '#fff', fontSize: '12px', fontFamily: 'var(--font-pixel)', letterSpacing: '0px', outline: 'none'
           }}
         />
         <button
           type="button"
           onClick={handleSend}
+          disabled={isPartnerClosed}
           style={{
-            background: 'var(--primary)', color: '#fff',
+            background: isPartnerClosed ? '#4a4a6b' : 'var(--primary)',
+            color: isPartnerClosed ? '#888' : '#fff',
             width: '38px', height: '38px', borderRadius: '8px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 2px 8px var(--primary-glow)',
-            cursor: 'pointer'
+            boxShadow: isPartnerClosed ? 'none' : '0 2px 8px var(--primary-glow)',
+            cursor: isPartnerClosed ? 'not-allowed' : 'pointer'
           }}
         >
           <Send size={16} />
