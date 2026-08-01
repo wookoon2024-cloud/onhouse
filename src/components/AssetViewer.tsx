@@ -222,7 +222,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   const [imgHeight, setImgHeight] = useState<number>(0);
   const [customColsInput, setCustomColsInput] = useState<number | ''>(4);
   const [customRowsInput, setCustomRowsInput] = useState<number | ''>(9);
-  const [customMarginInput, setCustomMarginInput] = useState<number | ''>(0);
+  const [customMarginXInput, setCustomMarginXInput] = useState<number | ''>(0);
+  const [customMarginYInput, setCustomMarginYInput] = useState<number | ''>(0);
   const [customSpacingInput, setCustomSpacingInput] = useState<number | ''>(0);
   const [customFrameWidthInput, setCustomFrameWidthInput] = useState<number | ''>(32);
   const [customFrameHeightInput, setCustomFrameHeightInput] = useState<number | ''>(32);
@@ -231,6 +232,12 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   const [isCustomFrameSize, setIsCustomFrameSize] = useState<boolean>(false);
   const [isNormalizing, setIsNormalizing] = useState<boolean>(false);
   const [previewZoom, setPreviewZoom] = useState<number>(1.0); // 1.0 (Fit), 1.5x, 2.0x, 3.0x, 4.0x
+  
+  // Preview Panning State
+  const previewContainerRef = useRef<HTMLDivElement>(null);
+  const [isSpaceDown, setIsSpaceDown] = useState<boolean>(false);
+  const [isPanning, setIsPanning] = useState<boolean>(false);
+  const panStartRef = useRef({ x: 0, y: 0, scrollL: 0, scrollT: 0 });
 
   // Open Market Publish Modal State
   const [showPublishModal, setShowPublishModal] = useState<boolean>(false);
@@ -264,6 +271,27 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   // New Action Row Prompt State
   const [showAddRowModal, setShowAddRowModal] = useState<boolean>(false);
   const [newActionNameInput, setNewActionNameInput] = useState<string>('');
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
+        e.preventDefault();
+        setIsSpaceDown(true);
+      }
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        setIsSpaceDown(false);
+        setIsPanning(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
 
   // Persist custom assets to localStorage
   useEffect(() => {
@@ -1711,8 +1739,10 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
 
         const currentTileSize = tileSizeInput || 16;
         if (uploadCategory === 'map') {
-          const autoCols = Math.max(1, Math.floor((img.width - customMarginInput * 2 + customSpacingInput) / (currentTileSize + customSpacingInput)));
-          const autoRows = Math.max(1, Math.floor((img.height - customMarginInput * 2 + customSpacingInput) / (currentTileSize + customSpacingInput)));
+          const mX = typeof customMarginXInput === 'number' ? customMarginXInput : 0;
+          const mY = typeof customMarginYInput === 'number' ? customMarginYInput : 0;
+          const autoCols = Math.max(1, Math.floor((img.width - mX * 2 + customSpacingInput) / (currentTileSize + customSpacingInput)));
+          const autoRows = Math.max(1, Math.floor((img.height - mY * 2 + customSpacingInput) / (currentTileSize + customSpacingInput)));
           setCustomColsInput(autoCols);
           setCustomRowsInput(autoRows);
           setCustomFrameWidthInput(currentTileSize);
@@ -1776,11 +1806,12 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     cols: number,
     rows: number,
     tSize: number,
-    margin: number,
+    marginX: number,
+    marginY: number,
     spacing: number
   ): Promise<string> => {
     return new Promise((resolve) => {
-      if (margin === 0 && spacing === 0) {
+      if (marginX === 0 && marginY === 0 && spacing === 0) {
         resolve(sourceUrl);
         return;
       }
@@ -1800,8 +1831,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
 
         for (let r = 0; r < rows; r++) {
           for (let c = 0; c < cols; c++) {
-            const sx = margin + c * (tSize + spacing);
-            const sy = margin + r * (tSize + spacing);
+            const sx = marginX + c * (tSize + spacing);
+            const sy = marginY + r * (tSize + spacing);
             const dx = c * tSize;
             const dy = r * tSize;
             ctx.drawImage(img, sx, sy, tSize, tSize, dx, dy, tSize, tSize);
@@ -2143,14 +2174,18 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
           : (imgHeight > 0 && offY < imgHeight ? Math.max(1, Math.floor((imgHeight - offY) / frameH)) : 7);
 
         // Automatic Gap & Margin Extraction for Map Tilesets
-        if (uploadCategory === 'map' && (customSpacingInput > 0 || customMarginInput > 0)) {
+        const mX = typeof customMarginXInput === 'number' ? customMarginXInput : 0;
+        const mY = typeof customMarginYInput === 'number' ? customMarginYInput : 0;
+        
+        if (uploadCategory === 'map' && (customSpacingInput > 0 || mX > 0 || mY > 0)) {
           setSaveProgressText('✂️ 타일 간격/검은줄 제거 및 픽셀 규격화 정제 중...');
           finalUrl = await extractCleanTilesetImage(
             fileDataUrl,
             cols,
             rows,
             tSize,
-            customMarginInput,
+            mX,
+            mY,
             customSpacingInput
           );
         } else if (uploadCategory === 'character' || offX > 0 || offY > 0 || (imgWidth > 0 && (frameW !== Math.round((imgWidth - offX) / cols) || frameH !== Math.round((imgHeight - offY) / rows)))) {
@@ -4279,15 +4314,13 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
 
               {/* Spacing & Margin Controls for Map Tilesets */}
               {uploadCategory === 'map' && (
-                <div style={{ display: 'flex', gap: '6px', background: '#101018', padding: '6px 8px', border: '1px solid #3b3b54' }}>
+                <div style={{ display: 'flex', gap: '4px' }}>
                   <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: '9px', color: '#a78bfa', display: 'block', marginBottom: '1px', fontWeight: 'normal' }}>
-                      ✏️ 타일 간격 (Spacing px):
-                    </label>
+                    <label style={{ fontSize: '10px', color: '#a78bfa', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}><Edit3 size={10} color="#ff6b6b" /> 타일 간격 (Spacing px):</label>
                     <input
                       type="number"
                       min={0}
-                      max={16}
+                      max={128}
                       value={customSpacingInput}
                       disabled={isSavingAsset}
                       onChange={(e) => {
@@ -4296,39 +4329,61 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                           setCustomSpacingInput('');
                           return;
                         }
-                        const s = parseInt(valStr, 10);
-                        if (!isNaN(s)) handleSpacingChange(Math.max(0, s));
+                        const space = parseInt(valStr, 10);
+                        if (!isNaN(space)) setCustomSpacingInput(space);
                       }}
                       onBlur={() => {
                         if (customSpacingInput === '') setCustomSpacingInput(0);
                       }}
-                      style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '3px 6px', color: '#fff', fontSize: '10px', textAlign: 'center', fontWeight: 'normal', height: '24px', boxSizing: 'border-box' }}
+                      style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '4px 6px', color: '#fff', fontSize: '11px', textAlign: 'center', outline: 'none', fontWeight: 'normal', height: '28px', boxSizing: 'border-box' }}
                     />
                   </div>
 
                   <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: '9px', color: '#aaa', display: 'block', marginBottom: '1px' }}>
-                      외곽 여백 (Margin px):
-                    </label>
+                    <label style={{ fontSize: '10px', color: '#a78bfa', display: 'block', marginBottom: '2px' }}>외곽 여백 X (Margin X):</label>
                     <input
                       type="number"
                       min={0}
-                      max={16}
-                      value={customMarginInput}
+                      max={128}
+                      value={customMarginXInput}
                       disabled={isSavingAsset}
                       onChange={(e) => {
                         const valStr = e.target.value;
                         if (valStr === '') {
-                          setCustomMarginInput('');
+                          setCustomMarginXInput('');
                           return;
                         }
-                        const m = parseInt(valStr, 10);
-                        if (!isNaN(m)) handleMarginChange(Math.max(0, m));
+                        const margin = parseInt(valStr, 10);
+                        if (!isNaN(margin)) setCustomMarginXInput(margin);
                       }}
                       onBlur={() => {
-                        if (customMarginInput === '') setCustomMarginInput(0);
+                        if (customMarginXInput === '') setCustomMarginXInput(0);
                       }}
-                      style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '3px 6px', color: '#fff', fontSize: '10px', textAlign: 'center', fontWeight: 'normal', height: '24px', boxSizing: 'border-box' }}
+                      style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '4px 6px', color: '#fff', fontSize: '11px', textAlign: 'center', outline: 'none', fontWeight: 'normal', height: '28px', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: '10px', color: '#a78bfa', display: 'block', marginBottom: '2px' }}>외곽 여백 Y (Margin Y):</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={128}
+                      value={customMarginYInput}
+                      disabled={isSavingAsset}
+                      onChange={(e) => {
+                        const valStr = e.target.value;
+                        if (valStr === '') {
+                          setCustomMarginYInput('');
+                          return;
+                        }
+                        const margin = parseInt(valStr, 10);
+                        if (!isNaN(margin)) setCustomMarginYInput(margin);
+                      }}
+                      onBlur={() => {
+                        if (customMarginYInput === '') setCustomMarginYInput(0);
+                      }}
+                      style={{ width: '100%', background: '#0d0d12', border: '1px solid #4a4a6b', borderRadius: 0, padding: '4px 6px', color: '#fff', fontSize: '11px', textAlign: 'center', outline: 'none', fontWeight: 'normal', height: '28px', boxSizing: 'border-box' }}
                     />
                   </div>
                 </div>
@@ -4392,13 +4447,37 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                     </div>
                   </div>
 
-                  {/* Grid Overlay Preview Canvas Container - Clean Scrollbar Free in Fit Mode! */}
-                  <div style={{
+                  <div 
+                    ref={previewContainerRef}
+                    onPointerDown={(e) => {
+                      if (isSpaceDown && previewZoom > 1.0 && previewContainerRef.current) {
+                        setIsPanning(true);
+                        panStartRef.current = {
+                          x: e.clientX,
+                          y: e.clientY,
+                          scrollL: previewContainerRef.current.scrollLeft,
+                          scrollT: previewContainerRef.current.scrollTop
+                        };
+                      }
+                    }}
+                    onPointerMove={(e) => {
+                      if (isPanning && previewContainerRef.current) {
+                        const dx = e.clientX - panStartRef.current.x;
+                        const dy = e.clientY - panStartRef.current.y;
+                        previewContainerRef.current.scrollLeft = panStartRef.current.scrollL - dx;
+                        previewContainerRef.current.scrollTop = panStartRef.current.scrollT - dy;
+                      }
+                    }}
+                    onPointerUp={() => setIsPanning(false)}
+                    onPointerLeave={() => setIsPanning(false)}
+                    style={{
                     position: 'relative', width: '100%', height: '180px', background: '#0a0a0f',
                     borderRadius: 0, border: '1px solid #3b3b54',
                     overflow: previewZoom > 1.0 ? 'auto' : 'hidden',
                     scrollbarWidth: 'none', msOverflowStyle: 'none',
-                    display: 'block', padding: previewZoom > 1.0 ? '8px' : 0
+                    display: 'block', padding: previewZoom > 1.0 ? '8px' : 0,
+                    cursor: isSpaceDown && previewZoom > 1.0 ? (isPanning ? 'grabbing' : 'grab') : 'default',
+                    userSelect: 'none'
                   }}>
                     {previewZoom === 1.0 ? (
                       /* Fit Mode (Pixel-Exact Aspect Ratio Container & Scaled Overlay) */
@@ -4473,8 +4552,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                             Array.from({ length: typeof customRowsInput === 'number' ? customRowsInput : 7 }).map((_, r) => {
                               const effFrameW = typeof customFrameWidthInput === 'number' ? customFrameWidthInput : tileSizeInput;
                               const effFrameH = typeof customFrameHeightInput === 'number' ? customFrameHeightInput : tileSizeInput;
-                              const effOffX = typeof customOffsetXInput === 'number' ? customOffsetXInput : (typeof customMarginInput === 'number' ? customMarginInput : 0);
-                              const effOffY = typeof customOffsetYInput === 'number' ? customOffsetYInput : (typeof customMarginInput === 'number' ? customMarginInput : 0);
+                              const effOffX = typeof customOffsetXInput === 'number' ? customOffsetXInput : (typeof customMarginXInput === 'number' ? customMarginXInput : 0);
+                              const effOffY = typeof customOffsetYInput === 'number' ? customOffsetYInput : (typeof customMarginYInput === 'number' ? customMarginYInput : 0);
                               const effSpacing = typeof customSpacingInput === 'number' ? customSpacingInput : 0;
 
                               const leftPx = (effOffX + c * (effFrameW + effSpacing)) * previewZoom;
