@@ -89,30 +89,9 @@ export default function App() {
   const [houseCode, setHouseCodeState] = useState<string>(getSavedHouseCode);
   const [showHouseModal, setShowHouseModal] = useState<boolean>(false);
 
-  // 0. Active Maps (loads house-isolated maps for current houseCode)
+  // 0. Active Maps (loads house-isolated maps directly from Supabase DB)
   const [activeMaps, setActiveMaps] = useState<Record<string, MapDefinition>>(() => {
-    const initial = JSON.parse(JSON.stringify(maps));
-    try {
-      const cached = localStorage.getItem('on_house_custom_maps_cache');
-      if (cached) {
-        const parsedCached = JSON.parse(cached);
-        Object.assign(initial, parsedCached);
-      }
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('on_house_map_')) {
-          const mapId = key.replace('on_house_map_', '');
-          const saved = localStorage.getItem(key);
-          if (saved) {
-            const parsed = JSON.parse(saved);
-            if (parsed && parsed.width && parsed.height) {
-              initial[mapId] = parsed;
-            }
-          }
-        }
-      }
-    } catch (e) {}
-    return initial;
+    return JSON.parse(JSON.stringify(maps));
   });
   const [isHouseLoaded, setIsHouseLoaded] = useState<boolean>(false);
 
@@ -140,12 +119,6 @@ export default function App() {
     } catch (e) {}
     const fetchedMapIds = Object.keys(mapsData);
     let savedOrder: string[] = dbOrder && dbOrder.length > 0 ? dbOrder : [];
-    if (savedOrder.length === 0) {
-      try {
-        const raw = localStorage.getItem('on_house_available_maps') || localStorage.getItem('on_house_available_map_ids');
-        if (raw) savedOrder = JSON.parse(raw);
-      } catch (e) {}
-    }
 
     const orderedIds = [
       ...savedOrder.filter(id => fetchedMapIds.includes(id)),
@@ -724,42 +697,12 @@ export default function App() {
         const { mapTilesets, charSprites, charOverrides, charRowActions } = assetsData;
         setDbCustomCharSprites(charSprites || []);
         
-        // Non-destructive merge for localStorage custom tilesets
         try {
-          const existingMapsStr = localStorage.getItem('on_house_custom_map_tilesets');
-          let finalMaps = mapTilesets || [];
-          if (existingMapsStr) {
-            const existingMaps = JSON.parse(existingMapsStr);
-            const mapMap = new Map<string, any>();
-            existingMaps.forEach((m: any) => { if (m?.id) mapMap.set(m.id, m); });
-            (mapTilesets || []).forEach((m: any) => { if (m?.id) mapMap.set(m.id, m); });
-            finalMaps = Array.from(mapMap.values());
-          }
-          localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(finalMaps));
+          localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(mapTilesets || []));
+          localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(charSprites || []));
+          localStorage.setItem('on_house_char_image_overrides', JSON.stringify(charOverrides || {}));
+          localStorage.setItem('on_house_char_row_actions', JSON.stringify(charRowActions || {}));
         } catch (e) {}
-
-        // Non-destructive merge for localStorage char sprites
-        try {
-          const existingCharsStr = localStorage.getItem('on_house_custom_char_sprites');
-          let finalChars = charSprites || [];
-          if (existingCharsStr) {
-            const existingChars = JSON.parse(existingCharsStr);
-            const charMap = new Map<string, any>();
-            existingChars.forEach((c: any) => { if (c?.id) charMap.set(c.id, c); });
-            (charSprites || []).forEach((c: any) => { if (c?.id) charMap.set(c.id, c); });
-            finalChars = Array.from(charMap.values());
-          }
-          localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(finalChars));
-        } catch (e) {}
-
-        if (charOverrides) {
-          localStorage.setItem('on_house_char_image_overrides', JSON.stringify(charOverrides));
-        }
-        if (charRowActions) {
-          const existingActionsStr = localStorage.getItem('on_house_char_row_actions');
-          const existingActions = existingActionsStr ? JSON.parse(existingActionsStr) : {};
-          localStorage.setItem('on_house_char_row_actions', JSON.stringify({ ...existingActions, ...charRowActions }));
-        }
         setAssetVersion((v) => v + 1);
         window.dispatchEvent(new Event('on_house_sprites_updated'));
       }
