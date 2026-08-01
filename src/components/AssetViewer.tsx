@@ -1500,6 +1500,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     if (!currentOption || !currentOption.url) return;
     const actionName = newActionNameInput.trim() || `동작 ${currentOption.rows + 1}`;
 
+    console.log(`[OnHouse ActionRow] 1/5 ➕ Adding action row "${actionName}" for charId: "${currentSelectedId}" (current rows: ${currentOption.rows})`);
+
     try {
       const img = await loadLoadedImageElement(currentOption.url);
       const oldRows = currentOption.rows;
@@ -1512,11 +1514,13 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       const tileW = Math.max(1, Math.floor(naturalW / cols));
       const tileH = Math.max(1, Math.floor(naturalH / oldRows));
 
+      console.log(`[OnHouse ActionRow] 2/5 🎨 Resizing spritesheet: ${naturalW}x${naturalH} -> ${naturalW}x${newRows * tileH} (tile: ${tileW}x${tileH})`);
+
       const canvas = document.createElement('canvas');
       canvas.width = naturalW;
       canvas.height = newRows * tileH;
       const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+      if (!ctx) throw new Error('Canvas 2D context unavailable');
       ctx.imageSmoothingEnabled = false;
 
       // Draw existing image
@@ -1570,28 +1574,35 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       setCharRowActions(updatedRowActions);
       localStorage.setItem('on_house_char_row_actions', JSON.stringify(updatedRowActions));
 
+      console.log(`[OnHouse ActionRow] 3/5 💾 Saved row actions to LocalStorage (${updatedList.length} actions: ${updatedList.join(', ')})`);
+
       // Save updated asset & override to Supabase DB!
       const currentHouseCode = getSavedHouseCode();
       const foundOpt = customCharSprites.find((c) => c.id === currentSelectedId) || DEFAULT_CHARACTER_SPRITES.find((c) => c.id === currentSelectedId);
-      saveHouseAssetToDB(currentHouseCode, 'char_sprite', {
-        id: currentSelectedId,
-        name: foundOpt?.name || currentSelectedId,
-        url: updatedUrl,
-        cols,
-        rows: newRows,
-        size: currentOption.size || 32,
-        isCustom: true
-      }).catch(() => {});
+      
+      console.log(`[OnHouse ActionRow] 4/5 ☁️ Syncing 3 asset rows (char_sprite, char_image_override, char_row_actions) to Supabase DB for house [${currentHouseCode}]...`);
+      
+      await Promise.all([
+        saveHouseAssetToDB(currentHouseCode, 'char_sprite', {
+          id: currentSelectedId,
+          name: foundOpt?.name || currentSelectedId,
+          url: updatedUrl,
+          cols,
+          rows: newRows,
+          size: currentOption.size || 32,
+          isCustom: true
+        }),
+        saveHouseAssetToDB(currentHouseCode, 'char_image_override', {
+          id: currentSelectedId,
+          ...newOverrideObj
+        }),
+        saveHouseAssetToDB(currentHouseCode, 'char_row_actions', {
+          id: currentSelectedId,
+          actions: updatedList
+        })
+      ]);
 
-      saveHouseAssetToDB(currentHouseCode, 'char_image_override', {
-        id: currentSelectedId,
-        ...newOverrideObj
-      }).catch(() => {});
-
-      saveHouseAssetToDB(currentHouseCode, 'char_row_actions', {
-        id: currentSelectedId,
-        actions: updatedList
-      }).catch(() => {});
+      console.log(`[OnHouse ActionRow] 5/5 ✅ Action row "${actionName}" (Row ${newRows - 1}) successfully saved to DB & LocalStorage!`);
 
       // Force instant DOM re-render & canvas game cache refresh
       setBoardRenderKey((prev) => prev + 1);
@@ -1603,7 +1614,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
       setShowAddRowModal(false);
       setNewActionNameInput('');
     } catch (err) {
-      console.error('Failed to add action row:', err);
+      console.error('[OnHouse ActionRow] ❌ Failed to add action row:', err);
       alert('동작 행 추가 중 오류가 발생했습니다. 다시 시도해 주세요.');
     }
   };

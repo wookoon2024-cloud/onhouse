@@ -521,6 +521,43 @@ export const fetchHouseAssets = async (houseCode: string) => {
       }
     } catch (e) {}
 
+    // Merge DB overrides & row actions with local overrides & row actions (preserving higher row counts or local additions)
+    try {
+      const savedLocalOverridesStr = localStorage.getItem('on_house_char_image_overrides');
+      if (savedLocalOverridesStr) {
+        const savedLocalOverrides = JSON.parse(savedLocalOverridesStr);
+        Object.entries(savedLocalOverrides).forEach(([id, locOv]: [string, any]) => {
+          if (locOv && locOv.url) {
+            const dbOv = charOverrides[id];
+            // If local override has more rows or DB has no override for this ID, use local override & re-sync to DB!
+            if (!dbOv || (locOv.rows && (!dbOv.rows || locOv.rows > dbOv.rows))) {
+              console.log(`[OnHouse Sync] 🔄 Preserving local override for '${id}' (rows: ${locOv.rows}) over DB (rows: ${dbOv?.rows || 0})`);
+              charOverrides[id] = locOv;
+              saveHouseAssetToDB(houseCode, 'char_image_override', { id, ...locOv }).catch(() => {});
+            }
+          }
+        });
+      }
+    } catch (e) {}
+
+    try {
+      const savedLocalActionsStr = localStorage.getItem('on_house_char_row_actions');
+      if (savedLocalActionsStr) {
+        const savedLocalActions = JSON.parse(savedLocalActionsStr);
+        Object.entries(savedLocalActions).forEach(([id, locActs]: [string, any]) => {
+          if (locActs && Array.isArray(locActs) && locActs.length > 0) {
+            const dbActs = charRowActions[id];
+            // If local actions has more items or DB has no actions for this ID, use local actions & re-sync to DB!
+            if (!dbActs || (Array.isArray(dbActs) && locActs.length > dbActs.length)) {
+              console.log(`[OnHouse Sync] 🔄 Preserving local row actions for '${id}' (count: ${locActs.length}) over DB (count: ${dbActs?.length || 0})`);
+              charRowActions[id] = locActs;
+              saveHouseAssetToDB(houseCode, 'char_row_actions', { id, actions: locActs }).catch(() => {});
+            }
+          }
+        });
+      }
+    } catch (e) {}
+
     try {
       localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(finalMapTilesets));
       localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(finalCharSprites));
