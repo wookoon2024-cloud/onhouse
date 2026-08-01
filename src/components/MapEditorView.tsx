@@ -1304,13 +1304,15 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                   const img = images[drawInfo.tilesetKey];
                   if (img) {
                     const tsInfo = getTilesetInfoLocal(drawInfo.tilesetKey);
-                    const srcX = (drawInfo.localIdx % tsInfo.cols) * 16;
-                    const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * 16;
-                    ctx.drawImage(
-                      img,
-                      srcX, srcY, 16, 16,
-                      x * tileSize, y * tileSize, tileSize, tileSize
-                    );
+                    if (tsInfo && tsInfo.cols) {
+                      const srcX = (drawInfo.localIdx % tsInfo.cols) * 16;
+                      const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * 16;
+                      ctx.drawImage(
+                        img,
+                        srcX, srcY, 16, 16,
+                        x * tileSize, y * tileSize, tileSize, tileSize
+                      );
+                    }
                   }
                 }
               }
@@ -3344,6 +3346,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                               const subInfo = getTileDrawInfo(subTile, activeTileset);
                               if (!subInfo) return <div key={i} />;
                               const subTsInfo = getTilesetInfoLocal(subInfo.tilesetKey);
+                              if (!subTsInfo || !subTsInfo.cols) return <div key={i} />;
                               const subCol = subInfo.localIdx % subTsInfo.cols;
                               const subRow = Math.floor(subInfo.localIdx / subTsInfo.cols);
                               return (
@@ -3379,6 +3382,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                             const hSelInfo = getTileDrawInfo(hist.selectedTile, hist.activeTileset);
                             if (!hSelInfo) return null;
                             const hTsInfo = getTilesetInfoLocal(hSelInfo.tilesetKey);
+                            if (!hTsInfo || !hTsInfo.cols) return null;
                             const hCol = hSelInfo.localIdx % hTsInfo.cols;
                             const hRow = Math.floor(hSelInfo.localIdx / hTsInfo.cols);
                             
