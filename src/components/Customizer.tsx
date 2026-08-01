@@ -20,38 +20,23 @@ const DEFAULT_CHARACTERS = [
 ];
 
 export const Customizer: React.FC<CustomizerProps> = ({ player, customCharSprites, onChange, onClose }) => {
-  // Load custom created character sprites from localStorage or DB props
+  // Always use DB customCharSprites as primary source of truth!
   const [customChars, setCustomChars] = useState<Array<{ id: string; name: string }>>(() => {
+    if (customCharSprites && Array.isArray(customCharSprites) && customCharSprites.length > 0) {
+      return customCharSprites;
+    }
     try {
       const saved = localStorage.getItem('on_house_custom_char_sprites');
       if (saved) return JSON.parse(saved);
     } catch (e) {}
-    return customCharSprites && Array.isArray(customCharSprites) ? customCharSprites : [];
+    return [];
   });
 
-  // Re-sync character options dynamically whenever sprites are updated locally or loaded from DB
+  // Re-sync character options dynamically whenever DB sprites are updated
   useEffect(() => {
-    const syncCustomChars = () => {
-      try {
-        const saved = localStorage.getItem('on_house_custom_char_sprites');
-        if (saved) {
-          setCustomChars(JSON.parse(saved));
-          return;
-        }
-      } catch (e) {}
-      if (customCharSprites && Array.isArray(customCharSprites)) {
-        setCustomChars(customCharSprites);
-      }
-    };
-
-    syncCustomChars();
-
-    window.addEventListener('on_house_sprites_updated', syncCustomChars);
-    window.addEventListener('storage', syncCustomChars);
-    return () => {
-      window.removeEventListener('on_house_sprites_updated', syncCustomChars);
-      window.removeEventListener('storage', syncCustomChars);
-    };
+    if (customCharSprites && Array.isArray(customCharSprites)) {
+      setCustomChars(customCharSprites);
+    }
   }, [customCharSprites]);
 
   const handleDeleteCustomChar = async (e: React.MouseEvent, charId: string, charName: string) => {

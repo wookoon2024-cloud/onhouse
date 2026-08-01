@@ -473,84 +473,11 @@ export const fetchHouseAssets = async (houseCode: string) => {
       });
     }
 
-    // Merge DB assets with existing local assets (preserving locally created assets that aren't tombstoned)
+    // Supabase DB is 100% Single Source of Truth for all house assets!
     const finalCharSprites = [...charSprites];
-    try {
-      const savedLocalStr = localStorage.getItem('on_house_custom_char_sprites');
-      if (savedLocalStr) {
-        const savedLocal: any[] = JSON.parse(savedLocalStr);
-        savedLocal.forEach((loc) => {
-          if (loc && loc.id && !deletedAssetIds.has(loc.id) && !seenCharSpriteIds.has(loc.id)) {
-            seenCharSpriteIds.add(loc.id);
-            finalCharSprites.push(loc);
-            // Re-sync un-saved local asset to Supabase DB asynchronously ONLY if DB didn't fail
-            if (!dbFetchFailed) saveHouseAssetToDB(houseCode, 'char_sprite', loc).catch(() => {});
-          }
-        });
-      }
-    } catch (e) {}
-
     const finalMapTilesets = [...mapTilesets];
-    try {
-      const savedLocalMapStr = localStorage.getItem('on_house_custom_map_tilesets');
-      if (savedLocalMapStr) {
-        const savedLocalMaps: any[] = JSON.parse(savedLocalMapStr);
-        savedLocalMaps.forEach((loc) => {
-          if (loc && loc.id && !deletedAssetIds.has(loc.id) && !seenMapTilesetIds.has(loc.id)) {
-            seenMapTilesetIds.add(loc.id);
-            finalMapTilesets.push(loc);
-            if (!dbFetchFailed) saveHouseAssetToDB(houseCode, 'map_tileset', loc).catch(() => {});
-          }
-        });
-      }
-    } catch (e) {}
 
-    // Merge DB overrides & row actions with local overrides & row actions (preserving higher row counts or local additions)
-    try {
-      const savedLocalOverridesStr = localStorage.getItem('on_house_char_image_overrides');
-      if (savedLocalOverridesStr) {
-        const savedLocalOverrides = JSON.parse(savedLocalOverridesStr);
-        Object.entries(savedLocalOverrides).forEach(([id, locOv]: [string, any]) => {
-          if (locOv && locOv.url) {
-            const dbOv = charOverrides[id];
-            // If local override has more rows or DB has no override for this ID, use local override & re-sync to DB!
-            if (!dbOv || (locOv.rows && (!dbOv.rows || locOv.rows > dbOv.rows))) {
-              if (dbFetchFailed) {
-                // If DB fetch failed, we just silently merge it locally without logging to avoid spam
-                charOverrides[id] = locOv;
-              } else {
-                console.log(`[OnHouse Sync] 🔄 Preserving local override for '${id}' (rows: ${locOv.rows}) over DB (rows: ${dbOv?.rows || 0})`);
-                charOverrides[id] = locOv;
-                saveHouseAssetToDB(houseCode, 'char_image_override', { id, ...locOv }).catch(() => {});
-              }
-            }
-          }
-        });
-      }
-    } catch (e) {}
-
-    try {
-      const savedLocalActionsStr = localStorage.getItem('on_house_char_row_actions');
-      if (savedLocalActionsStr) {
-        const savedLocalActions = JSON.parse(savedLocalActionsStr);
-        Object.entries(savedLocalActions).forEach(([id, locActs]: [string, any]) => {
-          if (locActs && Array.isArray(locActs) && locActs.length > 0) {
-            const dbActs = charRowActions[id];
-            // If local actions has more items or DB has no actions for this ID, use local actions & re-sync to DB!
-            if (!dbActs || (Array.isArray(dbActs) && locActs.length > dbActs.length)) {
-              if (dbFetchFailed) {
-                charRowActions[id] = locActs;
-              } else {
-                console.log(`[OnHouse Sync] 🔄 Preserving local row actions for '${id}' (count: ${locActs.length}) over DB (count: ${dbActs?.length || 0})`);
-                charRowActions[id] = locActs;
-                saveHouseAssetToDB(houseCode, 'char_row_actions', { id, actions: locActs }).catch(() => {});
-              }
-            }
-          }
-        });
-      }
-    } catch (e) {}
-
+    // Update local cache so localStorage matches DB 100% (without resurrecting stale local items)
     try {
       localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(finalMapTilesets));
       localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(finalCharSprites));
