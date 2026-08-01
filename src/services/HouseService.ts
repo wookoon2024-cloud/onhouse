@@ -478,6 +478,21 @@ export const fetchHouseAssets = async (houseCode: string) => {
     const finalCharSprites = [...charSprites];
     const finalMapTilesets = [...mapTilesets];
 
+    // Safely restore any custom map tilesets from local cache if missing from DB, and re-sync to DB!
+    try {
+      const savedLocalMapStr = localStorage.getItem('on_house_custom_map_tilesets');
+      if (savedLocalMapStr) {
+        const savedLocalMaps: any[] = JSON.parse(savedLocalMapStr);
+        savedLocalMaps.forEach((loc) => {
+          if (loc && loc.id && !seenMapTilesetIds.has(loc.id)) {
+            seenMapTilesetIds.add(loc.id);
+            finalMapTilesets.push(loc);
+            saveHouseAssetToDB(houseCode, 'map_tileset', loc).catch(() => {});
+          }
+        });
+      }
+    } catch (e) {}
+
     // Update local cache so localStorage matches DB 100% (without resurrecting stale local items)
     try {
       localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(finalMapTilesets));
@@ -577,90 +592,9 @@ export const deleteHouseAssetFromDB = async (
 };
 
 // Clean up all obsolete duplicate rows and tombstone delete records from Supabase DB to free storage space
-export const cleanupDatabaseTrash = async (houseCode: string) => {
-  try {
-    console.log(`[OnHouse Cleanup] Running DB trash cleanup for houseCode: ${houseCode}...`);
-
-    // Fetch lightweight meta rows (without reading heavy JSONB TOAST blobs)
-    const { data: rows, error } = await supabase
-      .from('house_assets')
-      .select('id, asset_type, updated_at')
-      .eq('house_code', houseCode)
-      .limit(200);
-
-    if (error || !rows || rows.length === 0) {
-      console.log('[OnHouse Cleanup] No rows to clean or query error');
-      return;
-    }
-
-    // Fetch full data for these meta rows by Primary Key ID (O(1) B-tree lookup)
-    const { data: fullRows } = await supabase
-      .from('house_assets')
-      .select('id, asset_type, asset_data, updated_at')
-      .in('id', rows.map((r: any) => r.id));
-
-    if (!fullRows || fullRows.length === 0) return;
-
-    const deletedIds = new Set<string>();
-    fullRows.forEach((row: any) => {
-      if (row.asset_type === 'char_delete' && row.asset_data?.id) {
-        deletedIds.add(row.asset_data.id);
-      }
-    });
-
-    const rowIdsToDelete: (string | number)[] = [];
-    const latestRowMap = new Map<string, { dbRowId: string | number; updatedAt: string }>();
-
-    fullRows.forEach((row: any) => {
-      const assetId = row.asset_data?.id;
-
-      if (row.asset_type === 'char_delete') {
-        rowIdsToDelete.push(row.id);
-        return;
-      }
-
-      if (assetId && deletedIds.has(assetId)) {
-        rowIdsToDelete.push(row.id);
-        return;
-      }
-
-      if (row.asset_type === 'map_order' || (assetId && (row.asset_type === 'char_sprite' || row.asset_type === 'char_image_override' || row.asset_type === 'map_tileset'))) {
-        const groupKey = row.asset_type === 'map_order' ? 'map_order:default' : `${row.asset_type}:${assetId}`;
-        const existing = latestRowMap.get(groupKey);
-
-        if (!existing) {
-          latestRowMap.set(groupKey, { dbRowId: row.id, updatedAt: row.updated_at || '' });
-        } else {
-          const timeExisting = new Date(existing.updatedAt).getTime() || 0;
-          const timeCurrent = new Date(row.updated_at || 0).getTime() || 0;
-
-          if (timeCurrent > timeExisting) {
-            rowIdsToDelete.push(existing.dbRowId);
-            latestRowMap.set(groupKey, { dbRowId: row.id, updatedAt: row.updated_at || '' });
-          } else {
-            rowIdsToDelete.push(row.id);
-          }
-        }
-      }
-    });
-
-    if (rowIdsToDelete.length > 0) {
-      console.log(`[OnHouse Cleanup] Found ${rowIdsToDelete.length} trash/obsolete rows to hard-delete from DB:`, rowIdsToDelete);
-      
-      for (let i = 0; i < rowIdsToDelete.length; i += 50) {
-        const chunk = rowIdsToDelete.slice(i, i + 50);
-        await supabase
-          .from('house_assets')
-          .delete()
-          .in('id', chunk);
-      }
-      console.log(`[OnHouse Cleanup] ✅ Successfully hard-deleted ${rowIdsToDelete.length} trash rows from Supabase DB!`);
-    } else {
-      console.log('[OnHouse Cleanup] DB is already clean. No trash rows found.');
-    }
-  } catch (err) {
-    console.warn('[OnHouse Cleanup] Error cleaning DB trash:', err);
-  }
+export const cleanupDatabaseTrash = async (_houseCode: string) => {
+  // Automatic DB deletion is disabled to guarantee 100% asset safety
+  return;
 };
 
 // ----------------------------------------------------
