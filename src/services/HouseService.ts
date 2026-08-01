@@ -523,25 +523,18 @@ export const saveHouseAssetToDB = async (
   assetData: any
 ) => {
   try {
-    // Note: We deliberately SKIP synchronous deletion of older rows here to avoid 
-    // expensive sequential JSONB scans (asset_data->>id) that cause DB timeouts under load.
-    // The background `cleanupDatabaseTrash` function handles garbage collection of duplicates efficiently.
+    const { error } = await supabase
+      .from('house_assets')
+      .insert({
+        house_code: houseCode,
+        asset_type: assetType,
+        asset_data: assetData,
+        updated_at: new Date().toISOString()
+      });
 
-    const res = await withTimeout(
-      supabase
-        .from('house_assets')
-        .insert({
-          house_code: houseCode,
-          asset_type: assetType,
-          asset_data: assetData,
-          updated_at: new Date().toISOString()
-        }),
-      20000
-    );
-
-    if (res.error) {
-      console.error('Failed to save asset to Supabase:', res.error.message);
-      return { success: false, error: res.error.message };
+    if (error) {
+      console.error('Failed to save asset to Supabase:', error.message);
+      return { success: false, error: error.message };
     }
     return { success: true };
   } catch (err: any) {
@@ -557,25 +550,22 @@ export const deleteHouseAssetFromDB = async (
   assetId: string
 ) => {
   try {
-    console.log(`[OnHouse Sync] Soft deleting (Tombstone) asset '${assetId}' (${assetType}) from DB for house [${houseCode}]...`);
+    const { error } = await supabase
+      .from('house_assets')
+      .insert({
+        house_code: houseCode,
+        asset_type: 'char_delete',
+        asset_data: { id: assetId }
+      });
 
-    // Instead of a slow sequential scan delete, we insert an O(1) tombstone record.
-    // fetchHouseAssets will instantly hide this asset, and cleanupDatabaseTrash will hard-delete it in the background!
-    await withTimeout(
-      supabase
-        .from('house_assets')
-        .insert({
-          house_code: houseCode,
-          asset_type: 'char_delete',
-          asset_data: { id: assetId }
-        }),
-      3500
-    );
-
+    if (error) {
+      console.error('Failed to delete asset from Supabase:', error.message);
+      return { success: false, error: error.message };
+    }
     return { success: true };
   } catch (err: any) {
     console.error('Error in deleteHouseAssetFromDB:', err);
-    return { success: false };
+    return { success: false, error: err?.message || 'DB 에셋 삭제 실패' };
   }
 };
 
