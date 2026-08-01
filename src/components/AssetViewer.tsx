@@ -1768,36 +1768,31 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
 
   const recalculateDimensions = (
     newSize: number = tileSizeInput,
-    margin: number = customMarginInput,
-    spacing: number = customSpacingInput,
+    mX: number = typeof customMarginXInput === 'number' ? customMarginXInput : 0,
+    mY: number = typeof customMarginYInput === 'number' ? customMarginYInput : 0,
+    spacing: number = typeof customSpacingInput === 'number' ? customSpacingInput : 0,
     w: number = imgWidth,
     h: number = imgHeight,
     cat: MainCategory = uploadCategory
   ) => {
     if (w <= 0 || h <= 0) return;
     if (cat === 'map') {
-      const autoCols = Math.max(1, Math.floor((w - margin * 2 + spacing) / (newSize + spacing)));
-      const autoRows = Math.max(1, Math.floor((h - margin * 2 + spacing) / (newSize + spacing)));
+      const autoCols = Math.max(1, Math.floor((w - mX * 2 + spacing) / (newSize + spacing)));
+      const autoRows = Math.max(1, Math.floor((h - mY * 2 + spacing) / (newSize + spacing)));
       setCustomColsInput(autoCols);
       setCustomRowsInput(autoRows);
     }
   };
 
-  const handleMarginChange = (marginVal: number) => {
-    const m = Math.max(0, marginVal);
-    setCustomMarginInput(m);
-    recalculateDimensions(tileSizeInput, m, customSpacingInput);
-  };
-
   const handleSpacingChange = (spacingVal: number) => {
     const s = Math.max(0, spacingVal);
     setCustomSpacingInput(s);
-    recalculateDimensions(tileSizeInput, customMarginInput, s);
+    recalculateDimensions(tileSizeInput, typeof customMarginXInput === 'number' ? customMarginXInput : 0, typeof customMarginYInput === 'number' ? customMarginYInput : 0, s);
   };
 
   const handleTileSizeSelect = (newSize: number) => {
     setTileSizeInput(newSize);
-    recalculateDimensions(newSize, customMarginInput, customSpacingInput);
+    recalculateDimensions(newSize, typeof customMarginXInput === 'number' ? customMarginXInput : 0, typeof customMarginYInput === 'number' ? customMarginYInput : 0, typeof customSpacingInput === 'number' ? customSpacingInput : 0);
   };
 
   // Helper to slice tiles with margin & spacing into a 100% clean gapless tileset PNG
@@ -4330,7 +4325,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                           return;
                         }
                         const space = parseInt(valStr, 10);
-                        if (!isNaN(space)) setCustomSpacingInput(space);
+                        if (!isNaN(space)) handleSpacingChange(Math.max(0, space));
                       }}
                       onBlur={() => {
                         if (customSpacingInput === '') setCustomSpacingInput(0);
@@ -4354,7 +4349,11 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                           return;
                         }
                         const margin = parseInt(valStr, 10);
-                        if (!isNaN(margin)) setCustomMarginXInput(margin);
+                        if (!isNaN(margin)) {
+                          const mX = Math.max(0, margin);
+                          setCustomMarginXInput(mX);
+                          recalculateDimensions(tileSizeInput, mX, typeof customMarginYInput === 'number' ? customMarginYInput : 0, typeof customSpacingInput === 'number' ? customSpacingInput : 0);
+                        }
                       }}
                       onBlur={() => {
                         if (customMarginXInput === '') setCustomMarginXInput(0);
@@ -4378,7 +4377,11 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                           return;
                         }
                         const margin = parseInt(valStr, 10);
-                        if (!isNaN(margin)) setCustomMarginYInput(margin);
+                        if (!isNaN(margin)) {
+                          const mY = Math.max(0, margin);
+                          setCustomMarginYInput(mY);
+                          recalculateDimensions(tileSizeInput, typeof customMarginXInput === 'number' ? customMarginXInput : 0, mY, typeof customSpacingInput === 'number' ? customSpacingInput : 0);
+                        }
                       }}
                       onBlur={() => {
                         if (customMarginYInput === '') setCustomMarginYInput(0);
