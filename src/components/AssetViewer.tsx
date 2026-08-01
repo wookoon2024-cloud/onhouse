@@ -56,10 +56,10 @@ import pigUrl from '../assets/pig.png';
 export type MainCategory = 'map' | 'character';
 
 const GridOverlayCanvas = ({
-  cols, rows, frameW, frameH, offX, offY, spacing, zoom, actualWidth, actualHeight
+  cols, rows, frameW, frameH, offX, offY, spacing, zoom, actualWidth, actualHeight, isChromaMode, onChromaClick
 }: {
   cols: number; rows: number; frameW: number; frameH: number; offX: number; offY: number; spacing: number; zoom: number;
-  actualWidth: number; actualHeight: number;
+  actualWidth: number; actualHeight: number; isChromaMode?: boolean; onChromaClick?: (x: number, y: number) => void;
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -105,7 +105,20 @@ const GridOverlayCanvas = ({
   return (
     <canvas 
       ref={canvasRef} 
-      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', imageRendering: 'pixelated' }} 
+      onClick={(e) => {
+        if (isChromaMode && onChromaClick) {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const x = (e.clientX - rect.left) / zoom;
+          const y = (e.clientY - rect.top) / zoom;
+          onChromaClick(x, y);
+        }
+      }}
+      style={{ 
+        position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', 
+        pointerEvents: isChromaMode ? 'auto' : 'none', 
+        imageRendering: 'pixelated',
+        cursor: isChromaMode ? 'crosshair' : 'default'
+      }} 
     />
   );
 };
@@ -273,6 +286,10 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
   const [assetNameInput, setAssetNameInput] = useState<string>('');
   const [tileSizeInput, setTileSizeInput] = useState<number>(16);
   const [fileDataUrl, setFileDataUrl] = useState<string | null>(null);
+  const [originalFileDataUrl, setOriginalFileDataUrl] = useState<string | null>(null);
+  const [isChromaMode, setIsChromaMode] = useState<boolean>(false);
+  const [chromaTolerance, setChromaTolerance] = useState<number>(30);
+  const [chromaColor, setChromaColor] = useState<{r: number, g: number, b: number} | null>(null);
   const [imgWidth, setImgWidth] = useState<number>(0);
   const [imgHeight, setImgHeight] = useState<number>(0);
   const [customColsInput, setCustomColsInput] = useState<number | ''>(4);
@@ -1786,6 +1803,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
     reader.onload = (ev) => {
       const result = ev.target?.result as string;
       setFileDataUrl(result);
+      setOriginalFileDataUrl(result);
+      setIsChromaMode(false);
+      setChromaColor(null);
 
       const img = new Image();
       img.onload = () => {
@@ -2093,12 +2113,72 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
 
       const normalizedDataUrl = normCanvas.toDataURL();
       setFileDataUrl(normalizedDataUrl);
+      setOriginalFileDataUrl(normalizedDataUrl);
+      setIsChromaMode(false);
+      setChromaColor(null);
       setImgWidth(normCanvas.width);
       setImgHeight(normCanvas.height);
       setIsNormalizing(false);
       alert(`✨ 스마트 보정 완료!\n여백을 자동으로 제거하고 ${targetCols}열 x ${targetRows}행 (${tSize}x${tSize}px) 정격 규격 스프라이트 시트로 보정하였습니다.`);
     };
     img.src = fileDataUrl;
+  };
+
+  // Chroma Key Processing
+  const applyChromaKey = (targetColor: {r: number, g: number, b: number}, tolerance: number) => {
+    if (!originalFileDataUrl) return;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0);
+      
+      const imgData = ctx.getImageData(0, 0, img.width, img.height);
+      const data = imgData.data;
+      
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i+3] === 0) continue; // Already transparent
+        const r = data[i], g = data[i+1], b = data[i+2];
+        const diff = Math.max(Math.abs(r - targetColor.r), Math.abs(g - targetColor.g), Math.abs(b - targetColor.b));
+        if (diff <= tolerance) {
+          data[i+3] = 0;
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+      setFileDataUrl(canvas.toDataURL('image/png'));
+    };
+    img.src = originalFileDataUrl;
+  };
+
+  useEffect(() => {
+    if (chromaColor) {
+      applyChromaKey(chromaColor, chromaTolerance);
+    }
+  }, [chromaTolerance, chromaColor]);
+
+  const handleChromaClick = (x: number, y: number) => {
+    if (!originalFileDataUrl) return;
+    const px = Math.floor(x);
+    const py = Math.floor(y);
+    if (px < 0 || py < 0 || px >= imgWidth || py >= imgHeight) return;
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0);
+      const pixel = ctx.getImageData(px, py, 1, 1).data;
+      setChromaColor({ r: pixel[0], g: pixel[1], b: pixel[2] });
+    };
+    img.src = originalFileDataUrl;
   };
 
   // Generate default character template spritesheet if no image uploaded
@@ -4505,6 +4585,49 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                     </div>
                   </div>
 
+                  {/* Chroma Key Toolbar */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#181824', padding: '4px 8px', border: '1px solid #3b3b54' }}>
+                    <button
+                      type="button"
+                      onClick={() => setIsChromaMode(!isChromaMode)}
+                      style={{
+                        padding: '4px 8px', fontSize: '10px', background: isChromaMode ? '#ff79c6' : '#282a36',
+                        color: isChromaMode ? '#000' : '#fff', border: '1px solid #4a4a6b', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: '4px'
+                      }}
+                    >
+                      🪄 {isChromaMode ? '배경색 스포이드 활성화됨' : '배경 투명화 (크로마키)'}
+                    </button>
+                    {chromaColor && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{
+                          width: '14px', height: '14px', border: '1px solid #fff',
+                          background: `rgb(${chromaColor.r}, ${chromaColor.g}, ${chromaColor.b})`
+                        }} title="제거된 배경색" />
+                        
+                        <label style={{ fontSize: '9px', color: '#ccc', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          오차 허용(Tolerance):
+                          <input 
+                            type="range" min="0" max="150" value={chromaTolerance}
+                            onChange={(e) => setChromaTolerance(parseInt(e.target.value))}
+                            style={{ width: '60px' }}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setChromaColor(null);
+                            setIsChromaMode(false);
+                            if (originalFileDataUrl) setFileDataUrl(originalFileDataUrl);
+                          }}
+                          style={{ padding: '2px 6px', fontSize: '9px', background: '#444', color: '#fff', border: 'none', cursor: 'pointer' }}
+                        >
+                          초기화
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
                   <div 
                     ref={previewContainerRef}
                     onPointerDown={(e) => {
@@ -4568,6 +4691,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                                 zoom={fitScale}
                                 actualWidth={fitW}
                                 actualHeight={fitH}
+                                isChromaMode={isChromaMode}
+                                onChromaClick={handleChromaClick}
                               />
                             </div>
                           </div>
@@ -4597,6 +4722,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
                           zoom={previewZoom}
                           actualWidth={imgWidth * previewZoom}
                           actualHeight={imgHeight * previewZoom}
+                          isChromaMode={isChromaMode}
+                          onChromaClick={handleChromaClick}
                         />
                       </div>
                     )}
