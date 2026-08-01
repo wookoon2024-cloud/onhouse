@@ -4316,7 +4316,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile 
               {uploadCategory === 'map' && (
                 <div style={{ display: 'flex', gap: '4px' }}>
                   <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: '10px', color: '#a78bfa', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}><Edit3 size={10} color="#ff6b6b" /> 타일 간격 (Spacing px):</label>
+                    <label style={{ fontSize: '10px', color: '#a78bfa', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>✏️ 타일 간격 (Spacing px):</label>
                     <input
                       type="number"
                       min={0}
