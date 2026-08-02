@@ -616,17 +616,13 @@ export default function App() {
       const found = list.find((item: any) => item.id === spriteType);
       const override = overrides[spriteType];
 
-      if (override && override.url) {
+      if (override || found) {
         return {
           id: spriteType,
           name: found?.name || spriteType,
-          url: override.url,
-          cols: override.cols || found?.cols || 4,
-          rows: override.rows || found?.rows || 7
+          cols: override?.cols || found?.cols || 4,
+          rows: override?.rows || found?.rows || 7
         };
-      }
-      if (found) {
-        return found;
       }
     } catch (e) {}
     return null;
@@ -1750,9 +1746,9 @@ export default function App() {
       mapId: localPlayer.mapId
     });
 
-    // Broadcast movement real-time over WebSocket to OTHER computers! (~20 updates/sec when moving, immediately when stopping)
+    // Broadcast movement real-time over WebSocket to OTHER computers! (~30 updates/sec when moving, immediately when stopping)
     const now = Date.now();
-    if (!isMoving || now - lastSyncTimeRef.current > 50) {
+    if (!isMoving || now - lastSyncTimeRef.current > 30) {
       lastSyncTimeRef.current = now;
       safeBroadcastChannel('player_sync', {
         id: deviceId.current,

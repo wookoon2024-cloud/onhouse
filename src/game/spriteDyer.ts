@@ -64,7 +64,8 @@ export function getDyedSprite(
   hueOffset: number,
   isOnline: boolean
 ): HTMLCanvasElement {
-  const cacheKey = `${img.src}_${hueOffset}_${isOnline}`;
+  const imgKey = img.getAttribute('data-id') || (img.src && img.src.length > 200 ? `${img.src.slice(0, 60)}_${img.src.length}` : img.src);
+  const cacheKey = `${imgKey}_${hueOffset}_${isOnline}`;
   if (canvasCache[cacheKey]) {
     return canvasCache[cacheKey];
   }
