@@ -354,7 +354,7 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
   const localPlayerRef = useRef<PlayerState>(localPlayer);
   const lastTimeRef = useRef<number>(performance.now());
   const lastSyncTimeRef = useRef<number>(0);
-  const smoothRemotePosRef = useRef<Record<string, { x: number; y: number; dir?: 'up' | 'down' | 'left' | 'right'; isMoving: boolean }>>({});
+  const smoothRemotePosRef = useRef<Record<string, { x: number; y: number; isMoving: boolean }>>({});
 
   // Active animated visual particles (flying hearts, cheering claps, celebrate fireworks, flame effects)
   const particlesRef = useRef<Array<{
@@ -1185,7 +1185,7 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         if (op.mapId === currentMapId && op.id !== p.id && op.nickname !== p.nickname) {
           let smooth = smoothRemotePosRef.current[op.id];
           if (!smooth) {
-            smooth = { x: op.x, y: op.y, dir: op.dir, isMoving: op.isMoving };
+            smooth = { x: op.x, y: op.y, isMoving: op.isMoving };
             smoothRemotePosRef.current[op.id] = smooth;
           }
 
@@ -1196,22 +1196,18 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
           if (dist > 160) {
             smooth.x = op.x;
             smooth.y = op.y;
-            smooth.dir = op.dir;
             smooth.isMoving = op.isMoving;
           } else {
-            // Delta-time dependent exponential decay lerp for buttery-smooth 60/120/144Hz motion
-            const lerpFactor = 1 - Math.exp(-15 * dt);
+            const lerpFactor = 0.28;
             smooth.x += dx * lerpFactor;
             smooth.y += dy * lerpFactor;
-            if (op.dir) smooth.dir = op.dir;
-            smooth.isMoving = dist > 0.8 || op.isMoving;
+            smooth.isMoving = dist > 0.5 || op.isMoving;
           }
 
           renderList.push({
             ...op,
             x: smooth.x,
             y: smooth.y,
-            dir: smooth.dir || op.dir,
             isMoving: smooth.isMoving
           });
         }
