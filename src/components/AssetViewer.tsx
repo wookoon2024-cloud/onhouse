@@ -2553,7 +2553,23 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
         const dbRes = await saveHouseAssetToDB(currentHouse, assetType, opt);
         if (!dbRes.success) {
           console.error('[Asset DB Save Error]', dbRes.error);
-          alert(`서버 저장 중 오류가 발생했습니다: ${dbRes.error || '네트워크 응답 지연'}`);
+          alert(`⚠️ 서버(DB) 저장 실패로 에셋 등록이 취소되었습니다.\n(원인: ${dbRes.error || 'Supabase 테이블 미생성 또는 네트워크 오류'})\n\n신규 Supabase 대시보드의 SQL Editor에서 테이블 생성 SQL을 실행해 주세요.`);
+          
+          // Rollback local state & localStorage so orphaned assets are not kept
+          if (uploadCategory === 'map') {
+            setCustomMapTilesets((prev) => {
+              const next = prev.filter((item) => !generatedOptions.some((g) => g.id === item.id));
+              safeLocalStorageSetItem('on_house_custom_map_tilesets', JSON.stringify(next));
+              return next;
+            });
+          } else {
+            setCustomCharSprites((prev) => {
+              const next = prev.filter((item) => !generatedOptions.some((g) => g.id === item.id));
+              safeLocalStorageSetItem('on_house_custom_char_sprites', JSON.stringify(next));
+              return next;
+            });
+          }
+
           setIsSavingAsset(false);
           setSaveProgressText('');
           return;
