@@ -59,6 +59,7 @@ export interface MapDefinition {
 }
 
 export function getNormalizedLayers(map: MapDefinition): CustomTileLayer[] {
+  if (!map) return [];
   if (map.layers && Array.isArray(map.layers) && map.layers.length > 0) {
     return map.layers.map((l, index) => ({
       id: l.id || (index === 0 ? 'layer_base' : index === 1 ? 'layer_decor' : `layer_${index + 1}`),
@@ -192,230 +193,6 @@ const createBoolGrid = (w: number, h: number, fillVal: boolean): boolean[][] => 
   return Array.from({ length: h }, () => Array(w).fill(fillVal));
 };
 
-// PRE-FIXED TILE INDEX HELPERS
-const getInteriorTile = (col: number, row: number) => 1000 + (row * 22 + col);
-// --- MAP 1: MY ROOM (마이 룸) ---
-const buildMyRoom = (): MapDefinition => {
-  const w = 45;
-  const h = 35;
-  const base = createGrid(w, h, getInteriorTile(1, 9)); // Wood floor
-  const decor = createGrid(w, h, -1);
-  const coll = createBoolGrid(w, h, false);
-
-  for (let x = 0; x < w; x++) {
-    base[0][x] = getInteriorTile(1, 0);
-    base[1][x] = getInteriorTile(1, 1);
-    base[2][x] = getInteriorTile(1, 2);
-    
-    coll[0][x] = true;
-    coll[1][x] = true;
-    coll[2][x] = true;
-    coll[h - 1][x] = true;
-  }
-  for (let y = 0; y < h; y++) {
-    coll[y][0] = true;
-    coll[y][w - 1] = true;
-  }
-
-  const cx = Math.floor(w / 2);
-  const cy = Math.floor(h / 2);
-
-  // Bed
-  decor[cy - 5][cx - 8] = getInteriorTile(0, 11);
-  decor[cy - 5][cx - 7] = getInteriorTile(1, 11);
-  decor[cy - 4][cx - 8] = getInteriorTile(0, 12);
-  decor[cy - 4][cx - 7] = getInteriorTile(1, 12);
-  coll[cy - 5][cx - 8] = true; coll[cy - 5][cx - 7] = true;
-  coll[cy - 4][cx - 8] = true; coll[cy - 4][cx - 7] = true;
-
-  // Carpet
-  decor[cy - 2][cx - 6] = getInteriorTile(10, 12);
-  decor[cy - 2][cx - 5] = getInteriorTile(11, 12);
-  decor[cy - 1][cx - 6] = getInteriorTile(10, 13);
-  decor[cy - 1][cx - 5] = getInteriorTile(11, 13);
-
-  // Wardrobe / Bookshelf
-  decor[3][cx + 8] = getInteriorTile(16, 5);
-  decor[4][cx + 8] = getInteriorTile(16, 6);
-  coll[3][cx + 8] = true; coll[4][cx + 8] = true;
-
-  decor[3][cx - 2] = getInteriorTile(12, 5);
-  decor[4][cx - 2] = getInteriorTile(12, 6);
-  coll[3][cx - 2] = true; coll[4][cx - 2] = true;
-
-  // Table & Chairs
-  decor[cy][cx] = getInteriorTile(15, 8);
-  decor[cy][cx - 1] = getInteriorTile(16, 8);
-  decor[cy][cx + 1] = getInteriorTile(16, 8);
-  coll[cy][cx] = true; coll[cy][cx - 1] = true; coll[cy][cx + 1] = true;
-
-  return {
-    id: 'room',
-    name: '🏠 마이 룸',
-    width: w,
-    height: h,
-    tileset: 'interior',
-    baseLayer: base,
-    decorLayer: decor,
-    collision: coll,
-    spawnPoints: [{ x: cx, y: cy + 4 }]
-  };
-};
-
-// --- MAP 2: SUBWAY (지하철역) ---
-const buildSubway = (): MapDefinition => {
-  const w = 55;
-  const h = 28;
-  const base = createGrid(w, h, getInteriorTile(3, 9)); 
-  const decor = createGrid(w, h, -1);
-  const coll = createBoolGrid(w, h, false);
-
-  for (let x = 0; x < w; x++) {
-    base[0][x] = getInteriorTile(2, 16);
-    base[1][x] = getInteriorTile(3, 16);
-    base[2][x] = getInteriorTile(4, 16);
-    
-    coll[0][x] = true;
-    coll[1][x] = true;
-    coll[2][x] = true;
-    coll[h - 1][x] = true;
-  }
-  for (let y = 0; y < h; y++) {
-    coll[y][0] = true;
-    coll[y][w - 1] = true;
-  }
-
-  for (let x = 5; x < w - 2; x += 8) {
-    decor[8][x] = getInteriorTile(12, 0);
-    decor[9][x] = getInteriorTile(12, 1);
-    coll[8][x] = true; coll[9][x] = true;
-  }
-
-  const bx = Math.floor(w / 2);
-  return {
-    id: 'subway',
-    name: '🚇 지하철역',
-    width: w,
-    height: h,
-    tileset: 'interior',
-    baseLayer: base,
-    decorLayer: decor,
-    collision: coll,
-    spawnPoints: [{ x: bx, y: 12 }]
-  };
-};
-
-// --- MAP 3: CLEAN CANVAS PARK (호수공원) ---
-// Clean, empty grass canvas for custom map building
-const buildLakePark = (): MapDefinition => {
-  const w = 50;
-  const h = 35;
-  // Simple grass base tile (ID 2000)
-  const base = createGrid(w, h, 2000); 
-  const decor = createGrid(w, h, -1);
-  const coll = createBoolGrid(w, h, false);
-
-  // Outer Map Colliders
-  for (let x = 0; x < w; x++) { coll[0][x] = true; coll[h - 1][x] = true; }
-  for (let y = 0; y < h; y++) { coll[y][0] = true; coll[y][w - 1] = true; }
-
-  return {
-    id: 'park',
-    name: '🌳 호수공원',
-    width: w,
-    height: h,
-    tileset: 'outdoor',
-    baseLayer: base,
-    decorLayer: decor,
-    collision: coll,
-    spawnPoints: [{ x: 25, y: 17 }]
-  };
-};
-
-// --- MAP 4: CLEAN CANVAS APT (아파트 단지) ---
-const buildApartmentComplex = (): MapDefinition => {
-  const w = 50;
-  const h = 35;
-  const base = createGrid(w, h, 2000);
-  const decor = createGrid(w, h, -1);
-  const coll = createBoolGrid(w, h, false);
-
-  for (let x = 0; x < w; x++) { coll[0][x] = true; coll[h - 1][x] = true; }
-  for (let y = 0; y < h; y++) { coll[y][0] = true; coll[y][w - 1] = true; }
-
-  return {
-    id: 'apt',
-    name: '🏢 아파트 단지',
-    width: w,
-    height: h,
-    tileset: 'outdoor',
-    baseLayer: base,
-    decorLayer: decor,
-    collision: coll,
-    spawnPoints: [{ x: 25, y: 17 }]
-  };
-};
-
-// --- MAP 5: VILLAGE (시골 마을) ---
-const buildVillage = (): MapDefinition => {
-  const w = 45;
-  const h = 35;
-  const base = createGrid(w, h, 3000);
-  const decor = createGrid(w, h, -1);
-  const coll = createBoolGrid(w, h, false);
-  for (let x = 0; x < w; x++) { coll[0][x] = true; coll[h - 1][x] = true; }
-  for (let y = 0; y < h; y++) { coll[y][0] = true; coll[y][w - 1] = true; }
-
-  return {
-    id: 'village',
-    name: '🏘️ 시골 마을',
-    width: w, height: h,
-    tileset: 'village',
-    baseLayer: base, decorLayer: decor, collision: coll,
-    spawnPoints: [{ x: 22, y: 17 }]
-  };
-};
-
-// --- MAP 6: WATER (해변 연못) ---
-const buildWater = (): MapDefinition => {
-  const w = 45;
-  const h = 35;
-  const base = createGrid(w, h, 7000);
-  const decor = createGrid(w, h, -1);
-  const coll = createBoolGrid(w, h, false);
-  for (let x = 0; x < w; x++) { coll[0][x] = true; coll[h - 1][x] = true; }
-  for (let y = 0; y < h; y++) { coll[y][0] = true; coll[y][w - 1] = true; }
-
-  return {
-    id: 'water',
-    name: '🌊 해변 연못',
-    width: w, height: h,
-    tileset: 'water',
-    baseLayer: base, decorLayer: decor, collision: coll,
-    spawnPoints: [{ x: 22, y: 17 }]
-  };
-};
-
-// --- MAP 7: FOREST (숲속 쉼터) ---
-const buildForest = (): MapDefinition => {
-  const w = 45;
-  const h = 35;
-  const base = createGrid(w, h, 6000);
-  const decor = createGrid(w, h, -1);
-  const coll = createBoolGrid(w, h, false);
-  for (let x = 0; x < w; x++) { coll[0][x] = true; coll[h - 1][x] = true; }
-  for (let y = 0; y < h; y++) { coll[y][0] = true; coll[y][w - 1] = true; }
-
-  return {
-    id: 'forest',
-    name: '🌲 숲속 쉼터',
-    width: w, height: h,
-    tileset: 'nature',
-    baseLayer: base, decorLayer: decor, collision: coll,
-    spawnPoints: [{ x: 22, y: 17 }]
-  };
-};
-
 export const createCustomMap = (id: string, name: string, tileset: string = 'outdoor'): MapDefinition => {
   const w = 40;
   const h = 30;
@@ -440,25 +217,12 @@ export const createCustomMap = (id: string, name: string, tileset: string = 'out
   };
 };
 
-export const PRESET_MAP_TEMPLATES: Record<string, { name: string; builder: () => MapDefinition }> = {
-  room: { name: '🏠 마이 룸', builder: buildMyRoom },
-  subway: { name: '🚇 지하철역', builder: buildSubway },
-  park: { name: '🌳 호수공원', builder: buildLakePark },
-  apt: { name: '🏢 아파트 단지', builder: buildApartmentComplex },
-  village: { name: '🏘️ 시골 마을', builder: buildVillage },
-  water: { name: '🌊 해변 연못', builder: buildWater },
-  forest: { name: '🌲 숲속 쉼터', builder: buildForest }
-};
-
-export const maps: Record<string, MapDefinition> = {
-  room: buildMyRoom(),
-  subway: buildSubway(),
-  park: buildLakePark(),
-  apt: buildApartmentComplex(),
-  village: buildVillage(),
-  water: buildWater(),
-  forest: buildForest()
-};
+// The 7 built-in preset map layouts (room/subway/park/apt/village/water/forest) have been removed
+// entirely per product decision — new maps are always blank custom canvases (createCustomMap).
+// These stay exported as empty so existing call sites that look something up in them degrade to
+// "not found" instead of needing to be ripped out one by one.
+export const PRESET_MAP_TEMPLATES: Record<string, { name: string; builder: () => MapDefinition }> = {};
+export const maps: Record<string, MapDefinition> = {};
 
 export const isCellCollision = (map: MapDefinition, tx: number, ty: number): boolean => {
   if (!map || tx < 0 || tx >= map.width || ty < 0 || ty >= map.height) return true;

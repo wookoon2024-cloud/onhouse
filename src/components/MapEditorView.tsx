@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { type MapDefinition, type MapObjectInstance, type CustomTileLayer, cleanDuplicateObjects, maps, PRESET_MAP_TEMPLATES, getNormalizedLayers } from '../game/MapData';
+import { type MapDefinition, type MapObjectInstance, type CustomTileLayer, cleanDuplicateObjects, maps, getNormalizedLayers, createCustomMap } from '../game/MapData';
 import { Trash2, Save, X, Undo, Redo, Pipette, Paintbrush, PaintBucket, Eraser, Info, Sparkles, Plus, Download, Upload, Pencil, MousePointer, Copy, Layers, MoveUp, MoveDown, ShieldAlert } from 'lucide-react';
 import { getTileDrawInfo, getTilesetInfo } from '../game/CanvasGame';
 import { publishItemToMarket, getSavedHouseCode } from '../services/HouseService';
@@ -208,7 +208,10 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
   const getInitialMap = (): MapDefinition => {
     const targetId = availableMapIds[0] || 'room';
-    const rawMap = activeMaps[targetId] || activeMaps.room || Object.values(activeMaps)[0] || maps.room;
+    // No built-in default maps ship anymore — fall back to a fresh blank map as a last resort
+    // so the editor never receives undefined (this path shouldn't normally be reached since the
+    // editor is gated behind having at least one map, but stay safe regardless).
+    const rawMap = activeMaps[targetId] || activeMaps.room || Object.values(activeMaps)[0] || maps.room || createCustomMap(targetId, '새 맵');
     return sanitizeMapIfEmptyCustom(rawMap, targetId);
   };
 
@@ -4230,39 +4233,7 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
             </div>
 
             <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '12px' }}>
-              추가할 프리셋 맵 템플릿을 선택하거나 새 커스텀 맵을 생성하세요:
-            </div>
-
-            {/* Presets List */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto', marginBottom: '14px' }}>
-              {Object.entries(PRESET_MAP_TEMPLATES).map(([key, template]) => {
-                const isAlreadyAdded = availableMapIds.includes(key);
-                return (
-                  <button
-                    key={key}
-                    disabled={isAlreadyAdded}
-                    onClick={() => {
-                      const newId = onAddMap(key);
-                      if (newId) setSelectedMapId(newId);
-                      setShowAddModal(false);
-                    }}
-                    style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      padding: '10px 14px', borderRadius: '6px',
-                      background: isAlreadyAdded ? 'rgba(255, 255, 255, 0.03)' : 'rgba(255, 255, 255, 0.07)',
-                      color: isAlreadyAdded ? '#666' : '#fff',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      cursor: isAlreadyAdded ? 'not-allowed' : 'pointer',
-                      textAlign: 'left', fontSize: '12px'
-                    }}
-                  >
-                    <span>{template.name}</span>
-                    <span style={{ fontSize: '10px', color: isAlreadyAdded ? '#555' : 'var(--accent)', fontWeight: 'normal' }}>
-                      {isAlreadyAdded ? '추가됨' : '+ 선택 추가'}
-                    </span>
-                  </button>
-                );
-              })}
+              새 커스텀 맵을 생성하세요:
             </div>
 
             {/* Custom Map Form */}

@@ -58,11 +58,6 @@ const safeLocalStorageSetItem = (key: string, value: string): boolean => {
   }
 };
 
-import ninjaBlueUrl from '../assets/ninja_blue.png';
-import samuraiBlueUrl from '../assets/samurai_blue.png';
-import samuraiGreenUrl from '../assets/samurai_green.png';
-import pigUrl from '../assets/pig.png';
-
 export type MainCategory = 'map' | 'character';
 
 const GridOverlayCanvas = ({
@@ -153,13 +148,6 @@ const DEFAULT_MAP_TILESETS: TilesetOption[] = [
   { id: 'nature', name: '🌳 숲 / 자연 (Nature)', url: natureTilesUrl, cols: 24, rows: 21, size: 16, prefix: 6000 },
   { id: 'water', name: '🌊 호수 / 강물 (Water)', url: waterTilesUrl, cols: 28, rows: 17, size: 16, prefix: 7000 },
   { id: 'field', name: '🌾 들판 / 잔디 (Field)', url: fieldTilesUrl, cols: 5, rows: 15, size: 16, prefix: 8000 },
-];
-
-const DEFAULT_CHARACTER_SPRITES: TilesetOption[] = [
-  { id: 'samurai_blue', name: '⚔️ 블루 무사 (Samurai Blue)', url: samuraiBlueUrl, cols: 4, rows: 7, size: 16 },
-  { id: 'ninja_blue', name: '🥷 닌자 (Ninja Blue)', url: ninjaBlueUrl, cols: 4, rows: 7, size: 16 },
-  { id: 'samurai_green', name: '🌿 그린 무사 (Samurai Green)', url: samuraiGreenUrl, cols: 4, rows: 7, size: 16 },
-  { id: 'pig', name: '🐷 아기 돼지 (Baby Pig)', url: pigUrl, cols: 2, rows: 1, size: 16 },
 ];
 
 const PALETTE_COLORS = [
@@ -264,7 +252,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
     new Map([...DEFAULT_MAP_TILESETS, ...customMapTilesets].map((m) => [m.id, m])).values()
   );
   const charOptions = Array.from(
-    new Map([...DEFAULT_CHARACTER_SPRITES, ...customCharSprites].map((c) => [c.id, c])).values()
+    new Map(customCharSprites.map((c) => [c.id, c])).values()
   ).map((opt) => {
     const override = charImageOverrides[opt.id];
     if (override && override.url && typeof override.url === 'string' && override.url.trim().length > 10) {
@@ -284,7 +272,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
   });
 
   const [selectedMapId, setSelectedMapId] = useState<string>('interior');
-  const [selectedCharId, setSelectedCharId] = useState<string>('samurai_blue');
+  const [selectedCharId, setSelectedCharId] = useState<string>('');
   const [gridZoom, setGridZoom] = useState<number>(1.5);
 
   // Temporary string state for direct typing in 맵 출력 크기 input box
@@ -442,7 +430,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
       Object.entries(charImageOverrides).forEach(([id, override]) => {
         const prevOverride = prevOverrides[id];
         if (override && override.url && (!prevOverride || prevOverride.url !== override.url || prevOverride.cols !== override.cols || prevOverride.rows !== override.rows || prevOverride.size !== override.size)) {
-          const foundOpt = customCharSprites.find((c) => c.id === id) || DEFAULT_CHARACTER_SPRITES.find((c) => c.id === id);
+          const foundOpt = customCharSprites.find((c) => c.id === id);
           const assetData = {
             id,
             name: foundOpt?.name || id,
@@ -579,9 +567,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
   }, []);
 
   const defaultFallbackOption: TilesetOption = {
-    id: 'samurai_blue',
-    name: '무사 (파랑)',
-    url: samuraiBlueUrl,
+    id: '',
+    name: '(등록된 캐릭터 없음)',
+    url: '',
     cols: 4,
     rows: 7,
     size: 32
@@ -1434,7 +1422,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
 
       // Save directly to Cloud DB (Supabase)
       const currentHouseCode = getSavedHouseCode();
-      const foundOpt = nextCustomChars.find((c) => c.id === charId) || DEFAULT_CHARACTER_SPRITES.find((c) => c.id === charId);
+      const foundOpt = nextCustomChars.find((c) => c.id === charId);
       const assetData = {
         id: charId,
         name: foundOpt?.name || charId,
@@ -1574,7 +1562,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
 
       // Save to Supabase DB
       const currentHouseCode = getSavedHouseCode();
-      const foundOpt = customCharSprites.find((c) => c.id === currentSelectedId) || DEFAULT_CHARACTER_SPRITES.find((c) => c.id === currentSelectedId);
+      const foundOpt = customCharSprites.find((c) => c.id === currentSelectedId);
       saveHouseAssetToDB(currentHouseCode, 'char_sprite', {
         id: currentSelectedId,
         name: foundOpt?.name || currentSelectedId,
@@ -1670,7 +1658,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
       });
 
       const currentHouseCode = getSavedHouseCode();
-      const foundOpt = customCharSprites.find((c) => c.id === currentSelectedId) || DEFAULT_CHARACTER_SPRITES.find((c) => c.id === currentSelectedId);
+      const foundOpt = customCharSprites.find((c) => c.id === currentSelectedId);
       saveHouseAssetToDB(currentHouseCode, 'char_sprite', {
         id: currentSelectedId,
         name: foundOpt?.name || currentSelectedId,
@@ -1777,7 +1765,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
 
       // Save updated asset & override to Supabase DB!
       const currentHouseCode = getSavedHouseCode();
-      const foundOpt = customCharSprites.find((c) => c.id === currentSelectedId) || DEFAULT_CHARACTER_SPRITES.find((c) => c.id === currentSelectedId);
+      const foundOpt = customCharSprites.find((c) => c.id === currentSelectedId);
       
       console.log(`[OnHouse ActionRow] 4/5 ☁️ Syncing 3 asset rows (char_sprite, char_image_override, char_row_actions) to Supabase DB for house [${currentHouseCode}]...`);
       
@@ -2613,7 +2601,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
         safeLocalStorageSetItem('on_house_char_image_overrides', JSON.stringify(next));
         return next;
       });
-      setSelectedCharId('samurai_blue');
+      setSelectedCharId('');
       await deleteHouseAssetFromDB(currentHouse, 'char_sprite', id);
       await deleteHouseAssetFromDB(currentHouse, 'char_image_override', id);
       await deleteHouseAssetFromDB(currentHouse, 'char_row_actions', id);
@@ -3026,12 +3014,6 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
                 key={`board-img-${currentSelectedId}-${boardRenderKey}-${Date.now()}`}
                 src={currentOption.url}
                 alt={currentOption.name}
-                onError={(e) => {
-                  const defaultOpt = DEFAULT_CHARACTER_SPRITES.find((c) => c.id === currentOption.id);
-                  if (defaultOpt && defaultOpt.url) {
-                    (e.currentTarget as HTMLImageElement).src = defaultOpt.url;
-                  }
-                }}
                 style={{
                   position: 'absolute',
                   top: 0,

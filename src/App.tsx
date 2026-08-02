@@ -104,7 +104,7 @@ export default function App() {
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch (e) {}
-    return ['room', 'subway', 'park', 'apt'];
+    return [];
   };
 
   // 0.5. Available Map IDs displayed in top bar
@@ -186,7 +186,7 @@ export default function App() {
     const savedName = localStorage.getItem('on_house_nickname') || generateNickname();
     localStorage.setItem('on_house_nickname', savedName);
 
-    const savedSprite = (localStorage.getItem('on_house_sprite') as any) || 'ninja_blue';
+    const savedSprite = (localStorage.getItem('on_house_sprite') as any) || '';
     const savedHue = parseInt(localStorage.getItem('on_house_hue') || '0');
     const rawStatus = localStorage.getItem('on_house_status');
     const savedStatus = (rawStatus === '반가워요!' || !rawStatus) ? '' : rawStatus;
@@ -1609,6 +1609,7 @@ export default function App() {
           break;
 
         case 'map_reset':
+          if (!maps[msg.mapId]) break;
           setActiveMaps((prev) => {
             const updated = {
               ...prev,
@@ -2444,6 +2445,8 @@ export default function App() {
     updateUnreadCount();
   };
 
+  // No built-in default maps ship anymore — a brand new house has none until the player adds one.
+  const currentMapData = activeMaps[localPlayer.mapId] || activeMaps[availableMapIds[0]];
 
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100dvh', overflow: 'hidden', background: '#09090f' }}>
@@ -2483,7 +2486,7 @@ export default function App() {
       )}
 
       {/* 1. Main Canvas Game (Rendered ONLY after house maps & assets finish loading from DB!) */}
-      {isHouseLoaded && (
+      {isHouseLoaded && currentMapData && (
         <CanvasGame
           localPlayer={localPlayer}
           otherPlayers={otherPlayers}
@@ -2499,12 +2502,37 @@ export default function App() {
           selectedTile={0}
           editLayer="base"
           onPaintTile={() => {}}
-          mapData={activeMaps[localPlayer.mapId] || activeMaps[availableMapIds[0]] || maps.room}
+          mapData={currentMapData}
           brushSize={1}
           assetVersion={assetVersion}
           isHouseLoaded={isHouseLoaded}
           reactionPrompt={reactionPrompt}
         />
+      )}
+
+      {/* 1.5 Empty State: House has finished loading but has no maps yet (brand new house) */}
+      {isHouseLoaded && !currentMapData && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: '#09090f', zIndex: 400,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          gap: '16px', color: '#fff', fontFamily: 'var(--font-pixel)', padding: '24px', textAlign: 'center'
+        }}>
+          <span style={{ fontSize: '15px', color: '#a78bfa' }}>🏠 아직 만든 맵이 없어요</span>
+          <span style={{ fontSize: '12px', color: 'var(--text-secondary)', maxWidth: '320px' }}>
+            첫 맵을 만들어서 시작해보세요.
+          </span>
+          <button
+            onClick={() => handleAddMap()}
+            style={{
+              padding: '10px 20px', fontSize: '13px', borderRadius: '8px',
+              background: 'var(--primary)', color: '#fff', border: '1px solid var(--primary-hover)',
+              cursor: 'pointer', fontWeight: 'bold'
+            }}
+          >
+            + 첫 맵 만들기
+          </button>
+        </div>
       )}
 
       {/* 2. Map Selector (Top Left - Only rendered after house loading completes!) */}
@@ -2973,6 +3001,10 @@ export default function App() {
 
                 <button
                   onClick={() => {
+                    if (!showProfessionalEditor && Object.keys(activeMaps).length === 0) {
+                      alert('먼저 맵을 1개 이상 만들어주세요.');
+                      return;
+                    }
                     setShowProfessionalEditor(!showProfessionalEditor);
                     setIsCustomizing(false);
                   }}

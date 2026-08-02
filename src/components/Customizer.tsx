@@ -12,12 +12,8 @@ interface CustomizerProps {
   onClose: () => void;
 }
 
-const DEFAULT_CHARACTERS = [
-  { id: 'ninja_blue', name: '🥷 닌자 (Ninja)' },
-  { id: 'samurai_blue', name: '⚔️ 블루 무사' },
-  { id: 'samurai_green', name: '🌿 그린 무사' },
-  { id: 'pig', name: '🐷 아기 돼지' },
-];
+// New houses start with no built-in default characters — only custom ones the player registers.
+const DEFAULT_CHARACTERS: Array<{ id: string; name: string }> = [];
 
 export const Customizer: React.FC<CustomizerProps> = ({ player, customCharSprites, onChange, onClose }) => {
   // Always use DB customCharSprites as primary source of truth!
@@ -57,7 +53,9 @@ export const Customizer: React.FC<CustomizerProps> = ({ player, customCharSprite
     } catch (err) {}
 
     if (player.spriteType === charId) {
-      onChange({ spriteType: 'ninja_blue' });
+      // Fall back to another remaining custom character if the player has one, otherwise the
+      // built-in sprite (still renders fine even though it's no longer offered in the picker).
+      onChange({ spriteType: nextCustoms[0]?.id || '' });
     }
 
     const currentHouseCode = getSavedHouseCode();

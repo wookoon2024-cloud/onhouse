@@ -12,10 +12,6 @@ import houseTilesUrl from '../assets/house_tiles.png';
 import natureTilesUrl from '../assets/nature_tiles.png';
 import waterTilesUrl from '../assets/water_tiles.png';
 import fieldTilesUrl from '../assets/field_tiles.png';
-import ninjaBlueUrl from '../assets/ninja_blue.png';
-import samuraiBlueUrl from '../assets/samurai_blue.png';
-import samuraiGreenUrl from '../assets/samurai_green.png';
-import pigUrl from '../assets/pig.png';
 
 import type { MapMemo } from '../types/memo';
 
@@ -604,11 +600,7 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         house: houseTilesUrl,
         nature: natureTilesUrl,
         water: waterTilesUrl,
-        field: fieldTilesUrl,
-        ninja_blue: overrides['ninja_blue']?.url || ninjaBlueUrl,
-        samurai_blue: overrides['samurai_blue']?.url || samuraiBlueUrl,
-        samurai_green: overrides['samurai_green']?.url || samuraiGreenUrl,
-        pig: overrides['pig']?.url || pigUrl
+        field: fieldTilesUrl
       };
 
       // Apply overrides for any character sprite ID
@@ -1205,10 +1197,13 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
 
       // Helper to render a single player on canvas
       const renderPlayer = (player: PlayerState) => {
-        const spriteSheet = images[player.spriteType] || images['ninja_blue'];
-        if (!spriteSheet) return;
+        // No built-in sprites ship anymore — a player only has an image once they register a
+        // custom character. Without one, still fall through and draw the nickname tag below
+        // instead of returning early, so the player isn't silently invisible on the map.
+        const spriteSheet = images[player.spriteType];
+        const hasSprite = !!spriteSheet;
 
-        const dyedSpriteSheet = getDyedSprite(spriteSheet, player.hue, player.isOnline);
+        const dyedSpriteSheet = hasSprite ? getDyedSprite(spriteSheet, player.hue, player.isOnline) : null;
 
         // Calculate sprite sheet grid bounds & frame offsets dynamically
         const charInfo = getCustomCharSpriteInfo(player.spriteType);
@@ -1220,8 +1215,8 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         const spacingX = charInfo.spacingX || 0;
         const spacingY = charInfo.spacingY || 0;
 
-        const tileW = charInfo.frameWidth || Math.max(1, Math.floor((spriteSheet.width - startX) / maxCols));
-        const tileH = charInfo.frameHeight || Math.max(1, Math.floor((spriteSheet.height - startY) / maxRows));
+        const tileW = charInfo.frameWidth || (hasSprite ? Math.max(1, Math.floor((spriteSheet.width - startX) / maxCols)) : 16);
+        const tileH = charInfo.frameHeight || (hasSprite ? Math.max(1, Math.floor((spriteSheet.height - startY) / maxRows)) : 16);
 
         const isEmoting = !!(player.emoteUntil && Date.now() < player.emoteUntil && player.currentEmote);
         const charRowActions = getCharRowActions(player.spriteType);
@@ -1324,17 +1319,33 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
             ctx.rotate(waddle);
           }
 
-          ctx.drawImage(
-            dyedSpriteSheet,
-            srcX, srcY, tileW, tileH,
-            -charDrawW / 2, -charDrawH / 2, charDrawW, charDrawH
-          );
-        } else {
+          if (hasSprite && dyedSpriteSheet) {
+            ctx.drawImage(
+              dyedSpriteSheet,
+              srcX, srcY, tileW, tileH,
+              -charDrawW / 2, -charDrawH / 2, charDrawW, charDrawH
+            );
+          } else {
+            // Placeholder marker for a character with no registered sprite yet (local/translated
+            // coordinate space here — origin is already at the character's center).
+            ctx.beginPath();
+            ctx.arc(0, 0, Math.min(charDrawW, charDrawH) / 3, 0, Math.PI * 2);
+            ctx.fillStyle = isOffline ? 'rgba(120, 120, 130, 0.5)' : 'rgba(167, 139, 250, 0.6)';
+            ctx.fill();
+          }
+        } else if (hasSprite && dyedSpriteSheet) {
           ctx.drawImage(
             dyedSpriteSheet,
             srcX, srcY, tileW, tileH,
             drawX, drawY, charDrawW, charDrawH
           );
+        } else {
+          // Placeholder marker for a character with no registered sprite yet, so the player is
+          // still visible on the map (nickname tag is drawn below regardless).
+          ctx.beginPath();
+          ctx.arc(drawX + charDrawW / 2, drawY + charDrawH / 2, Math.min(charDrawW, charDrawH) / 3, 0, Math.PI * 2);
+          ctx.fillStyle = isOffline ? 'rgba(120, 120, 130, 0.5)' : 'rgba(167, 139, 250, 0.6)';
+          ctx.fill();
         }
 
         ctx.filter = 'none';
