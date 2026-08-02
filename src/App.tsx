@@ -227,6 +227,19 @@ export default function App() {
     };
   });
 
+  // Keep localPlayer.spriteType pointing at a real custom character whenever one exists and the
+  // current value doesn't match any registered character (e.g. right after registering the
+  // house's first custom character). A native <select> falls back to visually showing the first
+  // <option> when its bound value matches nothing, so the Customizer can *look* like the new
+  // character is selected while the actual game state — and therefore in-game rendering — never
+  // switches to it, leaving the player as the placeholder marker.
+  useEffect(() => {
+    if (dbCustomCharSprites.length === 0) return;
+    if (!dbCustomCharSprites.some((c) => c.id === localPlayer.spriteType)) {
+      setLocalPlayer((prev) => ({ ...prev, spriteType: dbCustomCharSprites[0].id }));
+    }
+  }, [dbCustomCharSprites, localPlayer.spriteType]);
+
   useEffect(() => {
     localStorage.setItem(`on_house_available_maps_${houseCode}`, JSON.stringify(availableMapIds));
     if (availableMapIds.length > 0 && !availableMapIds.includes(localPlayer.mapId)) {
