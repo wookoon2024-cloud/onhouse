@@ -642,6 +642,36 @@ export default function App() {
     }
   };
 
+  // Guaranteed delivery with auto-retry for critical one-time events (DM messages, DM requests, read receipts)
+  const sendReliableBroadcastChannel = (event: string, payload: any) => {
+    if (!channelRef.current) return;
+
+    const attemptSend = (attemptsLeft: number) => {
+      if (!channelRef.current) return;
+      try {
+        channelRef.current.send({
+          type: 'broadcast',
+          event,
+          payload
+        }).then((res) => {
+          if (res !== 'ok' && attemptsLeft > 0) {
+            setTimeout(() => attemptSend(attemptsLeft - 1), 300);
+          }
+        }).catch(() => {
+          if (attemptsLeft > 0) {
+            setTimeout(() => attemptSend(attemptsLeft - 1), 300);
+          }
+        });
+      } catch (e) {
+        if (attemptsLeft > 0) {
+          setTimeout(() => attemptSend(attemptsLeft - 1), 300);
+        }
+      }
+    };
+
+    attemptSend(3);
+  };
+
   const sendPlayerSync = (playerData: PlayerState) => {
     try {
       const customData = getCustomCharData(playerData.spriteType);
@@ -2046,7 +2076,7 @@ export default function App() {
       timestamp: Date.now()
     });
 
-    safeBroadcastChannel('dm_msg', {
+    sendReliableBroadcastChannel('dm_msg', {
       fromId: localPlayer.id,
       fromName: localPlayer.nickname,
       toId,
@@ -2056,7 +2086,7 @@ export default function App() {
   };
 
   const handleReadDM = (toId: string) => {
-    safeBroadcastChannel('dm_read', {
+    sendReliableBroadcastChannel('dm_read', {
       fromId: localPlayer.id,
       toId
     });
@@ -2161,7 +2191,7 @@ export default function App() {
 
   // Send 1:1 DM Request to target player
   const handleRequestDMChat = (target: PlayerState) => {
-    safeBroadcastChannel('dm_request', {
+    sendReliableBroadcastChannel('dm_request', {
       fromId: localPlayer.id,
       fromName: localPlayer.nickname,
       fromPlayer: localPlayer,
@@ -2173,7 +2203,7 @@ export default function App() {
   // Accept incoming 1:1 DM Request
   const handleAcceptDMRequest = () => {
     if (!incomingDMRequest) return;
-    safeBroadcastChannel('dm_accept', {
+    sendReliableBroadcastChannel('dm_accept', {
       fromId: localPlayer.id,
       fromName: localPlayer.nickname,
       accepterPlayer: localPlayer,
@@ -2187,7 +2217,7 @@ export default function App() {
   // Decline incoming 1:1 DM Request
   const handleDeclineDMRequest = () => {
     if (!incomingDMRequest) return;
-    safeBroadcastChannel('dm_decline', {
+    sendReliableBroadcastChannel('dm_decline', {
       fromId: localPlayer.id,
       fromName: localPlayer.nickname,
       toId: incomingDMRequest.requesterId
@@ -2198,7 +2228,7 @@ export default function App() {
   // Close 1:1 DM Chat session and notify partner
   const handleCloseDMChat = () => {
     if (activeDMTarget) {
-      safeBroadcastChannel('dm_close', {
+      sendReliableBroadcastChannel('dm_close', {
         fromId: localPlayer.id,
         fromName: localPlayer.nickname,
         toId: activeDMTarget.id
