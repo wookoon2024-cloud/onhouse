@@ -391,39 +391,47 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
 
   // Persist custom assets to localStorage
   useEffect(() => {
-    safeLocalStorageSetItem('on_house_custom_map_tilesets', JSON.stringify(customMapTilesets));
+    try {
+      localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(customMapTilesets));
+    } catch (e) {
+      console.warn('Failed to save custom map tilesets', e);
+    }
   }, [customMapTilesets]);
 
   useEffect(() => {
-    safeLocalStorageSetItem('on_house_custom_char_sprites', JSON.stringify(customCharSprites));
+    try {
+      localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(customCharSprites));
+    } catch (e) {
+      console.warn('Failed to save custom char sprites', e);
+    }
   }, [customCharSprites]);
 
   const prevOverridesRef = useRef(charImageOverrides);
   useEffect(() => {
-    // 1. Try persisting to local storage (gracefully skipped if quota exceeded)
-    safeLocalStorageSetItem('on_house_char_image_overrides', JSON.stringify(charImageOverrides));
+    try {
+      localStorage.setItem('on_house_char_image_overrides', JSON.stringify(charImageOverrides));
 
-    // 2. Update customCharSprites list
-    setCustomCharSprites((prev) => {
-      let changed = false;
-      const next = prev.map((opt) => {
-        const override = charImageOverrides[opt.id];
-        if (override && override.url && override.url !== opt.url) {
-          changed = true;
-          return {
-            ...opt,
-            url: override.url,
-            cols: override.cols || opt.cols,
-            rows: override.rows || opt.rows
-          };
+      // Also update customCharSprites list in localStorage so custom sprites have the latest edited URL!
+      setCustomCharSprites((prev) => {
+        let changed = false;
+        const next = prev.map((opt) => {
+          const override = charImageOverrides[opt.id];
+          if (override && override.url && override.url !== opt.url) {
+            changed = true;
+            return {
+              ...opt,
+              url: override.url,
+              cols: override.cols || opt.cols,
+              rows: override.rows || opt.rows
+            };
+          }
+          return opt;
+        });
+        if (changed) {
+          localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(next));
         }
-        return opt;
+        return changed ? next : prev;
       });
-      if (changed) {
-        safeLocalStorageSetItem('on_house_custom_char_sprites', JSON.stringify(next));
-      }
-      return changed ? next : prev;
-    });
 
       // Save each override to Cloud DB & Broadcast to House Realtime channel!
       // Only save the items that actually changed to avoid DB request spam!
@@ -1436,8 +1444,12 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
       });
 
       // Synchronously write to localStorage BEFORE updating state or triggering event listeners!
-      safeLocalStorageSetItem('on_house_char_image_overrides', JSON.stringify(nextOverrides));
-      safeLocalStorageSetItem('on_house_custom_char_sprites', JSON.stringify(nextCustomChars));
+      try {
+        localStorage.setItem('on_house_char_image_overrides', JSON.stringify(nextOverrides));
+        localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(nextCustomChars));
+      } catch (e) {
+        console.warn('[PixelEditor] Failed to write to localStorage:', e);
+      }
 
       // Update React state
       setCharImageOverrides(nextOverrides);
@@ -1571,7 +1583,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
           }
           return opt;
         });
-        safeLocalStorageSetItem('on_house_custom_char_sprites', JSON.stringify(next));
+        localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(next));
         return next;
       });
 
@@ -1582,7 +1594,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
         [currentSelectedId]: updatedList
       };
       setCharRowActions(updatedRowActions);
-      safeLocalStorageSetItem('on_house_char_row_actions', JSON.stringify(updatedRowActions));
+      localStorage.setItem('on_house_char_row_actions', JSON.stringify(updatedRowActions));
 
       // Save to Supabase DB
       const currentHouseCode = getSavedHouseCode();
@@ -1664,7 +1676,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
         [currentSelectedId]: newOverrideObj
       };
       setCharImageOverrides(updatedOverrides);
-      safeLocalStorageSetItem('on_house_char_image_overrides', JSON.stringify(updatedOverrides));
+      localStorage.setItem('on_house_char_image_overrides', JSON.stringify(updatedOverrides));
 
       setCustomCharSprites((prev) => {
         const next = prev.map((opt) => {
@@ -1677,7 +1689,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
           }
           return opt;
         });
-        safeLocalStorageSetItem('on_house_custom_char_sprites', JSON.stringify(next));
+        localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(next));
         return next;
       });
 
@@ -2301,7 +2313,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
           size: newSize
         }
       };
-      safeLocalStorageSetItem('on_house_char_image_overrides', JSON.stringify(updated));
+      localStorage.setItem('on_house_char_image_overrides', JSON.stringify(updated));
       return updated;
     });
 
@@ -2312,7 +2324,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
         }
         return item;
       });
-      safeLocalStorageSetItem('on_house_custom_char_sprites', JSON.stringify(updated));
+      localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(updated));
       return updated;
     });
 
