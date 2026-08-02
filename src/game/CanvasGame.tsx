@@ -38,6 +38,12 @@ interface CanvasGameProps {
   brushSize: number; // 1 = 1x1, 2 = 2x2, 3 = 3x3, etc.
   assetVersion?: number;
   isHouseLoaded?: boolean;
+  // Authoritative character image data kept fresh in React state from the DB fetch + Realtime
+  // broadcasts (see App.tsx dbCharOverrides). localStorage is only a best-effort cache and can
+  // silently fail to hold everything once combined custom-character image data crosses the
+  // browser's per-origin quota (~5MB) — when that happens this prop is what still lets a
+  // just-saved character render in-game instead of staying stuck on stale/missing image data.
+  charImageOverrides?: Record<string, { url: string; cols?: number; rows?: number }>;
   reactionPrompt?: {
     fromId: string;
     fromName: string;
@@ -319,7 +325,8 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
   mapData,
   assetVersion = 0,
   isHouseLoaded = true,
-  reactionPrompt
+  reactionPrompt,
+  charImageOverrides
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -591,6 +598,11 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         const saved = localStorage.getItem('on_house_char_image_overrides');
         if (saved) overrides = JSON.parse(saved);
       } catch (e) {}
+      // React-state overrides (always complete, never quota-limited) win over whatever
+      // localStorage managed to cache.
+      if (charImageOverrides) {
+        overrides = { ...overrides, ...charImageOverrides };
+      }
 
       const assets: Record<string, string> = {
         interior: interiorTilesUrl,
@@ -673,7 +685,7 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
     return () => {
       window.removeEventListener('on_house_sprites_updated', loadAllAssets);
     };
-  }, [assetVersion]);
+  }, [assetVersion, charImageOverrides]);
 
   // State for Map Right-Click Context Menu
   const [mapContextMenu, setMapContextMenu] = useState<{ clientX: number; clientY: number; worldX: number; worldY: number } | null>(null);

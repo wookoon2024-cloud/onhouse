@@ -2537,6 +2537,7 @@ export default function App() {
           assetVersion={assetVersion}
           isHouseLoaded={isHouseLoaded}
           reactionPrompt={reactionPrompt}
+          charImageOverrides={dbCharOverrides}
         />
       )}
 
