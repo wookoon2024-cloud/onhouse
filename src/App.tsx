@@ -309,33 +309,23 @@ export default function App() {
 
   // Broadcast media viewing updates whenever state changes
   useEffect(() => {
-    if (!channelRef.current) return;
-
-    channelRef.current.send({
-      type: 'broadcast',
-      event: 'media_viewing_update',
-      payload: {
-        deviceId: deviceId.current,
-        playerId: localPlayer.id,
-        videoId: activeYouTubeVideoId || undefined,
-        webUrl: activeWebUrl || undefined,
-        syncEnabled: isWebSyncActive
-      }
+    safeBroadcastChannel('media_viewing_update', {
+      deviceId: deviceId.current,
+      playerId: localPlayer.id,
+      videoId: activeYouTubeVideoId || undefined,
+      webUrl: activeWebUrl || undefined,
+      syncEnabled: isWebSyncActive
     });
   }, [activeYouTubeVideoId, activeWebUrl, isWebSyncActive]);
 
   const handleNavigateWebUrl = (newUrl: string) => {
     setActiveWebUrl(newUrl);
-    if (channelRef.current && isWebSyncActive) {
-      channelRef.current.send({
-        type: 'broadcast',
-        event: 'media_viewing_update',
-        payload: {
-          deviceId: deviceId.current,
-          playerId: localPlayer.id,
-          webUrl: newUrl,
-          syncEnabled: true
-        }
+    if (isWebSyncActive) {
+      safeBroadcastChannel('media_viewing_update', {
+        deviceId: deviceId.current,
+        playerId: localPlayer.id,
+        webUrl: newUrl,
+        syncEnabled: true
       });
     }
   };
@@ -343,18 +333,12 @@ export default function App() {
   const handleToggleWebSync = () => {
     setIsWebSyncActive((prev) => {
       const next = !prev;
-      if (channelRef.current) {
-        channelRef.current.send({
-          type: 'broadcast',
-          event: 'media_viewing_update',
-          payload: {
-            deviceId: deviceId.current,
-            playerId: localPlayer.id,
-            webUrl: activeWebUrl || undefined,
-            syncEnabled: next
-          }
-        });
-      }
+      safeBroadcastChannel('media_viewing_update', {
+        deviceId: deviceId.current,
+        playerId: localPlayer.id,
+        webUrl: activeWebUrl || undefined,
+        syncEnabled: next
+      });
       return next;
     });
   };
