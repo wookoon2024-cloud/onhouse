@@ -730,7 +730,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
         ctx.clearRect(col * tileW, row * tileH, tileW, tileH);
         ctx.drawImage(patchImg, 0, 0, patchImg.width, patchImg.height, col * tileW, row * tileH, tileW, tileH);
 
-        const updatedUrl = canvas.toDataURL();
+        const pastedWebP = canvas.toDataURL('image/webp', 0.88);
+        const updatedUrl = (pastedWebP && pastedWebP.startsWith('data:image/webp')) ? pastedWebP : canvas.toDataURL('image/png');
         setCharImageOverrides((prev) => ({
           ...prev,
           [currentSelectedId]: {
@@ -825,7 +826,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
         }
       }
 
-      const updatedUrl = finalCanvas.toDataURL();
+      const deletedFrameWebP = finalCanvas.toDataURL('image/webp', 0.88);
+      const updatedUrl = (deletedFrameWebP && deletedFrameWebP.startsWith('data:image/webp')) ? deletedFrameWebP : finalCanvas.toDataURL('image/png');
 
       // Check if after clearing, that action row has no frames left anywhere
       const finalCtx = finalCanvas.getContext('2d');
@@ -1015,7 +1017,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
       ctx.drawImage(srcCanvas, dstCol * tileW, dstRow * tileH);
       ctx.drawImage(dstCanvas, srcCol * tileW, srcRow * tileH);
 
-      const updatedUrl = canvas.toDataURL();
+      const swappedWebP = canvas.toDataURL('image/webp', 0.88);
+      const updatedUrl = (swappedWebP && swappedWebP.startsWith('data:image/webp')) ? swappedWebP : canvas.toDataURL('image/png');
       setCharImageOverrides((prev) => ({
         ...prev,
         [currentSelectedId]: {
@@ -1405,7 +1408,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
 
       console.log(`[PixelEditor 4/6] ✍️ Rendered ${nonTransparentPixelsCount} non-transparent pixels onto frame (col: ${col}, row: ${row})`);
 
-      const updatedUrl = canvas.toDataURL('image/png');
+      const pixelEditorWebP = canvas.toDataURL('image/webp', 0.92);
+      const updatedUrl = (pixelEditorWebP && pixelEditorWebP.startsWith('data:image/webp')) ? pixelEditorWebP : canvas.toDataURL('image/png');
       console.log(`[PixelEditor 5/6] 📦 Generated updated data URL (length: ${updatedUrl.length})`);
 
       const newOverrideObj = {
@@ -1552,7 +1556,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
         ctx.drawImage(img, 0, bottomSrcY, naturalW, bottomH, 0, bottomDstY, naturalW, bottomH);
       }
 
-      const updatedUrl = canvas.toDataURL('image/png');
+      const deletedRowWebP = canvas.toDataURL('image/webp', 0.88);
+      const updatedUrl = (deletedRowWebP && deletedRowWebP.startsWith('data:image/webp')) ? deletedRowWebP : canvas.toDataURL('image/png');
 
       const newOverrideObj = {
         url: updatedUrl,
@@ -1660,7 +1665,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
         oldCols * tileW, targetRow * tileH, tileW, tileH
       );
 
-      const updatedUrl = canvas.toDataURL('image/png');
+      const addedColWebP = canvas.toDataURL('image/webp', 0.88);
+      const updatedUrl = (addedColWebP && addedColWebP.startsWith('data:image/webp')) ? addedColWebP : canvas.toDataURL('image/png');
 
       const newOverrideObj = {
         url: updatedUrl,
@@ -1985,7 +1991,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
             ctx.drawImage(img, sx, sy, tSize, tSize, dx, dy, tSize, tSize);
           }
         }
-        resolve(canvas.toDataURL('image/png'));
+        const cleanWebP = canvas.toDataURL('image/webp', 0.9);
+        resolve((cleanWebP && cleanWebP.startsWith('data:image/webp')) ? cleanWebP : canvas.toDataURL('image/png'));
       };
       img.onerror = () => resolve(sourceUrl);
       img.src = sourceUrl;
