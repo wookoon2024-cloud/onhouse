@@ -103,19 +103,39 @@ export const DEFAULT_CHAR_ROW_ACTIONS: Record<string, string[]> = {
   pig: ['대기', '걷기1'],
 };
 
-export function getCharRowActions(spriteType: string): string[] {
+const DEFAULT_PRESET_ACTIONS = ['대기', '걷기1', '걷기2', '걷기3', '공격', '피격', '환호'];
+
+export function getCharRowActions(spriteType: string, totalRows?: number): string[] {
+  let list: string[] = [];
   try {
     const saved = localStorage.getItem('on_house_char_row_actions');
     if (saved) {
       const parsed = JSON.parse(saved);
       if (parsed[spriteType] && Array.isArray(parsed[spriteType])) {
-        return parsed[spriteType];
+        list = parsed[spriteType];
       }
     }
   } catch (e) {
     // fallback
   }
-  return DEFAULT_CHAR_ROW_ACTIONS[spriteType] || ['대기', '걷기1', '걷기2', '걷기3', '공격', '피격', '환호'];
+
+  if (!list || list.length === 0) {
+    list = DEFAULT_CHAR_ROW_ACTIONS[spriteType] || DEFAULT_PRESET_ACTIONS;
+  }
+
+  if (totalRows !== undefined && totalRows > 0) {
+    const result: string[] = [];
+    for (let i = 0; i < totalRows; i++) {
+      if (i < list.length && list[i] !== undefined) {
+        result.push(list[i]);
+      } else {
+        result.push(i < DEFAULT_PRESET_ACTIONS.length ? DEFAULT_PRESET_ACTIONS[i] : `동작 ${i + 1}`);
+      }
+    }
+    return result;
+  }
+
+  return list;
 }
 
 export interface CharSpriteInfo {

@@ -2168,8 +2168,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
       });
 
       // Update action row names list
-      const currentList = charRowActions[currentSelectedId] || getCharRowActions(currentSelectedId);
-      const updatedList = [...currentList, actionName];
+      const currentList = getCharRowActions(currentSelectedId, oldRows);
+      const updatedList = [...currentList];
+      updatedList[oldRows] = actionName;
       const updatedRowActions = {
         ...charRowActions,
         [currentSelectedId]: updatedList
@@ -3158,7 +3159,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
   };
 
   // Current row action names array for selected character
-  const currentCharRowActions = charRowActions[currentSelectedId] || getCharRowActions(currentSelectedId);
+  const currentCharRowActions = charRowActions[currentSelectedId] || getCharRowActions(currentSelectedId, currentOption?.rows);
   const baseBoardSize = 256;
   const boardSize = Math.round(baseBoardSize * editorZoom);
 
@@ -3710,7 +3711,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
                     </div>
                     <input
                       type="text"
-                      value={currentCharRowActions[activeDisplayTile.row] || `동작 ${activeDisplayTile.row + 1}`}
+                      value={currentCharRowActions[activeDisplayTile.row] ?? `동작 ${activeDisplayTile.row + 1}`}
                       onChange={(e) => {
                         const newName = e.target.value;
                         const updatedList = [...currentCharRowActions];
