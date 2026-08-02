@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { PlayerState } from '../game/syncManager';
-import { User, Trash2 } from 'lucide-react';
-import { deleteHouseAssetFromDB, getSavedHouseCode } from '../services/HouseService';
-import { supabase } from '../lib/supabase';
+import { User } from 'lucide-react';
 import { getCharDisplaySize } from '../game/MapData';
 
 interface CustomizerProps {
@@ -34,45 +32,6 @@ export const Customizer: React.FC<CustomizerProps> = ({ player, customCharSprite
       setCustomChars(customCharSprites);
     }
   }, [customCharSprites]);
-
-  const handleDeleteCustomChar = async (e: React.MouseEvent, charId: string, charName: string) => {
-    e.stopPropagation();
-    if (!window.confirm(`[${charName}] 커스텀 캐릭터를 삭제하시겠습니까?`)) return;
-
-    const nextCustoms = customChars.filter((c) => c.id !== charId);
-    setCustomChars(nextCustoms);
-    localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(nextCustoms));
-
-    try {
-      const overridesSaved = localStorage.getItem('on_house_char_image_overrides');
-      if (overridesSaved) {
-        const overrides = JSON.parse(overridesSaved);
-        delete overrides[charId];
-        localStorage.setItem('on_house_char_image_overrides', JSON.stringify(overrides));
-      }
-    } catch (err) {}
-
-    if (player.spriteType === charId) {
-      // Fall back to another remaining custom character if the player has one, otherwise the
-      // built-in sprite (still renders fine even though it's no longer offered in the picker).
-      onChange({ spriteType: nextCustoms[0]?.id || '' });
-    }
-
-    const currentHouseCode = getSavedHouseCode();
-    await deleteHouseAssetFromDB(currentHouseCode, 'char_sprite', charId);
-    await deleteHouseAssetFromDB(currentHouseCode, 'char_image_override', charId);
-    await deleteHouseAssetFromDB(currentHouseCode, 'char_row_actions', charId);
-
-    try {
-      supabase.channel(`house:${currentHouseCode}`).send({
-        type: 'broadcast',
-        event: 'asset_delete',
-        payload: { assetType: 'char_sprite', assetId: charId }
-      });
-    } catch (e) {}
-
-    window.dispatchEvent(new Event('on_house_sprites_updated'));
-  };
 
   const allCharOptions = Array.from(
     new Map([...DEFAULT_CHARACTERS, ...customChars].map((c) => [c.id, c])).values()
@@ -160,24 +119,7 @@ export const Customizer: React.FC<CustomizerProps> = ({ player, customCharSprite
               ))}
             </select>
 
-            {!DEFAULT_CHARACTERS.some(d => d.id === player.spriteType) && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  const currentObj = allCharOptions.find(c => c.id === player.spriteType);
-                  if (currentObj) handleDeleteCustomChar(e, currentObj.id, currentObj.name);
-                }}
-                style={{
-                  padding: '7px 10px', background: 'rgba(239, 68, 68, 0.15)',
-                  border: '1px solid #ef4444', color: '#ff6b6b',
-                  borderRadius: 0, cursor: 'pointer', display: 'flex',
-                  alignItems: 'center', justifyContent: 'center', flexShrink: 0
-                }}
-                title="선택된 커스텀 캐릭터 삭제"
-              >
-                <Trash2 size={13} />
-              </button>
-            )}
+
           </div>
         </div>
 
