@@ -389,7 +389,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
 
   useEffect(() => {
     try {
-      localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(customCharSprites));
+      const lightweight = customCharSprites.map(({ url, ...meta }: any) => meta);
+      safeLocalStorageSetItem('on_house_custom_char_sprites', JSON.stringify(lightweight));
     } catch (e) {
       console.warn('Failed to save custom char sprites', e);
     }
@@ -1434,8 +1435,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
 
       // Synchronously write to localStorage BEFORE updating state or triggering event listeners!
       try {
-        localStorage.setItem('on_house_char_image_overrides', JSON.stringify(nextOverrides));
-        localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(nextCustomChars));
+        const lightweightChars = nextCustomChars.map(({ url, ...meta }: any) => meta);
+        safeLocalStorageSetItem('on_house_char_image_overrides', JSON.stringify(nextOverrides));
+        safeLocalStorageSetItem('on_house_custom_char_sprites', JSON.stringify(lightweightChars));
       } catch (e) {
         console.warn('[PixelEditor] Failed to write to localStorage:', e);
       }
@@ -1572,7 +1574,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
           }
           return opt;
         });
-        localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(next));
+        const lightweight = next.map(({ url, ...meta }: any) => meta);
+        safeLocalStorageSetItem('on_house_custom_char_sprites', JSON.stringify(lightweight));
         return next;
       });
 
@@ -1678,7 +1681,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
           }
           return opt;
         });
-        localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(next));
+        const lightweight = next.map(({ url, ...meta }: any) => meta);
+        safeLocalStorageSetItem('on_house_custom_char_sprites', JSON.stringify(lightweight));
         return next;
       });
 
@@ -1797,7 +1801,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
           }
           return opt;
         });
-        safeLocalStorageSetItem('on_house_custom_char_sprites', JSON.stringify(next));
+        const lightweight = next.map(({ url, ...meta }: any) => meta);
+        safeLocalStorageSetItem('on_house_custom_char_sprites', JSON.stringify(lightweight));
         return next;
       });
 
@@ -2313,7 +2318,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
         }
         return item;
       });
-      localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(updated));
+      const lightweight = updated.map(({ url, ...meta }: any) => meta);
+      safeLocalStorageSetItem('on_house_custom_char_sprites', JSON.stringify(lightweight));
       return updated;
     });
 
