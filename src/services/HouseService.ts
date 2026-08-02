@@ -632,15 +632,19 @@ export const deleteHouseAssetFromDB = async (
   try {
     console.log(`[OnHouse DB Delete] 🗑️ Real hard-deleting asset "${assetId}" (${assetType}) from house_assets...`);
 
+    // Only match the exact requested asset_type — this used to also match char_sprite/
+    // char_image_override regardless of what was asked for, so deleting e.g. just the
+    // char_row_actions record for a character would silently wipe its sprite and image
+    // override too. Filtered at the DB level instead of pulling every row for the house.
     const { data: rows } = await supabase
       .from('house_assets')
-      .select('id, asset_type, asset_data')
-      .eq('house_code', houseCode);
+      .select('id')
+      .eq('house_code', houseCode)
+      .eq('asset_type', assetType)
+      .filter('asset_data->>id', 'eq', assetId);
 
     if (rows && rows.length > 0) {
-      const idsToDelete = rows
-        .filter(r => (r.asset_type === assetType || r.asset_type === 'char_sprite' || r.asset_type === 'char_image_override') && r.asset_data?.id === assetId)
-        .map(r => r.id);
+      const idsToDelete = rows.map(r => r.id);
 
       if (idsToDelete.length > 0) {
         const { error } = await supabase
