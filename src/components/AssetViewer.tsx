@@ -177,7 +177,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
   });
 
   const [customCharSprites, setCustomCharSprites] = useState<TilesetOption[]>(() => {
-    if (dbCustomCharSprites && Array.isArray(dbCustomCharSprites) && dbCustomCharSprites.length > 0) {
+    if (dbCustomCharSprites && Array.isArray(dbCustomCharSprites)) {
       return dbCustomCharSprites;
     }
     try {
@@ -190,7 +190,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
 
   // Keep customCharSprites synced with DB props
   useEffect(() => {
-    if (dbCustomCharSprites && Array.isArray(dbCustomCharSprites) && dbCustomCharSprites.length > 0) {
+    if (dbCustomCharSprites && Array.isArray(dbCustomCharSprites)) {
       console.log(`[AssetViewer Sync] 🔄 Syncing customCharSprites from DB props (${dbCustomCharSprites.length} items: ${dbCustomCharSprites.map(c => c.name || c.id).join(', ')})`);
       setCustomCharSprites(dbCustomCharSprites);
     }
