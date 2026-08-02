@@ -201,6 +201,10 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
     }
   }, [dbCustomCharSprites]);
 
+  // Custom asset uploading & DB sync loading state
+  const [isSavingAsset, setIsSavingAsset] = useState<boolean>(false);
+  const [saveProgressText, setSaveProgressText] = useState<string>('');
+
   // Character Spritesheet Image Overrides (for drawn pixels or added/deleted rows/cols/size)
   const [charImageOverrides, setCharImageOverrides] = useState<Record<string, { url: string; rows: number; cols: number; size?: number; frameWidth?: number; frameHeight?: number; offsetX?: number; offsetY?: number; spacingX?: number; spacingY?: number }>>(() => {
     try {
