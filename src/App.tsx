@@ -1331,14 +1331,39 @@ export default function App() {
       }
     };
 
+    // Tab Wakeup & Visibility Auto-Heal Listener:
+    // Wakes up dormant WebSockets and syncs presence & missed messages within 50ms of user returning to tab/window!
+    const handleTabWakeup = () => {
+      if (document.visibilityState === 'visible' || document.hasFocus()) {
+        if (channelRef.current) {
+          try {
+            if (channelRef.current.state !== 'SUBSCRIBED') {
+              channelRef.current.subscribe();
+            }
+            sendPlayerSync(localPlayerRef.current);
+            channelRef.current.send({
+              type: 'broadcast',
+              event: 'request_player_sync',
+              payload: { fromId: deviceId.current }
+            });
+          } catch (e) {}
+        }
+        window.dispatchEvent(new Event('on_house_refocus_messenger'));
+      }
+    };
+
     window.addEventListener('beforeunload', handleUnload);
     window.addEventListener('pagehide', handleUnload);
+    document.addEventListener('visibilitychange', handleTabWakeup);
+    window.addEventListener('focus', handleTabWakeup);
 
     return () => {
       clearInterval(syncInterval);
       handleUnload();
       window.removeEventListener('beforeunload', handleUnload);
       window.removeEventListener('pagehide', handleUnload);
+      document.removeEventListener('visibilitychange', handleTabWakeup);
+      window.removeEventListener('focus', handleTabWakeup);
       if (channelRef.current === channel) {
         channelRef.current = null;
       }

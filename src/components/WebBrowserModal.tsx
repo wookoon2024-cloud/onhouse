@@ -172,7 +172,10 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
           </button>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => {
+              onClose();
+              window.dispatchEvent(new Event('on_house_refocus_messenger'));
+            }}
             style={{
               background: 'rgba(255, 255, 255, 0.15)',
               border: '1px solid rgba(255, 255, 255, 0.25)',

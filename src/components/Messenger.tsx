@@ -70,6 +70,7 @@ export const Messenger: React.FC<MessengerProps> = ({
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const modalRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const isUserScrolledUpRef = useRef(false);
 
   // Absolute initial pixel position state
@@ -192,11 +193,18 @@ export const Messenger: React.FC<MessengerProps> = ({
     return () => clearInterval(interval);
   }, [activeTarget, localPlayer.id]);
 
-  // Listen for realtime DM read events
+  // Listen for realtime DM read events & refocus requests from modals
   useEffect(() => {
     const handleReadEvent = () => loadHistory();
+    const handleRefocusEvent = () => {
+      setTimeout(() => inputRef.current?.focus(), 50);
+    };
     window.addEventListener('on_house_dm_read', handleReadEvent);
-    return () => window.removeEventListener('on_house_dm_read', handleReadEvent);
+    window.addEventListener('on_house_refocus_messenger', handleRefocusEvent);
+    return () => {
+      window.removeEventListener('on_house_dm_read', handleReadEvent);
+      window.removeEventListener('on_house_refocus_messenger', handleRefocusEvent);
+    };
   }, []);
 
   // Scroll to bottom whenever messages arrive or partner closes 1:1 session
@@ -598,6 +606,7 @@ export const Messenger: React.FC<MessengerProps> = ({
         display: 'flex', gap: '10px', alignItems: 'center', background: 'rgba(0,0,0,0.1)'
       }}>
         <input
+          ref={inputRef}
           type="text"
           placeholder={isPartnerClosed ? "상대방이 1:1 놀기를 종료하였습니다." : "메시지를 입력하세요..."}
           disabled={isPartnerClosed}
