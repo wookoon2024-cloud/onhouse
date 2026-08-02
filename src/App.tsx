@@ -931,16 +931,6 @@ export default function App() {
               }
             ]);
           }
-          // If partner reconnected after F5/tab reload, automatically unlock DM session
-          setClosedDMPartners((prev) => {
-            if (prev[playerId]) {
-              const copy = { ...prev };
-              delete copy[playerId];
-              return copy;
-            }
-            return prev;
-          });
-
           return {
             ...prev,
             [playerId]: {
@@ -1188,6 +1178,14 @@ export default function App() {
         if (!payload || payload.toId !== deviceId.current) return;
         const partner = payload.accepterPlayer || otherPlayers[payload.fromId] || offlinePlayers[payload.fromId];
         if (partner) {
+          setClosedDMPartners((prev) => {
+            if (prev[payload.fromId]) {
+              const copy = { ...prev };
+              delete copy[payload.fromId];
+              return copy;
+            }
+            return prev;
+          });
           setActiveDMTarget(partner);
           showToast(`[${payload.fromName}] 님이 1:1 놀기 요청을 수락했습니다!`);
         }
@@ -2379,11 +2377,21 @@ export default function App() {
   // Accept incoming 1:1 DM Request
   const handleAcceptDMRequest = () => {
     if (!incomingDMRequest) return;
+    const reqId = incomingDMRequest.requesterId;
+    setClosedDMPartners((prev) => {
+      if (prev[reqId]) {
+        const copy = { ...prev };
+        delete copy[reqId];
+        return copy;
+      }
+      return prev;
+    });
+
     sendReliableBroadcastChannel('dm_accept', {
       fromId: localPlayer.id,
       fromName: localPlayer.nickname,
       accepterPlayer: localPlayer,
-      toId: incomingDMRequest.requesterId
+      toId: reqId
     });
 
     setActiveDMTarget(incomingDMRequest.requesterPlayer);
