@@ -398,96 +398,104 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
 
   const prevOverridesRef = useRef(charImageOverrides);
   useEffect(() => {
+    // 1. Persist charImageOverrides to LocalStorage safely (pruning stale keys not in active character list)
     try {
-      localStorage.setItem('on_house_char_image_overrides', JSON.stringify(charImageOverrides));
-
-      // Also update customCharSprites list in localStorage so custom sprites have the latest edited URL!
-      setCustomCharSprites((prev) => {
-        let changed = false;
-        const next = prev.map((opt) => {
-          const override = charImageOverrides[opt.id];
-          if (override && (override.cols !== opt.cols || override.rows !== opt.rows)) {
-            changed = true;
-            return {
-              ...opt,
-              cols: override.cols || opt.cols,
-              rows: override.rows || opt.rows
-            };
-          }
-          return opt;
-        });
-        if (changed) {
-          const lightweightList = next.map(({ url, ...meta }: any) => meta);
-          safeLocalStorageSetItem('on_house_custom_char_sprites', JSON.stringify(lightweightList));
-        }
-        return changed ? next : prev;
-      });
-
-      // Save each override to Cloud DB & Broadcast to House Realtime channel!
-      // Only save the items that actually changed to avoid DB request spam!
-      const currentHouseCode = getSavedHouseCode();
-      const prevOverrides = prevOverridesRef.current;
-      
-      Object.entries(charImageOverrides).forEach(([id, override]) => {
-        if (!id) return; // No character selected — never persist a blank-id row.
-        const prevOverride = prevOverrides[id];
-        if (override && override.url && (!prevOverride || prevOverride.url !== override.url || prevOverride.cols !== override.cols || prevOverride.rows !== override.rows || prevOverride.size !== override.size)) {
-          const foundOpt = customCharSprites.find((c) => c.id === id);
-          const assetData = {
-            id,
-            name: foundOpt?.name || id,
-            url: override.url,
-            cols: override.cols || foundOpt?.cols || 4,
-            rows: override.rows || foundOpt?.rows || 7,
-            size: override.size || 32,
-            isCustom: foundOpt?.isCustom || false
-          };
-
-          // Save to Supabase DB
-          saveHouseAssetToDB(currentHouseCode, 'char_sprite', assetData);
-          saveHouseAssetToDB(currentHouseCode, 'char_image_override', {
-            id,
-            url: override.url,
-            cols: override.cols || foundOpt?.cols || 4,
-            rows: override.rows || foundOpt?.rows || 7,
-            size: override.size || 16
-          });
-
-          // Broadcast to Realtime channel
-          try {
-            supabase.channel(`house:${currentHouseCode}`).send({
-              type: 'broadcast',
-              event: 'asset_update',
-              payload: {
-                assetType: 'char_sprite',
-                assetData
-              }
-            });
-            supabase.channel(`house:${currentHouseCode}`).send({
-              type: 'broadcast',
-              event: 'asset_update',
-              payload: {
-                assetType: 'char_image_override',
-                assetData: {
-                  id,
-                  url: override.url,
-                  cols: override.cols || foundOpt?.cols || 4,
-                  rows: override.rows || foundOpt?.rows || 7,
-                  size: override.size || 16
-                }
-              }
-            });
-          } catch (e) {}
+      const activeCharIds = new Set(customCharSprites.map((c) => c.id));
+      const cleanOverrides: Record<string, any> = {};
+      Object.entries(charImageOverrides).forEach(([id, val]) => {
+        if (activeCharIds.has(id)) {
+          cleanOverrides[id] = val;
         }
       });
-
-      prevOverridesRef.current = charImageOverrides;
-
-      // Notify game canvas to reload sprites locally
-      window.dispatchEvent(new Event('on_house_sprites_updated'));
+      safeLocalStorageSetItem('on_house_char_image_overrides', JSON.stringify(cleanOverrides));
     } catch (e) {
-      console.warn('Failed to save char image overrides', e);
+      console.warn('[Storage Warning] LocalStorage write failed, continuing Cloud DB save.', e);
     }
+
+    // 2. Also update customCharSprites list in localStorage so custom sprites have the latest edited URL!
+    setCustomCharSprites((prev) => {
+      let changed = false;
+      const next = prev.map((opt) => {
+        const override = charImageOverrides[opt.id];
+        if (override && (override.cols !== opt.cols || override.rows !== opt.rows)) {
+          changed = true;
+          return {
+            ...opt,
+            cols: override.cols || opt.cols,
+            rows: override.rows || opt.rows
+          };
+        }
+        return opt;
+      });
+      if (changed) {
+        const lightweightList = next.map(({ url, ...meta }: any) => meta);
+        safeLocalStorageSetItem('on_house_custom_char_sprites', JSON.stringify(lightweightList));
+      }
+      return changed ? next : prev;
+    });
+
+    // 3. Save each override to Cloud DB & Broadcast to House Realtime channel!
+    // Always runs regardless of LocalStorage quota status!
+    const currentHouseCode = getSavedHouseCode();
+    const prevOverrides = prevOverridesRef.current;
+    
+    Object.entries(charImageOverrides).forEach(([id, override]) => {
+      if (!id) return; // No character selected — never persist a blank-id row.
+      const prevOverride = prevOverrides[id];
+      if (override && override.url && (!prevOverride || prevOverride.url !== override.url || prevOverride.cols !== override.cols || prevOverride.rows !== override.rows || prevOverride.size !== override.size)) {
+        const foundOpt = customCharSprites.find((c) => c.id === id);
+        const assetData = {
+          id,
+          name: foundOpt?.name || id,
+          url: override.url,
+          cols: override.cols || foundOpt?.cols || 4,
+          rows: override.rows || foundOpt?.rows || 7,
+          size: override.size || 32,
+          isCustom: foundOpt?.isCustom || false
+        };
+
+        // Save to Supabase DB
+        saveHouseAssetToDB(currentHouseCode, 'char_sprite', assetData);
+        saveHouseAssetToDB(currentHouseCode, 'char_image_override', {
+          id,
+          url: override.url,
+          cols: override.cols || foundOpt?.cols || 4,
+          rows: override.rows || foundOpt?.rows || 7,
+          size: override.size || 16
+        });
+
+        // Broadcast to Realtime channel
+        try {
+          supabase.channel(`house:${currentHouseCode}`).send({
+            type: 'broadcast',
+            event: 'asset_update',
+            payload: {
+              assetType: 'char_sprite',
+              assetData
+            }
+          });
+          supabase.channel(`house:${currentHouseCode}`).send({
+            type: 'broadcast',
+            event: 'asset_update',
+            payload: {
+              assetType: 'char_image_override',
+              assetData: {
+                id,
+                url: override.url,
+                cols: override.cols || foundOpt?.cols || 4,
+                rows: override.rows || foundOpt?.rows || 7,
+                size: override.size || 16
+              }
+            }
+          });
+        } catch (e) {}
+      }
+    });
+
+    prevOverridesRef.current = charImageOverrides;
+
+    // Notify game canvas to reload sprites locally
+    window.dispatchEvent(new Event('on_house_sprites_updated'));
   }, [charImageOverrides]);
 
   // Persist charRowActions to localStorage & Supabase Cloud DB
