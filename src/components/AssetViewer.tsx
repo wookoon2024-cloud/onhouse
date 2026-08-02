@@ -1737,30 +1737,52 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
       const tileW = Math.max(1, Math.floor(naturalW / cols));
       const tileH = Math.max(1, Math.floor(naturalH / oldRows));
 
-      console.log(`[OnHouse ActionRow] 2/5 🎨 Resizing spritesheet: ${naturalW}x${naturalH} -> ${naturalW}x${newRows * tileH} (tile: ${tileW}x${tileH})`);
+      // Cap max frame size to 128px (matches game's maximum 128px display limit for 100% crisp sharpness & 90% memory savings)
+      const maxDim = 128;
+      const scale = (tileW > maxDim || tileH > maxDim) ? maxDim / Math.max(tileW, tileH) : 1;
+      const destTileW = Math.max(1, Math.round(tileW * scale));
+      const destTileH = Math.max(1, Math.round(tileH * scale));
+
+      const destSheetW = cols * destTileW;
+      const destSheetH = newRows * destTileH;
+
+      console.log(`[OnHouse ActionRow] 2/5 🎨 Resizing spritesheet: ${naturalW}x${naturalH} -> ${destSheetW}x${destSheetH} (tile: ${destTileW}x${destTileH})`);
 
       const canvas = document.createElement('canvas');
-      canvas.width = naturalW;
-      canvas.height = newRows * tileH;
+      canvas.width = destSheetW;
+      canvas.height = destSheetH;
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('Canvas 2D context unavailable');
       ctx.imageSmoothingEnabled = false;
 
-      // Draw existing image
-      ctx.drawImage(img, 0, 0);
+      // Draw existing image frames scaled to destTileW x destTileH
+      for (let r = 0; r < oldRows; r++) {
+        for (let c = 0; c < cols; c++) {
+          ctx.drawImage(
+            img,
+            c * tileW, r * tileH, tileW, tileH,
+            c * destTileW, r * destTileH, destTileW, destTileH
+          );
+        }
+      }
 
       // Copy Row 0 (Idle frames) into the new bottom row as starting template
-      ctx.drawImage(img, 0, 0, naturalW, tileH, 0, (newRows - 1) * tileH, naturalW, tileH);
+      ctx.drawImage(
+        canvas,
+        0, 0, destSheetW, destTileH,
+        0, (newRows - 1) * destTileH, destSheetW, destTileH
+      );
 
-      const updatedUrl = canvas.toDataURL('image/png');
+      const outWebP = canvas.toDataURL('image/webp', 0.88);
+      const updatedUrl = (outWebP && outWebP.startsWith('data:image/webp')) ? outWebP : canvas.toDataURL('image/png');
 
       const newOverrideObj = {
         url: updatedUrl,
         rows: newRows,
         cols,
         size: currentOption.size || 32,
-        frameWidth: currentOption.frameWidth,
-        frameHeight: currentOption.frameHeight
+        frameWidth: destTileW,
+        frameHeight: destTileH
       };
 
       // Update image overrides state
@@ -1769,21 +1791,23 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
         [currentSelectedId]: newOverrideObj
       };
       setCharImageOverrides(updatedOverrides);
-      localStorage.setItem('on_house_char_image_overrides', JSON.stringify(updatedOverrides));
+      safeLocalStorageSetItem('on_house_char_image_overrides', JSON.stringify(updatedOverrides));
 
-      // Also update customCharSprites list in localStorage so custom sprites have the latest rows!
+      // Also update customCharSprites list in localStorage so custom sprites have the latest rows & url!
       setCustomCharSprites((prev) => {
         const next = prev.map((opt) => {
           if (opt.id === currentSelectedId) {
             return {
               ...opt,
               url: updatedUrl,
-              rows: newRows
+              rows: newRows,
+              frameWidth: destTileW,
+              frameHeight: destTileH
             };
           }
           return opt;
         });
-        localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(next));
+        safeLocalStorageSetItem('on_house_custom_char_sprites', JSON.stringify(next));
         return next;
       });
 
@@ -1795,7 +1819,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
         [currentSelectedId]: updatedList
       };
       setCharRowActions(updatedRowActions);
-      localStorage.setItem('on_house_char_row_actions', JSON.stringify(updatedRowActions));
+      safeLocalStorageSetItem('on_house_char_row_actions', JSON.stringify(updatedRowActions));
 
       console.log(`[OnHouse ActionRow] 3/5 💾 Saved row actions to LocalStorage (${updatedList.length} actions: ${updatedList.join(', ')})`);
 
@@ -1980,8 +2004,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
-        // Option B: Allow high-resolution custom frames (up to 512px maxDim) without blurry downscaling to 64px
-        const maxDim = 512;
+        // Cap max frame dimensions to 128px (matches game's maximum 128px display size limit for 1:1 crisp pixel sharpness & 90% storage savings)
+        const maxDim = 128;
         const scale = (frameW > maxDim || frameH > maxDim) ? maxDim / Math.max(frameW, frameH) : 1;
         const destFrameW = Math.max(1, Math.round(frameW * scale));
         const destFrameH = Math.max(1, Math.round(frameH * scale));
@@ -2017,7 +2041,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
             );
           }
         }
-        const outWebP = canvas.toDataURL('image/webp', 0.92);
+        const outWebP = canvas.toDataURL('image/webp', 0.88);
         const finalUrl = outWebP && outWebP.startsWith('data:image/webp') ? outWebP : canvas.toDataURL('image/png');
         resolve({ url: finalUrl, frameW: destFrameW, frameH: destFrameH });
       };
