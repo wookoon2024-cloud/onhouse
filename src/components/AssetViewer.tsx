@@ -275,6 +275,17 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
   const [selectedCharId, setSelectedCharId] = useState<string>('');
   const [gridZoom, setGridZoom] = useState<number>(1.5);
 
+  // Keep selectedCharId pointing at a real character whenever one exists. Without this, the
+  // dropdown/board can visually show the first available character (currentOption falls back to
+  // currentOptionList[0] for display) while selectedCharId itself stays '' — every save handler
+  // that keys off selectedCharId then silently writes/reads under an empty id.
+  useEffect(() => {
+    if (customCharSprites.length === 0) return;
+    if (!customCharSprites.some((c) => c.id === selectedCharId)) {
+      setSelectedCharId(customCharSprites[0].id);
+    }
+  }, [customCharSprites, selectedCharId]);
+
   // Temporary string state for direct typing in 맵 출력 크기 input box
   const [sizeInputText, setSizeInputText] = useState<string | null>(null);
 
@@ -647,6 +658,10 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
 
   // 📋 Copy Frame to Clipboard Buffer
   const handleCopyFrame = (col: number, row: number) => {
+    if (!currentSelectedId) {
+      setToastMessage('⚠️ 선택된 캐릭터가 없습니다.');
+      return;
+    }
     const srcResKey = `on_house_char_frame_res_${currentSelectedId}_${row}_${col}`;
     const savedRes = localStorage.getItem(srcResKey);
     const srcRes = savedRes ? parseInt(savedRes, 10) : (currentOption.size || 16);
@@ -661,11 +676,18 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
       canvas.width = tileW;
       canvas.height = tileH;
       const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+      if (!ctx) {
+        setToastMessage('⚠️ 프레임 복사에 실패했습니다 (캔버스 오류).');
+        return;
+      }
 
       ctx.drawImage(img, col * tileW, row * tileH, tileW, tileH, 0, 0, tileW, tileH);
       setCopiedFrameBuffer(canvas.toDataURL());
       setContextMenuTile(null);
+      setToastMessage('📋 선택한 프레임이 복사되었습니다! (Ctrl+V로 붙여넣기)');
+    };
+    img.onerror = () => {
+      setToastMessage('⚠️ 프레임 복사에 실패했습니다 (이미지 로딩 오류).');
     };
     img.src = currentOption.url;
   };
@@ -681,6 +703,10 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
   // 📥 Paste Copied Frame Buffer onto Target Frame
   const handlePasteFrame = (col: number, row: number) => {
     if (!copiedFrameBuffer) return;
+    if (!currentSelectedId) {
+      setToastMessage('⚠️ 선택된 캐릭터가 없습니다.');
+      return;
+    }
 
     // Persist destination frame resolution to match copied source frame resolution!
     const dstResKey = `on_house_char_frame_res_${currentSelectedId}_${row}_${col}`;
@@ -697,7 +723,10 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
         canvas.width = mainImg.width;
         canvas.height = mainImg.height;
         const ctx = canvas.getContext('2d');
-        if (!ctx) return;
+        if (!ctx) {
+          setToastMessage('⚠️ 붙여넣기에 실패했습니다 (캔버스 오류).');
+          return;
+        }
 
         ctx.drawImage(mainImg, 0, 0);
         ctx.clearRect(col * tileW, row * tileH, tileW, tileH);
@@ -716,8 +745,15 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
           }
         }));
         setContextMenuTile(null);
+        setToastMessage('📥 프레임이 붙여넣기 되었습니다!');
+      };
+      patchImg.onerror = () => {
+        setToastMessage('⚠️ 붙여넣기에 실패했습니다 (복사된 이미지 로딩 오류).');
       };
       patchImg.src = copiedFrameBuffer;
+    };
+    mainImg.onerror = () => {
+      setToastMessage('⚠️ 붙여넣기에 실패했습니다 (대상 캐릭터 이미지 로딩 오류).');
     };
     mainImg.src = currentOption.url;
   };
@@ -865,7 +901,6 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
       if (isCtrlOrCmd && (code === 'KeyC' || keyLower === 'c' || e.key === 'ㅊ')) {
         e.preventDefault();
         handleCopyFrame(current.col, current.row);
-        setToastMessage("📋 선택한 프레임이 복사되었습니다! (Ctrl+V로 붙여넣기)");
         return;
       }
 
@@ -882,7 +917,6 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
         e.preventDefault();
         if (copiedFrameBuffer) {
           handlePasteFrame(current.col, current.row);
-          setToastMessage("📥 프레임이 붙여넣기 되었습니다!");
         } else {
           setToastMessage("⚠️ 복사된 프레임이 없습니다. 먼저 Ctrl+C로 복사해 주세요!");
         }
