@@ -98,7 +98,7 @@ export default function App() {
   // Helper to load initial saved map tab order
   const getInitialAvailableMapIds = (): string[] => {
     try {
-      const savedOrder = localStorage.getItem('on_house_available_maps') || localStorage.getItem('on_house_available_map_ids');
+      const savedOrder = localStorage.getItem(`on_house_available_maps_${houseCode}`);
       if (savedOrder) {
         const parsed = JSON.parse(savedOrder);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -128,8 +128,7 @@ export default function App() {
     const finalOrder = orderedIds.length > 0 ? orderedIds : fetchedMapIds;
     setAvailableMapIds(finalOrder);
     try {
-      localStorage.setItem('on_house_available_maps', JSON.stringify(finalOrder));
-      localStorage.setItem('on_house_available_map_ids', JSON.stringify(finalOrder));
+      localStorage.setItem(`on_house_available_maps_${houseCode}`, JSON.stringify(finalOrder));
     } catch (e) {}
 
     // Guarantee initial entry always lands on the far-left first map (finalOrder[0])!
@@ -229,8 +228,7 @@ export default function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem('on_house_available_map_ids', JSON.stringify(availableMapIds));
-    localStorage.setItem('on_house_available_maps', JSON.stringify(availableMapIds));
+    localStorage.setItem(`on_house_available_maps_${houseCode}`, JSON.stringify(availableMapIds));
     if (availableMapIds.length > 0 && !availableMapIds.includes(localPlayer.mapId)) {
       setLocalPlayer((prev) => ({ ...prev, mapId: availableMapIds[0] }));
     }
@@ -705,8 +703,7 @@ export default function App() {
         if (payload && Array.isArray(payload.order) && payload.order.length > 0) {
           setAvailableMapIds(payload.order);
           try {
-            localStorage.setItem('on_house_available_maps', JSON.stringify(payload.order));
-            localStorage.setItem('on_house_available_map_ids', JSON.stringify(payload.order));
+            localStorage.setItem(`on_house_available_maps_${houseCode}`, JSON.stringify(payload.order));
           } catch (e) {}
         }
       })
@@ -895,7 +892,7 @@ export default function App() {
         setAvailableMapIds((prev) => {
           if (!prev.includes(payload.mapId)) {
             const next = [...prev, payload.mapId];
-            localStorage.setItem('on_house_available_map_ids', JSON.stringify(next));
+            localStorage.setItem(`on_house_available_maps_${houseCode}`, JSON.stringify(next));
             return next;
           }
           return prev;
@@ -907,7 +904,7 @@ export default function App() {
         
         setAvailableMapIds((prev) => {
           const next = prev.filter((id) => id !== targetMapId);
-          localStorage.setItem('on_house_available_map_ids', JSON.stringify(next));
+          localStorage.setItem(`on_house_available_maps_${houseCode}`, JSON.stringify(next));
           return next;
         });
 
@@ -1600,7 +1597,7 @@ export default function App() {
             setAvailableMapIds((prev) => {
               if (!prev.includes(msg.mapId)) {
                 const next = [...prev, msg.mapId];
-                localStorage.setItem('on_house_available_map_ids', JSON.stringify(next));
+                localStorage.setItem(`on_house_available_maps_${houseCode}`, JSON.stringify(next));
                 return next;
               }
               return prev;
@@ -3120,8 +3117,7 @@ export default function App() {
           onReorderMaps={(newOrder) => {
             setAvailableMapIds(newOrder);
             try {
-              localStorage.setItem('on_house_available_maps', JSON.stringify(newOrder));
-              localStorage.setItem('on_house_available_map_ids', JSON.stringify(newOrder));
+              localStorage.setItem(`on_house_available_maps_${houseCode}`, JSON.stringify(newOrder));
             } catch (e) {}
 
             // Update sortOrder property on map objects and save to DB
