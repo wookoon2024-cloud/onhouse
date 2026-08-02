@@ -231,14 +231,20 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
   });
   charImageOverridesRef.current = charImageOverrides;
 
-  // Keep charImageOverrides synced with DB props
+  // Keep charImageOverrides synced with DB props (preserving active local user edits)
   useEffect(() => {
     if (dbCharOverrides && typeof dbCharOverrides === 'object' && Object.keys(dbCharOverrides).length > 0) {
-      console.log(`[AssetViewer Sync] 🔄 Syncing charImageOverrides from DB props (${Object.keys(dbCharOverrides).length} items: ${Object.keys(dbCharOverrides).join(', ')})`);
-      setCharImageOverrides((prev) => ({
-        ...prev,
-        ...dbCharOverrides
-      }));
+      setCharImageOverrides((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        Object.entries(dbCharOverrides).forEach(([id, dbVal]) => {
+          if (dbVal && dbVal.url && !next[id]) {
+            next[id] = dbVal;
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
     }
   }, [dbCharOverrides]);
 
