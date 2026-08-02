@@ -162,6 +162,7 @@ interface PixelEditorCanvasProps {
   editorGridResH: number;
   cellSizePx: number;
   showBorders: boolean;
+  showCenterCrosshair?: boolean;
   brushSize: number;
   drawTool: 'pencil' | 'eraser';
   selectedColor: string;
@@ -177,6 +178,7 @@ const PixelEditorCanvas: React.FC<PixelEditorCanvasProps> = ({
   editorGridResH,
   cellSizePx,
   showBorders,
+  showCenterCrosshair = true,
   brushSize,
   drawTool,
   selectedColor,
@@ -242,6 +244,30 @@ const PixelEditorCanvas: React.FC<PixelEditorCanvasProps> = ({
       ctx.stroke();
     }
 
+    // Red Crosshair Center Guide Line Overlay
+    if (showCenterCrosshair) {
+      const midCol = Math.floor(editorGridResW / 2);
+      const midRow = Math.floor(editorGridResH / 2);
+      const midX = Math.floor(midCol * cellSizePx) + 0.5;
+      const midY = Math.floor(midRow * cellSizePx) + 0.5;
+
+      ctx.strokeStyle = 'rgba(255, 68, 68, 0.85)';
+      ctx.lineWidth = Math.max(1.5, Math.floor(cellSizePx / 3));
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      
+      // Vertical red center line
+      ctx.moveTo(midX, 0);
+      ctx.lineTo(midX, height);
+      
+      // Horizontal red center line
+      ctx.moveTo(0, midY);
+      ctx.lineTo(width, midY);
+
+      ctx.stroke();
+      ctx.setLineDash([]); // Reset line dash
+    }
+
     // Hover Brush Size Box Preview Overlay
     if (hoverCell && !isSpaceDown && !isEditorPanning) {
       const bx = hoverCell.x * cellSizePx;
@@ -256,7 +282,7 @@ const PixelEditorCanvas: React.FC<PixelEditorCanvasProps> = ({
       ctx.lineWidth = Math.max(1, Math.floor(cellSizePx / 4));
       ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
     }
-  }, [pixelGrid, editorGridResW, editorGridResH, cellSizePx, showBorders, hoverCell, isSpaceDown, isEditorPanning, brushSize, drawTool]);
+  }, [pixelGrid, editorGridResW, editorGridResH, cellSizePx, showBorders, showCenterCrosshair, hoverCell, isSpaceDown, isEditorPanning, brushSize, drawTool]);
 
   const updateHoverCell = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -549,6 +575,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
   const [selectedColor, setSelectedColor] = useState<string>('#ff0000');
   const [drawTool, setDrawTool] = useState<'pencil' | 'eraser'>('pencil');
   const [brushSize, setBrushSize] = useState<number>(1);
+  const [showCenterCrosshair, setShowCenterCrosshair] = useState<boolean>(true);
   const [isMouseDown, setIsMouseDown] = useState<boolean>(false);
   const [editorPan, setEditorPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isEditorPanning, setIsEditorPanning] = useState<boolean>(false);
@@ -3989,7 +4016,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
                     <Eraser size={11} /> 지우개
                   </button>
                   <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)', height: '24px', margin: '0 4px' }} />
-                  {[1, 2, 3, 4, 8, 16, 32].map(size => (
+                  {[1, 2, 3, 4, 16, 20, 32].map(size => (
                     <button
                       key={`brush-${size}`}
                       onClick={() => setBrushSize(size)}
@@ -4004,6 +4031,19 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
                     </button>
                   ))}
                   <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)', height: '24px', margin: '0 4px' }} />
+                  <button
+                    onClick={() => setShowCenterCrosshair(prev => !prev)}
+                    style={{
+                      padding: '4px 8px', fontSize: '10px', borderRadius: '4px',
+                      background: showCenterCrosshair ? 'rgba(239, 68, 68, 0.25)' : 'rgba(255,255,255,0.08)',
+                      color: showCenterCrosshair ? '#ff6b6b' : '#aaa',
+                      border: `1px solid ${showCenterCrosshair ? '#ff4444' : 'var(--border-glass)'}`,
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 'bold'
+                    }}
+                    title="중앙 빨간색 십자가 가이드선 보기/숨기기"
+                  >
+                    🎯 중앙선 ({showCenterCrosshair ? 'ON' : 'OFF'})
+                  </button>
                   <button
                     onClick={() => {
                       const newGrid = pixelGrid.map((row) => [...row].reverse());
@@ -4040,12 +4080,20 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
                     <Upload size={11} /> 📁 불러오기
                   </button>
 
-                  {/* 픽셀 전체 이동 화살표 버튼 4개 (좌, 위, 아래, 우) */}
+                  {/* 픽셀 전체 이동 화살표 버튼 4개 (좌, 위, 아래, 우) - 0.1ms 초고속 이동 */}
                   <div style={{ display: 'flex', gap: '2px', marginLeft: '2px' }}>
                     <button
                       onClick={() => {
                         setPixelGrid(prevGrid => {
-                          return prevGrid.map((row) => [...row.slice(1), 'transparent']);
+                          const resH = prevGrid.length;
+                          const newGrid = new Array(resH);
+                          for (let r = 0; r < resH; r++) {
+                            const row = prevGrid[r];
+                            const newRow = row.slice(1);
+                            newRow.push('transparent');
+                            newGrid[r] = newRow;
+                          }
+                          return newGrid;
                         });
                       }}
                       title="전체 픽셀 왼쪽으로 1px 이동"
@@ -4062,10 +4110,11 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
                         setPixelGrid(prevGrid => {
                           const resH = prevGrid.length;
                           const resW = prevGrid[0]?.length || 32;
-                          const newGrid = Array.from({ length: resH }, () => Array(resW).fill('transparent'));
+                          const newGrid = new Array(resH);
                           for (let r = 0; r < resH - 1; r++) {
-                            newGrid[r] = [...prevGrid[r + 1]];
+                            newGrid[r] = prevGrid[r + 1];
                           }
+                          newGrid[resH - 1] = new Array(resW).fill('transparent');
                           return newGrid;
                         });
                       }}
@@ -4083,9 +4132,10 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
                         setPixelGrid(prevGrid => {
                           const resH = prevGrid.length;
                           const resW = prevGrid[0]?.length || 32;
-                          const newGrid = Array.from({ length: resH }, () => Array(resW).fill('transparent'));
+                          const newGrid = new Array(resH);
+                          newGrid[0] = new Array(resW).fill('transparent');
                           for (let r = 1; r < resH; r++) {
-                            newGrid[r] = [...prevGrid[r - 1]];
+                            newGrid[r] = prevGrid[r - 1];
                           }
                           return newGrid;
                         });
@@ -4102,7 +4152,14 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
                     <button
                       onClick={() => {
                         setPixelGrid(prevGrid => {
-                          return prevGrid.map((row) => ['transparent', ...row.slice(0, row.length - 1)]);
+                          const resH = prevGrid.length;
+                          const newGrid = new Array(resH);
+                          for (let r = 0; r < resH; r++) {
+                            const row = prevGrid[r];
+                            const newRow = ['transparent', ...row.slice(0, row.length - 1)];
+                            newGrid[r] = newRow;
+                          }
+                          return newGrid;
                         });
                       }}
                       title="전체 픽셀 오른쪽으로 1px 이동"
@@ -4118,44 +4175,6 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
                 </div>
 
                 <div style={{ fontSize: '9px', color: '#aaa' }}>
-                  <strong style={{ color: 'var(--accent)' }}>{editorGridResW}x{editorGridResH}</strong> ({editorZoom}x)
-                </div>
-              </div>
-
-              {/* Fit-to-Container Cell Grid Container with Space + Drag Panning */}
-              {(() => {
-                const maxW = 300;
-                const maxH = 300;
-                const scaleW = maxW / editorGridResW;
-                const scaleH = maxH / editorGridResH;
-                const baseScale = Math.min(scaleW, scaleH);
-                const cellSizePx = Math.max(0.2, baseScale * editorZoom);
-                const boardW = Math.round(editorGridResW * cellSizePx);
-                const boardH = Math.round(editorGridResH * cellSizePx);
-                const showBorders = editorGridResW <= 48 && editorGridResH <= 48;
-
-                return (
-                  <div
-                    onMouseDown={(e) => {
-                      if (isSpaceDown || e.button === 1) {
-                        e.preventDefault();
-                        setIsEditorPanning(true);
-                        editorPanStartRef.current = {
-                          startX: e.clientX,
-                          startY: e.clientY,
-                          initPanX: editorPan.x,
-                          initPanY: editorPan.y
-                        };
-                      }
-                    }}
-                    onMouseMove={(e) => {
-                      if (isEditorPanning && editorPanStartRef.current) {
-                        const dx = e.clientX - editorPanStartRef.current.startX;
-                        const dy = e.clientY - editorPanStartRef.current.startY;
-                        setEditorPan({
-                          x: editorPanStartRef.current.initPanX + dx,
-                          y: editorPanStartRef.current.initPanY + dy
-                        });
                       }
                     }}
                     onMouseUp={() => {
@@ -4207,6 +4226,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
                       editorGridResH={editorGridResH}
                       cellSizePx={cellSizePx}
                       showBorders={showBorders}
+                      showCenterCrosshair={showCenterCrosshair}
                       brushSize={brushSize}
                       drawTool={drawTool}
                       selectedColor={selectedColor}
