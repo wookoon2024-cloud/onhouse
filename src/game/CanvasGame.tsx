@@ -1215,8 +1215,15 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         const spacingX = charInfo.spacingX || 0;
         const spacingY = charInfo.spacingY || 0;
 
-        const tileW = charInfo.frameWidth || (hasSprite ? Math.max(1, Math.floor((spriteSheet.width - startX) / maxCols)) : 16);
-        const tileH = charInfo.frameHeight || (hasSprite ? Math.max(1, Math.floor((spriteSheet.height - startY) / maxRows)) : 16);
+        let tileW = charInfo.frameWidth || (hasSprite ? Math.max(1, Math.floor((spriteSheet.width - startX) / maxCols)) : 16);
+        let tileH = charInfo.frameHeight || (hasSprite ? Math.max(1, Math.floor((spriteSheet.height - startY) / maxRows)) : 16);
+
+        // Fallback safety check: If saved frameWidth/frameHeight exceeds actual loaded spriteSheet bounds,
+        // dynamically recalculate from the actual image dimensions so older/misconfigured assets still render cleanly!
+        if (hasSprite && (startX + tileW > spriteSheet.width || startY + tileH > spriteSheet.height)) {
+          tileW = Math.max(1, Math.floor((spriteSheet.width - startX) / maxCols));
+          tileH = Math.max(1, Math.floor((spriteSheet.height - startY) / maxRows));
+        }
 
         const isEmoting = !!(player.emoteUntil && Date.now() < player.emoteUntil && player.currentEmote);
         const charRowActions = getCharRowActions(player.spriteType);

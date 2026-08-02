@@ -1965,7 +1965,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
     });
   };
 
-  // Helper to crop precise sprite sheet region (with start offsets and custom frame sizes) into a clean 100% gapless PNG
+  // Helper to crop precise sprite sheet region (with start offsets and custom frame sizes) into a clean 100% gapless PNG/WebP
   const cropSpriteSheetRegion = (
     sourceUrl: string,
     offX: number,
@@ -1975,14 +1975,14 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
     frameW: number,
     frameH: number,
     spacing: number = 0
-  ): Promise<string> => {
+  ): Promise<{ url: string; frameW: number; frameH: number }> => {
     return new Promise((resolve) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
-        // Cap max frame dimensions to 64x64px for standard 2D game resolution!
-        const maxDim = 64;
-        const scale = Math.min(1, maxDim / Math.max(frameW, frameH));
+        // Option B: Allow high-resolution custom frames (up to 512px maxDim) without blurry downscaling to 64px
+        const maxDim = 512;
+        const scale = (frameW > maxDim || frameH > maxDim) ? maxDim / Math.max(frameW, frameH) : 1;
         const destFrameW = Math.max(1, Math.round(frameW * scale));
         const destFrameH = Math.max(1, Math.round(frameH * scale));
 
@@ -1991,7 +1991,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
         canvas.height = Math.max(1, rows * destFrameH);
         const ctx = canvas.getContext('2d');
         if (!ctx) {
-          resolve(sourceUrl);
+          resolve({ url: sourceUrl, frameW, frameH });
           return;
         }
         ctx.imageSmoothingEnabled = false;
@@ -2017,10 +2017,11 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
             );
           }
         }
-        const outWebP = canvas.toDataURL('image/webp', 0.85);
-        resolve(outWebP && outWebP.startsWith('data:image/webp') ? outWebP : canvas.toDataURL('image/png'));
+        const outWebP = canvas.toDataURL('image/webp', 0.92);
+        const finalUrl = outWebP && outWebP.startsWith('data:image/webp') ? outWebP : canvas.toDataURL('image/png');
+        resolve({ url: finalUrl, frameW: destFrameW, frameH: destFrameH });
       };
-      img.onerror = () => resolve(sourceUrl);
+      img.onerror = () => resolve({ url: sourceUrl, frameW, frameH });
       img.src = sourceUrl;
     });
   };
@@ -2381,7 +2382,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
         } else if (uploadCategory === 'character' || offX > 0 || offY > 0 || (imgWidth > 0 && (frameW !== Math.round((imgWidth - offX) / cols) || frameH !== Math.round((imgHeight - offY) / rows)))) {
           // Automatic cropping for character sprite sheets, start offsets (시작 X, Y), and custom frame dimensions
           setSaveProgressText('✂️ 에셋 영역 자동 크롭 및 오프셋 정제 중...');
-          finalUrl = await cropSpriteSheetRegion(
+          const cropRes = await cropSpriteSheetRegion(
             fileDataUrl,
             offX,
             offY,
@@ -2391,6 +2392,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
             frameH,
             customSpacingInput || 0
           );
+          finalUrl = cropRes.url;
+          frameW = cropRes.frameW;
+          frameH = cropRes.frameH;
           offX = 0;
           offY = 0;
         }
