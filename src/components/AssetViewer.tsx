@@ -2525,11 +2525,20 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
         setActiveTab('character');
         setSelectedCharId(generatedOptions[0].id);
 
-        // The game canvas only reads character images from char_image_override, not from
-        // char_sprite's own url — register one now so a freshly uploaded character actually
-        // renders in-game instead of staying a placeholder until someone edits it later.
-        setCharImageOverrides((prev) => {
-          const nextOverrides = { ...prev };
+        // The game canvas only reads character images from char_image_override (in localStorage),
+        // not from char_sprite's own url — register one now so a freshly uploaded character
+        // actually renders in-game instead of staying a placeholder until someone edits it later.
+        // Written directly to localStorage (NOT via setCharImageOverrides/React state) on purpose:
+        // that state is watched by a separate effect which independently re-saves char_sprite +
+        // char_image_override to Supabase whenever it changes. Triggering it here raced against
+        // the explicit, sequential DB save loop a few lines below (both doing their own
+        // insert-then-delete-duplicates for the same brand-new id), and the loser of that race
+        // could have its freshly-inserted char_sprite row deleted by the other's cleanup step —
+        // confirmed live: a test character ended up with a char_image_override row but no
+        // matching char_sprite row at all.
+        try {
+          const savedOverridesStr = localStorage.getItem('on_house_char_image_overrides');
+          const nextOverrides = savedOverridesStr ? JSON.parse(savedOverridesStr) : {};
           generatedOptions.forEach((opt) => {
             nextOverrides[opt.id] = {
               url: opt.url,
@@ -2544,8 +2553,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
               spacingY: opt.spacingY
             };
           });
-          return nextOverrides;
-        });
+          safeLocalStorageSetItem('on_house_char_image_overrides', JSON.stringify(nextOverrides));
+        } catch (e) {}
       }
 
       // Notify window to update CanvasGame image caches immediately
