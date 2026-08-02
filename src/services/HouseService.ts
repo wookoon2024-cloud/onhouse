@@ -606,8 +606,31 @@ export const fetchHouseAssets = async (houseCode: string) => {
   }
 };
 
-// Save custom asset to Supabase (Hard Deletes existing older rows for same asset ID to prevent duplicates)
-export const saveHouseAssetToDB = async (
+// Serializes concurrent saveHouseAssetToDB calls for the same (house, type, id). Multiple UI
+// paths can end up saving the same asset within milliseconds of each other (e.g. a handler that
+// updates React state AND explicitly saves to DB, while a separate effect watching that same
+// state also saves it) — each call does its own insert-then-delete-duplicates cleanup, and two
+// running concurrently can delete each other's freshly-inserted row depending on timing (confirmed
+// live: a newly uploaded character's char_sprite row vanished this way, twice). Queuing same-key
+// calls so each one's insert+cleanup fully finishes before the next starts removes the race
+// without touching every call site that triggers a save.
+const pendingAssetSaves = new Map<string, Promise<any>>();
+
+export const saveHouseAssetToDB = (
+  houseCode: string,
+  assetType: 'map_tileset' | 'char_sprite' | 'char_image_override' | 'char_row_actions',
+  assetData: any
+) => {
+  const lockKey = `${houseCode}:${assetType}:${assetData?.id || ''}`;
+  const prior = pendingAssetSaves.get(lockKey) || Promise.resolve();
+  const run = prior.then(() => doSaveHouseAssetToDB(houseCode, assetType, assetData));
+  // Keep the chain alive even if this save fails, so the NEXT queued save for this key doesn't
+  // get stuck waiting on a permanently-rejected promise.
+  pendingAssetSaves.set(lockKey, run.catch(() => {}));
+  return run;
+};
+
+const doSaveHouseAssetToDB = async (
   houseCode: string,
   assetType: 'map_tileset' | 'char_sprite' | 'char_image_override' | 'char_row_actions',
   assetData: any
