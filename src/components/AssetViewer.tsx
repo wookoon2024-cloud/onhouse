@@ -189,11 +189,15 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
     }
   });
 
-  // Keep customCharSprites synced with DB props
+  // Keep customCharSprites synced with DB props & purge stale local storage items
   useEffect(() => {
     if (dbCustomCharSprites && Array.isArray(dbCustomCharSprites)) {
       console.log(`[AssetViewer Sync] 🔄 Syncing customCharSprites from DB props (${dbCustomCharSprites.length} items: ${dbCustomCharSprites.map(c => c.name || c.id).join(', ')})`);
       setCustomCharSprites(dbCustomCharSprites);
+      try {
+        const lightweightCharSprites = dbCustomCharSprites.map(({ url, ...meta }: any) => meta);
+        safeLocalStorageSetItem('on_house_custom_char_sprites', JSON.stringify(lightweightCharSprites));
+      } catch (e) {}
     }
   }, [dbCustomCharSprites]);
 

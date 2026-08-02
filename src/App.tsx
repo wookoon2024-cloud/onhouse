@@ -691,10 +691,11 @@ export default function App() {
           if (mapTilesets && mapTilesets.length > 0) {
             localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(mapTilesets));
           }
-          if (charSprites && charSprites.length > 0) {
-            localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(charSprites));
+          if (charSprites) {
+            const lightweightChars = charSprites.map(({ url, ...meta }: any) => meta);
+            localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(lightweightChars));
           }
-          if (charOverrides && Object.keys(charOverrides).length > 0) {
+          if (charOverrides) {
             localStorage.setItem('on_house_char_image_overrides', JSON.stringify(charOverrides));
           }
           if (charRowActions && Object.keys(charRowActions).length > 0) {
