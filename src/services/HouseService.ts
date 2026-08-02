@@ -442,6 +442,19 @@ export const fetchHouseAssets = async (houseCode: string) => {
     const metaRows = [...(tilesetMetaRes.data || []), ...(charMetaRes.data || [])];
 
     if (metaRows.length === 0) {
+      try {
+        localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify([]));
+        localStorage.setItem('on_house_custom_char_sprites', JSON.stringify([]));
+        localStorage.setItem('on_house_char_image_overrides', JSON.stringify({}));
+        localStorage.setItem('on_house_char_row_actions', JSON.stringify({}));
+
+        localStorage.setItem(`on_house_custom_map_tilesets_${houseCode}`, JSON.stringify([]));
+        localStorage.setItem(`on_house_custom_char_sprites_${houseCode}`, JSON.stringify([]));
+        localStorage.setItem(`on_house_char_image_overrides_${houseCode}`, JSON.stringify({}));
+        localStorage.setItem(`on_house_char_row_actions_${houseCode}`, JSON.stringify({}));
+
+        window.dispatchEvent(new Event('on_house_sprites_updated'));
+      } catch (e) {}
       return { mapTilesets: [], charSprites: [], charOverrides: {}, charRowActions: {} };
     }
 
