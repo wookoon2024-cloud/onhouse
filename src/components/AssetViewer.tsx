@@ -678,42 +678,65 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
 
   // 📋 Copy Frame to Clipboard Buffer
   const handleCopyFrame = (col: number, row: number) => {
+    console.log(`[FrameCopy] 📋 Copy requested for frame (col: ${col}, row: ${row}) on character ID "${currentSelectedId}" (Name: ${currentOption?.name || 'Unknown'})...`);
+    
     if (!currentSelectedId) {
+      console.warn('[FrameCopy] ⚠️ Copy aborted: No character selected.');
       setToastMessage('⚠️ 선택된 캐릭터가 없습니다.');
       return;
     }
+    if (!currentOption?.url) {
+      console.error('[FrameCopy] ❌ Copy failed: currentOption.url is empty or undefined.');
+      setToastMessage('⚠️ 복사할 캐릭터 이미지 데이터가 없습니다.');
+      return;
+    }
+
     const srcResKey = `on_house_char_frame_res_${currentSelectedId}_${row}_${col}`;
     const savedRes = localStorage.getItem(srcResKey);
     const srcRes = savedRes ? parseInt(savedRes, 10) : (currentOption.size || 16);
     setCopiedFrameRes(srcRes);
+    setCopiedFrameSrc({ col, row });
 
     const img = new Image();
-    img.crossOrigin = 'anonymous';
+    // Only set crossOrigin for remote http/https URLs. Data URLs must NOT set crossOrigin in Chrome/Firefox!
+    if (!currentOption.url.startsWith('data:')) {
+      img.crossOrigin = 'anonymous';
+    }
+
     img.onload = () => {
+      console.log(`[FrameCopy] 🖼️ Base image loaded. Natural size: ${img.width}x${img.height}, Grid: ${currentOption.cols}x${currentOption.rows}`);
       const tileW = Math.max(16, Math.floor(img.width / currentOption.cols));
       const tileH = Math.max(16, Math.floor(img.height / currentOption.rows));
+      
       const canvas = document.createElement('canvas');
       canvas.width = tileW;
       canvas.height = tileH;
       const ctx = canvas.getContext('2d');
       if (!ctx) {
+        console.error('[FrameCopy] ❌ Canvas 2d context creation failed.');
         setToastMessage('⚠️ 프레임 복사에 실패했습니다 (캔버스 오류).');
         return;
       }
 
       ctx.drawImage(img, col * tileW, row * tileH, tileW, tileH, 0, 0, tileW, tileH);
-      setCopiedFrameBuffer(canvas.toDataURL());
+      const dataUrl = canvas.toDataURL('image/png');
+      setCopiedFrameBuffer(dataUrl);
       setContextMenuTile(null);
+      console.log(`[FrameCopy] ✅ Frame (col: ${col}, row: ${row}) copied successfully! Buffer size: ${(dataUrl.length / 1024).toFixed(1)} KB`);
       setToastMessage('📋 선택한 프레임이 복사되었습니다! (Ctrl+V로 붙여넣기)');
     };
-    img.onerror = () => {
+
+    img.onerror = (err) => {
+      console.error('[FrameCopy] ❌ Image loading failed for URL:', currentOption.url.slice(0, 100) + '...', err);
       setToastMessage('⚠️ 프레임 복사에 실패했습니다 (이미지 로딩 오류).');
     };
+
     img.src = currentOption.url;
   };
 
   // ✂️ Cut Frame (Copy to Clipboard Buffer & Clear Frame Cell)
   const handleCutFrame = (col: number, row: number) => {
+    console.log(`[FrameCut] ✂️ Cut requested for frame (col: ${col}, row: ${row})...`);
     handleCopyFrame(col, row);
     setTimeout(() => {
       handleDeleteFrameColumn(col, row);
@@ -722,9 +745,21 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
 
   // 📥 Paste Copied Frame Buffer onto Target Frame
   const handlePasteFrame = (col: number, row: number) => {
-    if (!copiedFrameBuffer) return;
+    console.log(`[FramePaste] 📥 Paste requested onto frame (col: ${col}, row: ${row}) for character ID "${currentSelectedId}"...`);
+    
+    if (!copiedFrameBuffer) {
+      console.warn('[FramePaste] ⚠️ Paste aborted: copiedFrameBuffer is empty.');
+      setToastMessage('⚠️ 복사된 프레임이 없습니다. 먼저 Ctrl+C로 복사해 주세요!');
+      return;
+    }
     if (!currentSelectedId) {
+      console.warn('[FramePaste] ⚠️ Paste aborted: No character selected.');
       setToastMessage('⚠️ 선택된 캐릭터가 없습니다.');
+      return;
+    }
+    if (!currentOption?.url) {
+      console.error('[FramePaste] ❌ Paste failed: currentOption.url is empty or undefined.');
+      setToastMessage('⚠️ 대상 캐릭터 이미지 데이터가 없습니다.');
       return;
     }
 
@@ -733,17 +768,25 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
     localStorage.setItem(dstResKey, copiedFrameRes.toString());
 
     const mainImg = new Image();
-    mainImg.crossOrigin = 'anonymous';
+    // Only set crossOrigin for remote http/https URLs. Data URLs must NOT set crossOrigin!
+    if (!currentOption.url.startsWith('data:')) {
+      mainImg.crossOrigin = 'anonymous';
+    }
+
     mainImg.onload = () => {
+      console.log(`[FramePaste] 🖼️ Main target image loaded. Natural size: ${mainImg.width}x${mainImg.height}`);
       const tileW = Math.max(16, Math.floor(mainImg.width / currentOption.cols));
       const tileH = Math.max(16, Math.floor(mainImg.height / currentOption.rows));
+      
       const patchImg = new Image();
       patchImg.onload = () => {
+        console.log(`[FramePaste] 🩹 Patch frame loaded (${patchImg.width}x${patchImg.height}). Patching into cell (col: ${col}, row: ${row}, tileW: ${tileW}, tileH: ${tileH})...`);
         const canvas = document.createElement('canvas');
         canvas.width = mainImg.width;
         canvas.height = mainImg.height;
         const ctx = canvas.getContext('2d');
         if (!ctx) {
+          console.error('[FramePaste] ❌ Canvas 2d context creation failed.');
           setToastMessage('⚠️ 붙여넣기에 실패했습니다 (캔버스 오류).');
           return;
         }
@@ -754,6 +797,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
 
         const pastedWebP = canvas.toDataURL('image/webp', 0.88);
         const updatedUrl = (pastedWebP && pastedWebP.startsWith('data:image/webp')) ? pastedWebP : canvas.toDataURL('image/png');
+        
+        console.log(`[FramePaste] ✅ Frame pasted successfully! New total image size: ${(updatedUrl.length / 1024).toFixed(1)} KB`);
+
         setCharImageOverrides((prev) => ({
           ...prev,
           [currentSelectedId]: {
@@ -768,14 +814,20 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
         setContextMenuTile(null);
         setToastMessage('📥 프레임이 붙여넣기 되었습니다!');
       };
-      patchImg.onerror = () => {
+
+      patchImg.onerror = (err) => {
+        console.error('[FramePaste] ❌ Patch image loading failed:', err);
         setToastMessage('⚠️ 붙여넣기에 실패했습니다 (복사된 이미지 로딩 오류).');
       };
+
       patchImg.src = copiedFrameBuffer;
     };
-    mainImg.onerror = () => {
+
+    mainImg.onerror = (err) => {
+      console.error('[FramePaste] ❌ Target main image loading failed:', err);
       setToastMessage('⚠️ 붙여넣기에 실패했습니다 (대상 캐릭터 이미지 로딩 오류).');
     };
+
     mainImg.src = currentOption.url;
   };
 
