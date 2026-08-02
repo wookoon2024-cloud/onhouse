@@ -191,7 +191,7 @@ export const Messenger: React.FC<MessengerProps> = ({
     loadHistory();
     const interval = setInterval(loadHistory, 500);
     return () => clearInterval(interval);
-  }, [activeTarget, localPlayer.id]);
+  }, [activeTarget?.id, localPlayer.id]);
 
   // Listen for realtime DM read events & refocus requests from modals
   useEffect(() => {
