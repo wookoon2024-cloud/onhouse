@@ -370,6 +370,58 @@ const PixelEditorCanvas: React.FC<PixelEditorCanvasProps> = ({
   );
 };
 
+const PixelPreviewCanvas: React.FC<{
+  pixelGrid: string[][];
+  editorGridResW: number;
+  editorGridResH: number;
+}> = ({ pixelGrid, editorGridResW, editorGridResH }) => {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d', { alpha: true });
+    if (!ctx) return;
+
+    if (canvas.width !== editorGridResW || canvas.height !== editorGridResH) {
+      canvas.width = editorGridResW;
+      canvas.height = editorGridResH;
+    }
+    ctx.imageSmoothingEnabled = false;
+
+    ctx.clearRect(0, 0, editorGridResW, editorGridResH);
+
+    const resH = pixelGrid.length;
+    for (let r = 0; r < resH; r++) {
+      const row = pixelGrid[r];
+      if (!row) continue;
+      const resW = row.length;
+      for (let c = 0; c < resW; c++) {
+        const color = row[c];
+        if (color && color !== 'transparent') {
+          ctx.fillStyle = color;
+          ctx.fillRect(c, r, 1, 1);
+        }
+      }
+    }
+  }, [pixelGrid, editorGridResW, editorGridResH]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{
+        width: '64px',
+        height: '64px',
+        border: '2px solid var(--accent)',
+        borderRadius: '4px',
+        background: '#111',
+        imageRendering: 'pixelated',
+        objectFit: 'contain'
+      }}
+    />
+  );
+};
+
 interface AssetViewerProps {
   onClose: () => void;
   onSelectTile?: (index: number) => void;
@@ -4175,69 +4227,106 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
                 </div>
 
                 <div style={{ fontSize: '9px', color: '#aaa' }}>
-                      }
-                    }}
-                    onMouseUp={() => {
-                      if (isEditorPanning) {
-                        setIsEditorPanning(false);
-                        editorPanStartRef.current = null;
-                      }
-                    }}
-                    style={{
-                      width: '320px', height: '320px', overflow: 'hidden',
-                      background: '#0a0a0f', borderRadius: '8px', border: '1px solid var(--border-glass)',
-                      padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.8)', margin: '0 auto', boxSizing: 'border-box',
-                      cursor: isSpaceDown ? (isEditorPanning ? 'grabbing' : 'grab') : 'default',
-                      position: 'relative', userSelect: 'none'
-                    }}
-                  >
-                    {/* Space + Drag Panning Hint Badge & Quick Reset Button */}
-                    {(isSpaceDown || editorZoom > 1.0 || editorPan.x !== 0 || editorPan.y !== 0) && (
-                      <div style={{
-                        position: 'absolute', top: '6px', left: '6px', zIndex: 10,
-                        background: 'rgba(0,0,0,0.8)', color: '#89b4fa', fontSize: '9px',
-                        padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(137, 180, 250, 0.3)',
-                        display: 'flex', alignItems: 'center', gap: '6px'
-                      }}>
-                        <span>💡 Space + 드래그: 캔버스 이동</span>
-                        {(editorPan.x !== 0 || editorPan.y !== 0) && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditorPan({ x: 0, y: 0 });
-                            }}
-                            style={{
-                              background: 'rgba(139, 92, 246, 0.4)', color: '#fff',
-                              border: 'none', borderRadius: '2px', padding: '1px 4px',
-                              fontSize: '9px', cursor: 'pointer', fontWeight: 'bold'
-                            }}
-                            title="캔버스 위치 중앙 리셋"
-                          >
-                            🎯 리셋
-                          </button>
-                        )}
-                      </div>
-                    )}
+                  <strong style={{ color: 'var(--accent)' }}>{editorGridResW}x{editorGridResH}</strong> ({editorZoom}x)
+                </div>
+              </div>
 
-                    <PixelEditorCanvas
-                      pixelGrid={pixelGrid}
-                      editorGridResW={editorGridResW}
-                      editorGridResH={editorGridResH}
-                      cellSizePx={cellSizePx}
-                      showBorders={showBorders}
-                      showCenterCrosshair={showCenterCrosshair}
-                      brushSize={brushSize}
-                      drawTool={drawTool}
-                      selectedColor={selectedColor}
-                      isSpaceDown={isSpaceDown}
-                      isEditorPanning={isEditorPanning}
-                      editorPan={editorPan}
-                      onPixelGridChange={setPixelGrid}
-                    />
-                  </div>
-                );
-              })()}
+              {/* Main Drawing Viewport */}
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1, minHeight: 0 }}>
+                {(() => {
+                  const maxW = 300;
+                  const maxH = 300;
+                  const scaleW = maxW / editorGridResW;
+                  const scaleH = maxH / editorGridResH;
+                  const baseScale = Math.min(scaleW, scaleH);
+                  const cellSizePx = Math.max(0.2, baseScale * editorZoom);
+                  const showBorders = editorGridResW <= 48 && editorGridResH <= 48;
+
+                  return (
+                    <div style={{ position: 'relative', overflow: 'hidden', maxWidth: '100%', maxHeight: '100%' }}>
+                      <div
+                        onMouseDown={(e) => {
+                          if (isSpaceDown || e.button === 1) {
+                            e.preventDefault();
+                            setIsEditorPanning(true);
+                            editorPanStartRef.current = {
+                              startX: e.clientX,
+                              startY: e.clientY,
+                              initPanX: editorPan.x,
+                              initPanY: editorPan.y
+                            };
+                          }
+                        }}
+                        onMouseMove={(e) => {
+                          if (isEditorPanning && editorPanStartRef.current) {
+                            const dx = e.clientX - editorPanStartRef.current.startX;
+                            const dy = e.clientY - editorPanStartRef.current.startY;
+                            setEditorPan({
+                              x: editorPanStartRef.current.initPanX + dx,
+                              y: editorPanStartRef.current.initPanY + dy
+                            });
+                          }
+                        }}
+                        onMouseUp={() => {
+                          if (isEditorPanning) {
+                            setIsEditorPanning(false);
+                            editorPanStartRef.current = null;
+                          }
+                        }}
+                        style={{
+                          width: '320px', height: '320px', overflow: 'hidden',
+                          background: '#0a0a0f', borderRadius: '8px', border: '1px solid var(--border-glass)',
+                          padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.8)', margin: '0 auto', boxSizing: 'border-box',
+                          cursor: isSpaceDown ? (isEditorPanning ? 'grabbing' : 'grab') : 'default',
+                          position: 'relative', userSelect: 'none'
+                        }}
+                      >
+                        {/* Space + Drag Panning Hint Badge & Quick Reset Button */}
+                        {(isSpaceDown || editorZoom > 1.0 || editorPan.x !== 0 || editorPan.y !== 0) && (
+                          <div style={{
+                            position: 'absolute', top: '6px', left: '6px', zIndex: 10,
+                            background: 'rgba(0,0,0,0.8)', color: '#89b4fa', fontSize: '9px',
+                            padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(137, 180, 250, 0.3)',
+                            display: 'flex', alignItems: 'center', gap: '6px'
+                          }}>
+                            <span>🔍 {editorZoom}x | 📍 ({Math.round(editorPan.x)}, {Math.round(editorPan.y)})</span>
+                            {(editorPan.x !== 0 || editorPan.y !== 0) && (
+                              <button
+                                onClick={() => setEditorPan({ x: 0, y: 0 })}
+                                style={{
+                                  background: 'var(--accent)', color: '#000',
+                                  border: 'none', borderRadius: '2px', padding: '1px 4px',
+                                  fontSize: '9px', cursor: 'pointer', fontWeight: 'bold'
+                                }}
+                                title="캔버스 위치 중앙 리셋"
+                              >
+                                🎯 리셋
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        <PixelEditorCanvas
+                          pixelGrid={pixelGrid}
+                          editorGridResW={editorGridResW}
+                          editorGridResH={editorGridResH}
+                          cellSizePx={cellSizePx}
+                          showBorders={showBorders}
+                          showCenterCrosshair={showCenterCrosshair}
+                          brushSize={brushSize}
+                          drawTool={drawTool}
+                          selectedColor={selectedColor}
+                          isSpaceDown={isSpaceDown}
+                          isEditorPanning={isEditorPanning}
+                          editorPan={editorPan}
+                          onPixelGridChange={setPixelGrid}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
 
             {/* Right: Color Palette & Actions */}
@@ -4288,30 +4377,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
               {/* Live Preview */}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', borderTop: '1px solid var(--border-glass)', paddingTop: '8px' }}>
                 <span style={{ fontSize: '10px', color: '#aaa' }}>실시간 미리보기</span>
-                {(() => {
-                  const previewW = Math.max(16, Math.round(52 * (editorGridResW / editorGridResH)));
-                  const previewH = 52;
-                  const cellW = previewW / editorGridResW;
-                  const cellH = previewH / editorGridResH;
-
-                  return (
-                    <div
-                      style={{
-                        width: `${previewW}px`, height: `${previewH}px`, border: '2px solid var(--accent)', borderRadius: '4px',
-                        display: 'grid',
-                        gridTemplateColumns: `repeat(${editorGridResW}, ${cellW}px)`,
-                        gridTemplateRows: `repeat(${editorGridResH}, ${cellH}px)`,
-                        background: '#111', overflow: 'hidden'
-                      }}
-                    >
-                      {pixelGrid.map((row, y) =>
-                        row.map((color, x) => (
-                          <div key={`p-${y}-${x}`} style={{ background: color === 'transparent' ? 'transparent' : color }} />
-                        ))
-                      )}
-                    </div>
-                  );
-                })()}
+                <PixelPreviewCanvas pixelGrid={pixelGrid} editorGridResW={editorGridResW} editorGridResH={editorGridResH} />
               </div>
 
               {/* Save / Cancel buttons */}
