@@ -1024,6 +1024,8 @@ export default function App() {
           }
           return prev;
         });
+        setAssetVersion((v) => v + 1);
+        window.dispatchEvent(new Event('on_house_sprites_updated'));
       })
       .on('broadcast', { event: 'map_delete' }, ({ payload }) => {
         if (!payload || !payload.mapId) return;
@@ -3447,6 +3449,9 @@ export default function App() {
                 console.warn('Supabase DB save note:', res.error);
               }
             });
+
+            setAssetVersion((v) => v + 1);
+            window.dispatchEvent(new Event('on_house_sprites_updated'));
 
             // Broadcast to all devices in real-time via active channel!
             safeBroadcastChannel('map_update', { mapId, mapData: updatedMap });

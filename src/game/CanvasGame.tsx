@@ -1120,7 +1120,8 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
 
       // 1. Draw Base Floor Layer (using Offscreen Baked Canvas Cache for 60 FPS smooth rendering!)
       const normLayers = getNormalizedLayers(map);
-      const offscreenKey = `${map.id}_${map.width}_${map.height}_${assetVersion}_${Object.keys(images).length}`;
+      const mapSampleHash = `${map.baseLayer?.[0]?.[0] || 0}_${map.decorLayer?.[0]?.[0] || 0}_${map.baseLayer?.length || 0}_${map.decorLayer?.length || 0}`;
+      const offscreenKey = `${map.id}_${map.width}_${map.height}_${assetVersion}_${mapSampleHash}_${Object.keys(images).length}`;
       if (!offscreenCanvasRef.current) {
         offscreenCanvasRef.current = document.createElement('canvas');
       }
