@@ -189,11 +189,25 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
     }
   });
 
-  // Keep customCharSprites synced with DB props & purge stale local storage items
+  // Latest charImageOverrides, readable from effects declared above the state itself.
+  const charImageOverridesRef = useRef<Record<string, any>>({});
+
+  // Keep customCharSprites synced with DB props & purge stale local storage items.
+  // char_sprite rows in the DB deliberately carry no `url` (the image lives only in
+  // char_image_override, to avoid storing the same DataURL twice) — so replacing local entries
+  // wholesale with DB ones strips the url off a character that was just uploaded, leaving the
+  // editor board with a broken <img> until a reload repopulates overrides from localStorage.
+  // Carry the existing url forward whenever the incoming DB row doesn't have one.
   useEffect(() => {
     if (dbCustomCharSprites && Array.isArray(dbCustomCharSprites)) {
       console.log(`[AssetViewer Sync] 🔄 Syncing customCharSprites from DB props (${dbCustomCharSprites.length} items: ${dbCustomCharSprites.map(c => c.name || c.id).join(', ')})`);
-      setCustomCharSprites(dbCustomCharSprites);
+      setCustomCharSprites((prev) =>
+        dbCustomCharSprites.map((dbOpt: any) => {
+          if (dbOpt.url) return dbOpt;
+          const knownUrl = prev.find((p) => p.id === dbOpt.id)?.url || charImageOverridesRef.current[dbOpt.id]?.url;
+          return knownUrl ? { ...dbOpt, url: knownUrl } : dbOpt;
+        })
+      );
       try {
         const lightweightCharSprites = dbCustomCharSprites.map(({ url, ...meta }: any) => meta);
         safeLocalStorageSetItem('on_house_custom_char_sprites', JSON.stringify(lightweightCharSprites));
@@ -215,6 +229,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
       return dbCharOverrides || {};
     }
   });
+  charImageOverridesRef.current = charImageOverrides;
 
   // Keep charImageOverrides synced with DB props
   useEffect(() => {
