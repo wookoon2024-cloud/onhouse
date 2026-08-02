@@ -428,6 +428,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
       const prevOverrides = prevOverridesRef.current;
       
       Object.entries(charImageOverrides).forEach(([id, override]) => {
+        if (!id) return; // No character selected — never persist a blank-id row.
         const prevOverride = prevOverrides[id];
         if (override && override.url && (!prevOverride || prevOverride.url !== override.url || prevOverride.cols !== override.cols || prevOverride.rows !== override.rows || prevOverride.size !== override.size)) {
           const foundOpt = customCharSprites.find((c) => c.id === id);
