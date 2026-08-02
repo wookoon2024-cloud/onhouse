@@ -552,20 +552,31 @@ export const fetchHouseAssets = async (houseCode: string) => {
       }
     } catch (e) {}
 
-    // Update local cache so localStorage matches DB 100% (without resurrecting stale local items)
+    // Update local cache so localStorage matches DB 100% (without resurrecting stale local items).
+    // Each write is independent: one oversized entry (e.g. map tilesets) hitting the quota must
+    // not stop the others from being cached, and must never block the sprites-updated event below
+    // — that event is what tells CanvasGame to reload images, so skipping it would leave a
+    // successfully-saved character invisible in-game even though the DB write worked fine.
+    const lightweightCharSprites = finalCharSprites.map(({ url, ...meta }: any) => meta);
+    const safeCacheSet = (key: string, value: string) => {
+      try {
+        localStorage.setItem(key, value);
+      } catch (e) {
+        console.warn(`[OnHouse Cache] LocalStorage quota hit writing "${key}", skipping local cache (DB save unaffected).`);
+      }
+    };
+
+    safeCacheSet('on_house_custom_map_tilesets', JSON.stringify(finalMapTilesets));
+    safeCacheSet('on_house_custom_char_sprites', JSON.stringify(lightweightCharSprites));
+    safeCacheSet('on_house_char_image_overrides', JSON.stringify(charOverrides));
+    safeCacheSet('on_house_char_row_actions', JSON.stringify(charRowActions));
+
+    safeCacheSet(`on_house_custom_map_tilesets_${houseCode}`, JSON.stringify(finalMapTilesets));
+    safeCacheSet(`on_house_custom_char_sprites_${houseCode}`, JSON.stringify(lightweightCharSprites));
+    safeCacheSet(`on_house_char_image_overrides_${houseCode}`, JSON.stringify(charOverrides));
+    safeCacheSet(`on_house_char_row_actions_${houseCode}`, JSON.stringify(charRowActions));
+
     try {
-      const lightweightCharSprites = finalCharSprites.map(({ url, ...meta }: any) => meta);
-
-      localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(finalMapTilesets));
-      localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(lightweightCharSprites));
-      localStorage.setItem('on_house_char_image_overrides', JSON.stringify(charOverrides));
-      localStorage.setItem('on_house_char_row_actions', JSON.stringify(charRowActions));
-
-      localStorage.setItem(`on_house_custom_map_tilesets_${houseCode}`, JSON.stringify(finalMapTilesets));
-      localStorage.setItem(`on_house_custom_char_sprites_${houseCode}`, JSON.stringify(lightweightCharSprites));
-      localStorage.setItem(`on_house_char_image_overrides_${houseCode}`, JSON.stringify(charOverrides));
-      localStorage.setItem(`on_house_char_row_actions_${houseCode}`, JSON.stringify(charRowActions));
-
       window.dispatchEvent(new Event('on_house_sprites_updated'));
     } catch (e) {}
 

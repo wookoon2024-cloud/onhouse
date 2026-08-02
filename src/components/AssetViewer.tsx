@@ -1568,7 +1568,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
         [currentSelectedId]: newOverrideObj
       };
       setCharImageOverrides(updatedOverrides);
-      localStorage.setItem('on_house_char_image_overrides', JSON.stringify(updatedOverrides));
+      safeLocalStorageSetItem('on_house_char_image_overrides', JSON.stringify(updatedOverrides));
 
       // Also update customCharSprites in state & localStorage
       setCustomCharSprites((prev) => {
@@ -1676,7 +1676,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
         [currentSelectedId]: newOverrideObj
       };
       setCharImageOverrides(updatedOverrides);
-      localStorage.setItem('on_house_char_image_overrides', JSON.stringify(updatedOverrides));
+      safeLocalStorageSetItem('on_house_char_image_overrides', JSON.stringify(updatedOverrides));
 
       setCustomCharSprites((prev) => {
         const next = prev.map((opt) => {
@@ -2315,7 +2315,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
           size: newSize
         }
       };
-      localStorage.setItem('on_house_char_image_overrides', JSON.stringify(updated));
+      safeLocalStorageSetItem('on_house_char_image_overrides', JSON.stringify(updated));
       return updated;
     });
 

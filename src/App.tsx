@@ -687,21 +687,26 @@ export default function App() {
         setDbCustomCharSprites(charSprites || []);
         setDbCharOverrides(charOverrides || {});
         
-        try {
-          if (mapTilesets && mapTilesets.length > 0) {
-            localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(mapTilesets));
+        const safeCacheSet = (key: string, value: string) => {
+          try {
+            localStorage.setItem(key, value);
+          } catch (e) {
+            console.warn(`[OnHouse Cache] LocalStorage quota hit writing "${key}", skipping local cache.`);
           }
-          if (charSprites) {
-            const lightweightChars = charSprites.map(({ url, ...meta }: any) => meta);
-            localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(lightweightChars));
-          }
-          if (charOverrides) {
-            localStorage.setItem('on_house_char_image_overrides', JSON.stringify(charOverrides));
-          }
-          if (charRowActions && Object.keys(charRowActions).length > 0) {
-            localStorage.setItem('on_house_char_row_actions', JSON.stringify(charRowActions));
-          }
-        } catch (e) {}
+        };
+        if (mapTilesets && mapTilesets.length > 0) {
+          safeCacheSet('on_house_custom_map_tilesets', JSON.stringify(mapTilesets));
+        }
+        if (charSprites) {
+          const lightweightChars = charSprites.map(({ url, ...meta }: any) => meta);
+          safeCacheSet('on_house_custom_char_sprites', JSON.stringify(lightweightChars));
+        }
+        if (charOverrides) {
+          safeCacheSet('on_house_char_image_overrides', JSON.stringify(charOverrides));
+        }
+        if (charRowActions && Object.keys(charRowActions).length > 0) {
+          safeCacheSet('on_house_char_row_actions', JSON.stringify(charRowActions));
+        }
         setAssetVersion((v) => v + 1);
         window.dispatchEvent(new Event('on_house_sprites_updated'));
       }
