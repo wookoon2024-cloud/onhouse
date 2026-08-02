@@ -631,7 +631,7 @@ export default function App() {
   const channelRef = useRef<RealtimeChannel | null>(null);
 
   const safeBroadcastChannel = (event: string, payload: any) => {
-    if (channelRef.current) {
+    if (channelRef.current && (channelRef.current.state === 'SUBSCRIBED' || (channelRef.current as any).state === 'joined')) {
       try {
         channelRef.current.send({
           type: 'broadcast',
@@ -855,6 +855,16 @@ export default function App() {
               }
             ]);
           }
+          // If partner reconnected after F5/tab reload, automatically unlock DM session
+          setClosedDMPartners((prev) => {
+            if (prev[playerId]) {
+              const copy = { ...prev };
+              delete copy[playerId];
+              return copy;
+            }
+            return prev;
+          });
+
           return {
             ...prev,
             [playerId]: {
