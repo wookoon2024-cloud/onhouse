@@ -2532,6 +2532,23 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
           setSaveProgressText('');
           return;
         }
+
+        if (assetType === 'char_sprite') {
+          const overrideObj = {
+            url: opt.url,
+            cols: opt.cols,
+            rows: opt.rows,
+            size: opt.size,
+            frameWidth: opt.frameWidth,
+            frameHeight: opt.frameHeight,
+            offsetX: opt.offsetX,
+            offsetY: opt.offsetY,
+            spacingX: opt.spacingX,
+            spacingY: opt.spacingY
+          };
+          await saveHouseAssetToDB(currentHouse, 'char_image_override', { id: opt.id, ...overrideObj });
+        }
+
         try {
           supabase.channel(`house:${currentHouse}`).send({
             type: 'broadcast',

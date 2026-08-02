@@ -491,6 +491,20 @@ export const fetchHouseAssets = async (houseCode: string) => {
           if (!seenCharSpriteIds.has(id)) {
             seenCharSpriteIds.add(id);
             charSprites.push(row.asset_data);
+            if (!charOverrides[id] && row.asset_data.url) {
+              charOverrides[id] = {
+                url: row.asset_data.url,
+                cols: row.asset_data.cols,
+                rows: row.asset_data.rows,
+                size: row.asset_data.size,
+                frameWidth: row.asset_data.frameWidth,
+                frameHeight: row.asset_data.frameHeight,
+                offsetX: row.asset_data.offsetX,
+                offsetY: row.asset_data.offsetY,
+                spacingX: row.asset_data.spacingX,
+                spacingY: row.asset_data.spacingY
+              };
+            }
           }
         } else if (row.asset_type === 'char_image_override') {
           if (!charOverrides[id]) {

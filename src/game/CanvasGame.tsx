@@ -603,7 +603,21 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         field: fieldTilesUrl
       };
 
-      // Apply overrides for any character sprite ID
+      // Load registered custom character sprite images
+      try {
+        const customChars = localStorage.getItem('on_house_custom_char_sprites');
+        if (customChars) {
+          const list = JSON.parse(customChars);
+          list.forEach((opt: { id: string; url?: string; dataUrl?: string }) => {
+            const charUrl = opt.url || opt.dataUrl;
+            if (opt.id && charUrl) {
+              assets[opt.id] = charUrl;
+            }
+          });
+        }
+      } catch (e) {}
+
+      // Apply overrides for any character sprite ID (overrides take priority if present)
       Object.entries(overrides).forEach(([key, val]) => {
         if (val && val.url) {
           assets[key] = val.url;
