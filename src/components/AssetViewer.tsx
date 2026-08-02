@@ -416,11 +416,10 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
         let changed = false;
         const next = prev.map((opt) => {
           const override = charImageOverrides[opt.id];
-          if (override && override.url && override.url !== opt.url) {
+          if (override && (override.cols !== opt.cols || override.rows !== opt.rows)) {
             changed = true;
             return {
               ...opt,
-              url: override.url,
               cols: override.cols || opt.cols,
               rows: override.rows || opt.rows
             };
@@ -428,7 +427,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
           return opt;
         });
         if (changed) {
-          localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(next));
+          const lightweightList = next.map(({ url, ...meta }: any) => meta);
+          safeLocalStorageSetItem('on_house_custom_char_sprites', JSON.stringify(lightweightList));
         }
         return changed ? next : prev;
       });
@@ -2516,7 +2516,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
         const existingStr = localStorage.getItem('on_house_custom_char_sprites');
         const existing: TilesetOption[] = existingStr ? JSON.parse(existingStr) : customCharSprites;
         const next = [...existing, ...generatedOptions];
-        safeLocalStorageSetItem('on_house_custom_char_sprites', JSON.stringify(next));
+        const lightweightNext = next.map(({ url, ...meta }: any) => meta);
+        safeLocalStorageSetItem('on_house_custom_char_sprites', JSON.stringify(lightweightNext));
         setCustomCharSprites(next);
         setActiveTab('character');
         setSelectedCharId(generatedOptions[0].id);

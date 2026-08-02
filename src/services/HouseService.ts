@@ -554,13 +554,15 @@ export const fetchHouseAssets = async (houseCode: string) => {
 
     // Update local cache so localStorage matches DB 100% (without resurrecting stale local items)
     try {
+      const lightweightCharSprites = finalCharSprites.map(({ url, ...meta }: any) => meta);
+
       localStorage.setItem('on_house_custom_map_tilesets', JSON.stringify(finalMapTilesets));
-      localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(finalCharSprites));
+      localStorage.setItem('on_house_custom_char_sprites', JSON.stringify(lightweightCharSprites));
       localStorage.setItem('on_house_char_image_overrides', JSON.stringify(charOverrides));
       localStorage.setItem('on_house_char_row_actions', JSON.stringify(charRowActions));
 
       localStorage.setItem(`on_house_custom_map_tilesets_${houseCode}`, JSON.stringify(finalMapTilesets));
-      localStorage.setItem(`on_house_custom_char_sprites_${houseCode}`, JSON.stringify(finalCharSprites));
+      localStorage.setItem(`on_house_custom_char_sprites_${houseCode}`, JSON.stringify(lightweightCharSprites));
       localStorage.setItem(`on_house_char_image_overrides_${houseCode}`, JSON.stringify(charOverrides));
       localStorage.setItem(`on_house_char_row_actions_${houseCode}`, JSON.stringify(charRowActions));
 
@@ -602,7 +604,15 @@ export const saveHouseAssetToDB = async (
   try {
     const assetId = assetData?.id;
     const assetName = assetData?.name || assetId || 'Unknown';
-    const payloadSizeKb = assetData ? Math.round(JSON.stringify(assetData).length / 1024) : 0;
+
+    // Omit heavy DataURL string from char_sprite metadata payload to avoid duplicate DB storage
+    let payloadData = assetData;
+    if (assetType === 'char_sprite' && assetData && assetData.url && assetData.url.startsWith('data:image')) {
+      const { url, ...metaOnly } = assetData;
+      payloadData = metaOnly;
+    }
+
+    const payloadSizeKb = payloadData ? Math.round(JSON.stringify(payloadData).length / 1024) : 0;
     console.log(`[OnHouse DB Save] 📤 Saving asset "${assetName}" (${assetType}, size: ~${payloadSizeKb}KB) into house_assets table for house [${houseCode}]...`);
 
     // 1. Insert the new row FIRST so a failed insert never leaves the asset deleted with nothing
@@ -612,7 +622,7 @@ export const saveHouseAssetToDB = async (
       .insert({
         house_code: houseCode,
         asset_type: assetType,
-        asset_data: assetData,
+        asset_data: payloadData,
         updated_at: new Date().toISOString()
       })
       .select('id');
