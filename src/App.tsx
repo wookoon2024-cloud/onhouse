@@ -108,6 +108,7 @@ export default function App() {
   };
 
   // 0.5. Available Map IDs displayed in top bar
+  const [availableMapIds, setAvailableMapIds] = useState<string[]>(getInitialAvailableMapIds);
   const [dbCustomCharSprites, setDbCustomCharSprites] = useState<any[]>([]);
   const [dbCharOverrides, setDbCharOverrides] = useState<Record<string, any>>({});
 
