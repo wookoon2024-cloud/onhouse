@@ -747,7 +747,46 @@ export default function App() {
       setIsHouseLoaded(true);
     });
 
-    // 3. Connect Supabase Realtime channel with presence tracking
+    // 3. Connect Supabase Realtime channel with presence tracking.
+    // A Supabase channel that has already joined once can NOT be revived by calling subscribe()
+    // on it again — internally join() throws "tried to join multiple times", and when the channel
+    // is in the 'errored' state subscribe() silently no-ops instead. Recovery therefore has to
+    // throw the dead channel away and build a brand new one, which is what connectChannel does.
+    let activeChannel: ReturnType<typeof supabase.channel> | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let reconnectAttempts = 0;
+    let disposed = false;
+    let hasAnnouncedJoin = false;
+
+    // RealtimeChannel.state is 'joined' | 'joining' | 'closed' | 'errored' | 'leaving'.
+    // It is NOT 'SUBSCRIBED' — that value only ever appears as the status argument of the
+    // subscribe() callback. Comparing state against 'SUBSCRIBED' is therefore always true,
+    // which is why the previous wakeup handler tried to re-subscribe on every single focus.
+    const isChannelUsable = (ch: any) => !!ch && (ch.state === 'joined' || ch.state === 'SUBSCRIBED');
+    const isChannelDead = (ch: any) => !ch || ch.state === 'closed' || ch.state === 'errored';
+
+    const scheduleReconnect = (reason: string) => {
+      if (disposed || reconnectTimer) return;
+      reconnectAttempts += 1;
+      const delay = Math.min(30000, 1000 * Math.pow(2, reconnectAttempts - 1));
+      console.warn(`[OnHouse Realtime] Channel ${reason}; rebuilding in ${delay}ms (attempt ${reconnectAttempts})`);
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        connectChannel();
+      }, delay);
+    };
+
+    const connectChannel = () => {
+      if (disposed) return;
+
+      // Discard any previous instance first — see note above on why reuse is impossible.
+      if (activeChannel) {
+        const stale = activeChannel;
+        activeChannel = null;
+        if (channelRef.current === stale) channelRef.current = null;
+        try { supabase.removeChannel(stale); } catch (e) {}
+      }
+
     const channel = supabase.channel(`house:${houseCode}`, {
       config: {
         presence: {
@@ -755,6 +794,7 @@ export default function App() {
         }
       }
     });
+    activeChannel = channel;
 
     channel
       .on('broadcast', { event: 'map_order_update' }, ({ payload }) => {
@@ -1254,8 +1294,22 @@ export default function App() {
         }
       })
       .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          // Welcome message for self
+        if (status !== 'SUBSCRIBED') {
+          // CHANNEL_ERROR / TIMED_OUT / CLOSED were previously ignored entirely, so a socket
+          // dropped while the tab sat in the background stayed dead for the rest of the session
+          // and every send() afterwards silently went nowhere.
+          if (channelRef.current === channel) channelRef.current = null;
+          if (activeChannel === channel && (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED')) {
+            scheduleReconnect(status);
+          }
+          return;
+        }
+
+        reconnectAttempts = 0;
+
+        // Only announce on the first successful join, not on every silent reconnect.
+        if (!hasAnnouncedJoin) {
+          hasAnnouncedJoin = true;
           setChatLogs((logs) => [
             ...logs,
             {
@@ -1265,7 +1319,9 @@ export default function App() {
               time: Date.now()
             }
           ]);
+        }
 
+        {
           channelRef.current = channel;
           try {
             channel.track({
@@ -1294,11 +1350,20 @@ export default function App() {
           });
         }
       });
+    };
 
-    // Periodic heartbeat sync interval every 8 seconds to ensure position alignment across computers
+    connectChannel();
+
+    // Periodic heartbeat sync interval every 8 seconds to ensure position alignment across computers.
+    // Doubles as a safety net: if the channel died without ever reporting a status (which happens
+    // when the browser silently kills a backgrounded socket), rebuild it here.
     const syncInterval = setInterval(() => {
-      if (channelRef.current) {
+      if (disposed) return;
+      const ch = channelRef.current;
+      if (isChannelUsable(ch)) {
         sendPlayerSync(localPlayerRef.current);
+      } else if (isChannelDead(ch) && !reconnectTimer && (document.visibilityState === 'visible' || document.hasFocus())) {
+        scheduleReconnect('heartbeat found channel dead');
       }
     }, 8000);
 
@@ -1312,7 +1377,7 @@ export default function App() {
         });
       }
       try {
-        channel.send({
+        activeChannel?.send({
           type: 'broadcast',
           event: 'player_leave',
           payload: {
@@ -1335,39 +1400,63 @@ export default function App() {
     // Wakes up dormant WebSockets and syncs presence & missed messages within 50ms of user returning to tab/window!
     const handleTabWakeup = () => {
       if (document.visibilityState === 'visible' || document.hasFocus()) {
-        if (channelRef.current) {
+        const ch = channelRef.current;
+        if (isChannelDead(ch)) {
+          // Previously this called ch.subscribe() to "wake" the channel, which cannot work:
+          // on an errored channel subscribe() is a silent no-op, and on a closed one the
+          // internal join() throws "tried to join multiple times" — and because the throw
+          // happened before the sync calls below, inside a catch that swallowed it, returning
+          // to the tab did nothing at all while looking like it had recovered.
+          if (!reconnectTimer) connectChannel();
+        } else if (isChannelUsable(ch)) {
           try {
-            if (channelRef.current.state !== 'SUBSCRIBED') {
-              channelRef.current.subscribe();
-            }
             sendPlayerSync(localPlayerRef.current);
-            channelRef.current.send({
+            ch.send({
               type: 'broadcast',
               event: 'request_player_sync',
               payload: { fromId: deviceId.current }
             });
-          } catch (e) {}
+          } catch (e) {
+            console.warn('[OnHouse Realtime] Wakeup sync failed, rebuilding channel:', e);
+            if (!reconnectTimer) connectChannel();
+          }
         }
         window.dispatchEvent(new Event('on_house_refocus_messenger'));
       }
+    };
+
+    // A dropped connection often surfaces as an offline/online transition rather than a channel
+    // status change, so recover from that too.
+    const handleOnline = () => {
+      reconnectAttempts = 0;
+      handleTabWakeup();
     };
 
     window.addEventListener('beforeunload', handleUnload);
     window.addEventListener('pagehide', handleUnload);
     document.addEventListener('visibilitychange', handleTabWakeup);
     window.addEventListener('focus', handleTabWakeup);
+    window.addEventListener('online', handleOnline);
 
     return () => {
+      disposed = true;
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
       clearInterval(syncInterval);
       handleUnload();
       window.removeEventListener('beforeunload', handleUnload);
       window.removeEventListener('pagehide', handleUnload);
       document.removeEventListener('visibilitychange', handleTabWakeup);
       window.removeEventListener('focus', handleTabWakeup);
-      if (channelRef.current === channel) {
+      window.removeEventListener('online', handleOnline);
+      const last = activeChannel;
+      activeChannel = null;
+      if (channelRef.current === last) {
         channelRef.current = null;
       }
-      supabase.removeChannel(channel);
+      if (last) supabase.removeChannel(last);
     };
   }, [houseCode]);
 
