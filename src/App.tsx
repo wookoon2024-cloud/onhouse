@@ -2198,6 +2198,11 @@ export default function App() {
 
     // Path B: Cloud DB Persistence (guarantees 100% delivery even if WebSocket times out)
     sendDMToCloudDB(dmObj);
+
+    // Hand the message back so the sender stores this exact object. The caller used to build its
+    // own copy with a different id, which then failed to match the Cloud DB copy during the 3s
+    // sync and reappeared as a second message in the sender's own conversation.
+    return dmObj;
   };
 
   const handleReadDM = (toId: string) => {

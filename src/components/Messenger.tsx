@@ -7,7 +7,7 @@ interface MessengerProps {
   localPlayer: PlayerState;
   activeTarget: PlayerState | null; // Selected user to DM
   onClose: () => void;
-  onSendDM: (toId: string, text: string) => void;
+  onSendDM: (toId: string, text: string) => DirectMessage | void;
   onReadDM?: (toId: string) => void;
   onWatchYouTube?: (videoId: string) => void;
   onOpenWebUrl?: (url: string) => void;
@@ -275,7 +275,13 @@ export const Messenger: React.FC<MessengerProps> = ({
   const handleSend = () => {
     if (!inputText.trim() || !activeTarget) return;
 
-    const newDM: DirectMessage = {
+    // Send first and store exactly what was sent, so the local copy carries the same id as the
+    // one written to the Cloud DB. Building a separate copy here gave the sender's own message
+    // two different ids, and the 3s cloud sync then treated the server copy as a new message and
+    // appended it again — the message appearing more than once after typing it a single time.
+    const sent = onSendDM(activeTarget.id, inputText.trim());
+
+    const newDM: DirectMessage = sent || {
       id: 'dm_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now().toString(36),
       fromId: localPlayer.id,
       fromName: localPlayer.nickname,
@@ -286,7 +292,6 @@ export const Messenger: React.FC<MessengerProps> = ({
     };
 
     saveDM(newDM);
-    onSendDM(activeTarget.id, inputText.trim());
     setInputText('');
     
     isUserScrolledUpRef.current = false;
@@ -297,9 +302,13 @@ export const Messenger: React.FC<MessengerProps> = ({
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSend();
-    }
+    if (e.key !== 'Enter') return;
+    // While a Korean/Japanese/Chinese IME is composing, the Enter that commits the composition
+    // still raises keydown — so a single visible Enter press fired handleSend twice, sending the
+    // message more than once. keyCode 229 is the legacy signal for the same condition.
+    if ((e.nativeEvent as any)?.isComposing || (e as any).keyCode === 229) return;
+    e.preventDefault();
+    handleSend();
   };
 
   if (!activeTarget) return null;
