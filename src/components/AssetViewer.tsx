@@ -229,7 +229,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
   }, []);
 
   // Character Spritesheet Image Overrides (for drawn pixels or added/deleted rows/cols/size)
-  const [charImageOverrides, setCharImageOverrides] = useState<Record<string, { url: string; rows: number; cols: number; size?: number }>>(() => {
+  const [charImageOverrides, setCharImageOverrides] = useState<Record<string, { url: string; rows: number; cols: number; size?: number; frameWidth?: number; frameHeight?: number; offsetX?: number; offsetY?: number; spacingX?: number; spacingY?: number }>>(() => {
     try {
       const saved = localStorage.getItem('on_house_char_image_overrides');
       return saved ? JSON.parse(saved) : {};
@@ -2453,6 +2453,28 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
         setCustomCharSprites(next);
         setActiveTab('character');
         setSelectedCharId(generatedOptions[0].id);
+
+        // The game canvas only reads character images from char_image_override, not from
+        // char_sprite's own url — register one now so a freshly uploaded character actually
+        // renders in-game instead of staying a placeholder until someone edits it later.
+        setCharImageOverrides((prev) => {
+          const nextOverrides = { ...prev };
+          generatedOptions.forEach((opt) => {
+            nextOverrides[opt.id] = {
+              url: opt.url,
+              cols: opt.cols,
+              rows: opt.rows,
+              size: opt.size,
+              frameWidth: opt.frameWidth,
+              frameHeight: opt.frameHeight,
+              offsetX: opt.offsetX,
+              offsetY: opt.offsetY,
+              spacingX: opt.spacingX,
+              spacingY: opt.spacingY
+            };
+          });
+          return nextOverrides;
+        });
       }
 
       // Notify window to update CanvasGame image caches immediately
