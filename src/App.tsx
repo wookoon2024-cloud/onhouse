@@ -154,10 +154,31 @@ export default function App() {
   };
 
   useEffect(() => {
-    const syncDbCharSprites = () => {
+    const syncDbCharSprites = (evt?: Event) => {
       try {
         const saved = localStorage.getItem('on_house_custom_char_sprites');
         setDbCustomCharSprites(saved ? JSON.parse(saved) : []);
+      } catch (e) {}
+      // Also refresh the character IMAGE data, not just the metadata list. dbCharOverrides was
+      // only ever set from the initial DB fetch and from Realtime broadcasts — and Supabase
+      // broadcasts don't echo back to the sender, so this client's own edits never reached it.
+      // AssetViewer merges dbCharOverrides on top of its local copy, so a stale entry here
+      // silently reverted local edits (e.g. a pasted frame) as soon as the editor was reopened.
+      // Prefer the in-memory payload the editor hands us over localStorage, since the localStorage
+      // write may have been dropped by the ~5MB quota and would otherwise feed back stale data.
+      const detail = (evt as CustomEvent | undefined)?.detail;
+      if (detail && detail.charImageOverrides && typeof detail.charImageOverrides === 'object') {
+        setDbCharOverrides((prev) => ({ ...prev, ...detail.charImageOverrides }));
+        return;
+      }
+      try {
+        const savedOverrides = localStorage.getItem('on_house_char_image_overrides');
+        if (savedOverrides) {
+          const parsed = JSON.parse(savedOverrides);
+          if (parsed && typeof parsed === 'object') {
+            setDbCharOverrides((prev) => ({ ...prev, ...parsed }));
+          }
+        }
       } catch (e) {}
     };
 

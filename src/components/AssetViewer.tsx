@@ -301,6 +301,9 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
   const [contextMenuTile, setContextMenuTile] = useState<{ x: number; y: number; col: number; row: number } | null>(null);
   const [copiedFrameBuffer, setCopiedFrameBuffer] = useState<string | null>(null);
   const [copiedFrameRes, setCopiedFrameRes] = useState<number>(16);
+  // Where the copy came from, so paste can tell the user which frame it overwrote — and warn when
+  // that's the same frame it was copied from (a no-op that otherwise looks like a silent failure).
+  const [copiedFrameSrc, setCopiedFrameSrc] = useState<{ col: number; row: number } | null>(null);
 
   // Drag and Drop Swap Frame State
   const [draggedTile, setDraggedTile] = useState<{ col: number; row: number } | null>(null);
@@ -509,8 +512,12 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
 
     prevOverridesRef.current = charImageOverrides;
 
-    // Notify game canvas to reload sprites locally
-    window.dispatchEvent(new Event('on_house_sprites_updated'));
+    // Notify game canvas to reload sprites locally. Carry the in-memory override map along so
+    // App can refresh its own copy from real data rather than re-reading localStorage, whose
+    // write may have been dropped by the storage quota.
+    window.dispatchEvent(new CustomEvent('on_house_sprites_updated', {
+      detail: { charImageOverrides }
+    }));
   }, [charImageOverrides]);
 
   // Persist charRowActions to localStorage & Supabase Cloud DB

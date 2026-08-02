@@ -463,10 +463,16 @@ export const fetchHouseAssets = async (houseCode: string) => {
     const targetIds = metaRows.map((r: any) => r.id);
 
     // Stage 2: Fetch asset_data ONLY for these target IDs using Primary Key B-Tree Index (O(1) fast, ~10ms!)
+    // Newest row first: the dedup passes below are "first occurrence of an asset id wins", and
+    // without an explicit ORDER BY Postgres may return duplicate rows in any order — so a stale
+    // copy could beat the current one and silently revert a just-saved edit. Duplicates should be
+    // rare (saveHouseAssetToDB prunes them), but they can survive a failed/skipped cleanup, and
+    // rows are inserted with ascending ids so highest id == most recently written.
     const { data: fullRows, error: fullErr } = await supabase
       .from('house_assets')
       .select('id, asset_type, asset_data')
-      .in('id', targetIds);
+      .in('id', targetIds)
+      .order('id', { ascending: false });
 
     if (fullErr) console.error('[OnHouse DB Sync Error] Full rows fetch error:', fullErr);
 
@@ -670,23 +676,37 @@ const doSaveHouseAssetToDB = async (
     // 2. Now that the new row is safely in, delete older duplicate rows for the same asset ID.
     // Filtered at the DB level (asset_type + jsonb id) instead of pulling every asset_data blob
     // for the house, which was slow/timeout-prone and reintroduced the TOAST issue we fixed before.
-    if (assetId) {
-      const newRowId = data && data[0]?.id;
-      const { data: existingRows } = await supabase
+    const newRowId = data && data[0]?.id;
+    if (assetId && newRowId) {
+      const { data: existingRows, error: selErr } = await supabase
         .from('house_assets')
         .select('id')
         .eq('house_code', houseCode)
         .eq('asset_type', assetType)
         .filter('asset_data->>id', 'eq', assetId);
 
-      const oldRowIds = (existingRows || [])
-        .map(r => r.id)
-        .filter(id => id !== newRowId);
+      if (selErr) {
+        console.warn(`[OnHouse DB Save] Duplicate lookup failed for "${assetId}", leaving old rows in place:`, selErr.message);
+      } else {
+        const oldRowIds = (existingRows || [])
+          .map(r => r.id)
+          .filter(id => id !== newRowId);
 
-      if (oldRowIds.length > 0) {
-        await supabase.from('house_assets').delete().in('id', oldRowIds);
-        console.log(`[OnHouse DB Save] 🧹 Hard deleted ${oldRowIds.length} old duplicate rows for asset "${assetId}"`);
+        if (oldRowIds.length > 0) {
+          const { error: delErr } = await supabase.from('house_assets').delete().in('id', oldRowIds);
+          if (delErr) {
+            console.warn(`[OnHouse DB Save] Duplicate cleanup failed for "${assetId}" (rows will be deduped on read):`, delErr.message);
+          } else {
+            console.log(`[OnHouse DB Save] 🧹 Hard deleted ${oldRowIds.length} old duplicate rows for asset "${assetId}"`);
+          }
+        }
       }
+    } else if (assetId && !newRowId) {
+      // Never run cleanup without a confirmed new row id: `oldRowIds` is "everything except the
+      // row we just inserted", so an unknown new id makes that "everything", and the freshly
+      // saved asset would be deleted along with the duplicates — silently wiping the asset from
+      // the DB entirely. Leaving duplicates is strictly safer; reads already prefer the newest.
+      console.warn(`[OnHouse DB Save] Insert returned no row id for "${assetId}"; skipping duplicate cleanup to avoid deleting the row just saved.`);
     }
 
     return { success: true };
