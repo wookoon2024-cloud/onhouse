@@ -757,13 +757,21 @@ export default function App() {
     let reconnectAttempts = 0;
     let disposed = false;
     let hasAnnouncedJoin = false;
+    let connecting = false;
 
     // RealtimeChannel.state is 'joined' | 'joining' | 'closed' | 'errored' | 'leaving'.
     // It is NOT 'SUBSCRIBED' — that value only ever appears as the status argument of the
     // subscribe() callback. Comparing state against 'SUBSCRIBED' is therefore always true,
     // which is why the previous wakeup handler tried to re-subscribe on every single focus.
-    const isChannelUsable = (ch: any) => !!ch && (ch.state === 'joined' || ch.state === 'SUBSCRIBED');
-    const isChannelDead = (ch: any) => !ch || ch.state === 'closed' || ch.state === 'errored';
+    //
+    // These deliberately inspect `activeChannel` rather than `channelRef.current`: channelRef is
+    // only populated once SUBSCRIBED arrives, so while a join is still in flight it is null and a
+    // liveness check based on it reports "dead". A focus event during that window then tore down
+    // the connecting channel and started another, and because removeChannel() resolves
+    // asynchronously the two briefly overlapped — both bound to the same broadcast handlers, so
+    // every message arrived twice and events sent mid-rebuild were lost.
+    const isChannelUsable = () => !!activeChannel && ((activeChannel as any).state === 'joined' || (activeChannel as any).state === 'SUBSCRIBED');
+    const isChannelDead = () => !connecting && (!activeChannel || (activeChannel as any).state === 'closed' || (activeChannel as any).state === 'errored');
 
     const scheduleReconnect = (reason: string) => {
       if (disposed || reconnectTimer) return;
@@ -777,7 +785,10 @@ export default function App() {
     };
 
     const connectChannel = () => {
-      if (disposed) return;
+      // `connecting` blocks re-entry while a join is in flight. Without it, focus/visibilitychange
+      // events arriving during the join spawned overlapping channels (duplicate messages).
+      if (disposed || connecting) return;
+      connecting = true;
 
       // Discard any previous instance first — see note above on why reuse is impossible.
       if (activeChannel) {
@@ -1263,7 +1274,10 @@ export default function App() {
       .on('broadcast', { event: 'dm_msg' }, ({ payload }) => {
         if (!payload || payload.toId !== deviceId.current) return;
         saveDM({
-          id: 'dm_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now().toString(36),
+          // Keep the sender's id — it is the only thing that lets saveDM recognise the same
+          // message redelivered over the retry/BroadcastChannel/Cloud-DB paths. Generating a
+          // fresh random id here made every redelivery look like a brand new message.
+          id: payload.id || ('dm_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now().toString(36)),
           fromId: payload.fromId,
           fromName: payload.fromName,
           toId: deviceId.current,
@@ -1294,6 +1308,8 @@ export default function App() {
         }
       })
       .subscribe((status) => {
+        if (activeChannel === channel) connecting = false;
+
         if (status !== 'SUBSCRIBED') {
           // CHANNEL_ERROR / TIMED_OUT / CLOSED were previously ignored entirely, so a socket
           // dropped while the tab sat in the background stayed dead for the rest of the session
@@ -1359,10 +1375,9 @@ export default function App() {
     // when the browser silently kills a backgrounded socket), rebuild it here.
     const syncInterval = setInterval(() => {
       if (disposed) return;
-      const ch = channelRef.current;
-      if (isChannelUsable(ch)) {
+      if (isChannelUsable()) {
         sendPlayerSync(localPlayerRef.current);
-      } else if (isChannelDead(ch) && !reconnectTimer && (document.visibilityState === 'visible' || document.hasFocus())) {
+      } else if (isChannelDead() && !reconnectTimer && (document.visibilityState === 'visible' || document.hasFocus())) {
         scheduleReconnect('heartbeat found channel dead');
       }
     }, 8000);
@@ -1401,14 +1416,14 @@ export default function App() {
     const handleTabWakeup = () => {
       if (document.visibilityState === 'visible' || document.hasFocus()) {
         const ch = channelRef.current;
-        if (isChannelDead(ch)) {
+        if (isChannelDead()) {
           // Previously this called ch.subscribe() to "wake" the channel, which cannot work:
           // on an errored channel subscribe() is a silent no-op, and on a closed one the
           // internal join() throws "tried to join multiple times" — and because the throw
           // happened before the sync calls below, inside a catch that swallowed it, returning
           // to the tab did nothing at all while looking like it had recovered.
           if (!reconnectTimer) connectChannel();
-        } else if (isChannelUsable(ch)) {
+        } else if (isChannelUsable() && ch) {
           try {
             sendPlayerSync(localPlayerRef.current);
             ch.send({

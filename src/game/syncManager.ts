@@ -94,6 +94,11 @@ export function getDMs(): DirectMessage[] {
 
 export function saveDM(dm: DirectMessage) {
   const dms = getDMs();
+  // Idempotent on the sender-assigned id. A DM is deliberately delivered over three paths
+  // (BroadcastChannel, the auto-retrying WebSocket broadcast, and Cloud DB persistence), so the
+  // same message legitimately arrives more than once — without this guard each arrival was stored
+  // as a separate message and the conversation showed everything twice.
+  if (dm.id && dms.some((existing) => existing.id === dm.id)) return;
   dms.push(dm);
   localStorage.setItem(DM_HISTORY_KEY, JSON.stringify(dms));
 }
