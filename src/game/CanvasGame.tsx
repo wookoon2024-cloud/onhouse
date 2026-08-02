@@ -31,6 +31,7 @@ interface CanvasGameProps {
 
   // Editor Props
   isEditMode: boolean;
+  isEditorOpen?: boolean;
   selectedTile: number;
   editLayer: 'base' | 'decor' | 'collision';
   onPaintTile: (tx: number, ty: number, tileIdx: number, layer: 'base' | 'decor' | 'collision') => void;
@@ -319,6 +320,7 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
   onCreateMemoRequest,
   
   isEditMode,
+  isEditorOpen = false,
   selectedTile,
   editLayer,
   onPaintTile,
@@ -492,6 +494,7 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
     };
 
     const handleWalkTo = (e: Event) => {
+      if (isEditMode || isEditorOpen) return;
       const detail = (e as CustomEvent).detail;
       if (detail && detail.x !== undefined && detail.y !== undefined) {
         const p = localPlayerRef.current;
@@ -711,6 +714,11 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
   // Keyboard input listeners
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (isEditMode || isEditorOpen) {
+        keysPressed.current = {};
+        return;
+      }
+
       const targetTag = (e.target as HTMLElement)?.tagName?.toLowerCase();
       if (targetTag === 'input' || targetTag === 'textarea' || (e.target as HTMLElement)?.isContentEditable) {
         return;
@@ -1944,7 +1952,7 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
 
   // Click on Canvas handler to interact with characters, memos, or walk to floor destination
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (isEditMode) return; // Disable DMs while building!
+    if (isEditMode || isEditorOpen) return; // Disable clicking / walking while building or editing!
     if (!canvasRef.current || !localPlayer) return;
 
     // Always dismiss context menu if open
@@ -2111,7 +2119,7 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
   // Context menu handler for Right-Click on Map Floor to show "📝 이 위치에 메모 남기기"
   const handleContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();
-    if (isEditMode) return;
+    if (isEditMode || isEditorOpen) return;
 
     if (!canvasRef.current || !localPlayer) return;
     const canvas = canvasRef.current;
@@ -2211,7 +2219,7 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
           if (isEditMode) {
             isPainting.current = true;
             handlePaintAtCoords(e);
-          } else if (e.touches && e.touches.length > 0) {
+          } else if (!isEditorOpen && e.touches && e.touches.length > 0) {
             const touch = e.touches[0];
             autoWalkPathRef.current = null;
             setFloatingJoystick({

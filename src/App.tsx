@@ -2762,6 +2762,7 @@ export default function App() {
           onInteractMemo={(memo) => setActiveViewMemo(memo)}
           onCreateMemoRequest={(x, y) => setActiveCreateMemoPos({ x, y })}
           isEditMode={false}
+          isEditorOpen={showAssetViewer || isCustomizing || isMarketOpen || showHouseModal || !!activeCreateMemoPos || !!activeViewMemo}
           selectedTile={0}
           editLayer="base"
           onPaintTile={() => {}}
