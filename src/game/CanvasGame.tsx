@@ -1965,10 +1965,35 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
     const candidates: { player: PlayerState; dist: number }[] = [];
 
     const checkCandidate = (p: PlayerState) => {
+      const charInfo = getCustomCharSpriteInfo(p.spriteType);
+      const spriteSheet = images ? images[p.spriteType] : null;
+      const hasSprite = !!spriteSheet;
+      const maxCols = Math.max(1, charInfo.cols);
+      const maxRows = Math.max(1, charInfo.rows);
+
+      let tileW = charInfo.frameWidth || (hasSprite ? Math.max(1, Math.floor((spriteSheet.width - (charInfo.offsetX || 0)) / maxCols)) : 16);
+      let tileH = charInfo.frameHeight || (hasSprite ? Math.max(1, Math.floor((spriteSheet.height - (charInfo.offsetY || 0)) / maxRows)) : 16);
+
+      const baseCharSize = p.charSize || charInfo.size || 16;
+      const aspect = tileW / Math.max(1, tileH);
+      let charDrawW = Math.round((baseCharSize / 16) * vSize);
+      let charDrawH = Math.round((baseCharSize / 16) * vSize);
+
+      if (aspect < 0.95 || aspect > 1.05) {
+        charDrawH = Math.round(charDrawW / aspect);
+      }
+
       const px = p.x * tileScale + vSize / 2;
       const py = p.y * tileScale + vSize / 2;
-      const dist = Math.sqrt((gameX - px) ** 2 + (gameY - py) ** 2);
-      if (dist < 28) {
+
+      // Full visual bounding box hit test (covers hair, head, face, chest, body & feet with 8px margin)
+      const spriteLeft = px - charDrawW / 2 - 8;
+      const spriteRight = px + charDrawW / 2 + 8;
+      const spriteTop = py - charDrawH - 12;
+      const spriteBottom = py + 12;
+
+      if (gameX >= spriteLeft && gameX <= spriteRight && gameY >= spriteTop && gameY <= spriteBottom) {
+        const dist = Math.hypot(gameX - px, gameY - (py - charDrawH / 2));
         candidates.push({ player: p, dist });
       }
     };
