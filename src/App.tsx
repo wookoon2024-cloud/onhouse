@@ -307,14 +307,23 @@ export default function App() {
   const activeDMTargetRef = useRef<PlayerState | null>(null);
   activeDMTargetRef.current = activeDMTarget;
 
+  // Latest media-viewing state, re-broadcast whenever the channel (re)subscribes.
+  // This is state, not an event: safeBroadcastChannel drops sends while the channel is down, so a
+  // "closed the video" update sent during a reconnect was lost forever and the partner stayed
+  // stuck on "보는중". Re-announcing on every successful subscribe makes it self-correcting.
+  const mediaViewingRef = useRef<{ videoId?: string; webUrl?: string; syncEnabled: boolean }>({ syncEnabled: false });
+
   // Broadcast media viewing updates whenever state changes
   useEffect(() => {
-    safeBroadcastChannel('media_viewing_update', {
-      deviceId: deviceId.current,
-      playerId: localPlayer.id,
+    mediaViewingRef.current = {
       videoId: activeYouTubeVideoId || undefined,
       webUrl: activeWebUrl || undefined,
       syncEnabled: isWebSyncActive
+    };
+    safeBroadcastChannel('media_viewing_update', {
+      deviceId: deviceId.current,
+      playerId: localPlayer.id,
+      ...mediaViewingRef.current
     });
   }, [activeYouTubeVideoId, activeWebUrl, isWebSyncActive]);
 
@@ -972,6 +981,13 @@ export default function App() {
         if (!payload || payload.fromId === deviceId.current) return;
         // Reply with current local player state immediately!
         sendPlayerSync(localPlayerRef.current);
+        // Include what we're viewing, so a peer that missed our last media update — e.g. it was
+        // the one that was offline when we closed a video — is corrected on its way back in.
+        safeBroadcastChannel('media_viewing_update', {
+          deviceId: deviceId.current,
+          playerId: localPlayerRef.current.id,
+          ...mediaViewingRef.current
+        });
       })
       .on('broadcast', { event: 'chat' }, ({ payload }) => {
         if (!payload || payload.id === deviceId.current) return;
@@ -1363,6 +1379,19 @@ export default function App() {
             type: 'broadcast',
             event: 'request_player_sync',
             payload: { fromId: deviceId.current }
+          });
+
+          // Re-announce what we are (or are no longer) viewing. If the channel was down when the
+          // user closed a video/page, that close update was dropped and the partner would still
+          // be showing "보는중"; resending the current state on every join clears it.
+          channel.send({
+            type: 'broadcast',
+            event: 'media_viewing_update',
+            payload: {
+              deviceId: deviceId.current,
+              playerId: localPlayerRef.current.id,
+              ...mediaViewingRef.current
+            }
           });
         }
       });
