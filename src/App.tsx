@@ -306,6 +306,8 @@ export default function App() {
   const [closedDMPartners, setClosedDMPartners] = useState<Record<string, boolean>>({});
   const activeDMTargetRef = useRef<PlayerState | null>(null);
   activeDMTargetRef.current = activeDMTarget;
+  const closedDMPartnersRef = useRef<Record<string, boolean>>({});
+  closedDMPartnersRef.current = closedDMPartners;
 
   // Latest media-viewing state, re-broadcast whenever the channel (re)subscribes.
   // This is state, not an event: safeBroadcastChannel drops sends while the channel is down, so a
@@ -1161,11 +1163,26 @@ export default function App() {
       })
       .on('broadcast', { event: 'dm_request' }, ({ payload }) => {
         if (!payload || payload.toId !== deviceId.current) return;
+
+        // If local user is already in an active 1:1 play session, automatically decline as busy
+        if (activeDMTargetRef.current && !closedDMPartnersRef.current?.[activeDMTargetRef.current.id]) {
+          sendReliableBroadcastChannel('dm_decline_busy', {
+            fromId: localPlayerRef.current.id,
+            fromName: localPlayerRef.current.nickname,
+            toId: payload.fromId
+          });
+          return;
+        }
+
         setIncomingDMRequest({
           requesterId: payload.fromId,
           requesterName: payload.fromName,
           requesterPlayer: payload.fromPlayer
         });
+      })
+      .on('broadcast', { event: 'dm_decline_busy' }, ({ payload }) => {
+        if (!payload || payload.toId !== deviceId.current) return;
+        showToast(`💡 [${payload.fromName}] 님은 이미 다른 플레이어와 1:1 놀기를 진행 중입니다.`);
       })
       .on('broadcast', { event: 'dm_accept' }, ({ payload }) => {
         if (!payload || payload.toId !== deviceId.current) return;
@@ -2340,6 +2357,16 @@ export default function App() {
 
   // Send 1:1 DM Request to target player
   const handleRequestDMChat = (target: PlayerState) => {
+    // Prevent duplicate request if local user is ALREADY in an active 1:1 play session
+    if (activeDMTarget && !closedDMPartners[activeDMTarget.id]) {
+      if (activeDMTarget.id === target.id) {
+        showToast(`💡 이미 [${target.nickname}] 님과 1:1 놀기를 진행 중입니다!`);
+      } else {
+        showToast(`💡 이미 [${activeDMTarget.nickname}] 님과 1:1 놀기를 진행 중입니다. 먼저 현재 1:1 놀기를 종료해 주세요.`);
+      }
+      return;
+    }
+
     sendReliableBroadcastChannel('dm_request', {
       fromId: localPlayer.id,
       fromName: localPlayer.nickname,
