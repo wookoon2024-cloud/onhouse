@@ -187,6 +187,7 @@ const PixelEditorCanvas: React.FC<PixelEditorCanvasProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDrawingRef = useRef<boolean>(false);
+  const [hoverCell, setHoverCell] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -240,7 +241,37 @@ const PixelEditorCanvas: React.FC<PixelEditorCanvasProps> = ({
       }
       ctx.stroke();
     }
-  }, [pixelGrid, editorGridResW, editorGridResH, cellSizePx, showBorders]);
+
+    // Hover Brush Size Box Preview Overlay
+    if (hoverCell && !isSpaceDown && !isEditorPanning) {
+      const bx = hoverCell.x * cellSizePx;
+      const by = hoverCell.y * cellSizePx;
+      const bw = Math.min(brushSize, editorGridResW - hoverCell.x) * cellSizePx;
+      const bh = Math.min(brushSize, editorGridResH - hoverCell.y) * cellSizePx;
+
+      ctx.fillStyle = drawTool === 'eraser' ? 'rgba(255, 99, 99, 0.35)' : 'rgba(167, 139, 250, 0.35)';
+      ctx.fillRect(bx, by, bw, bh);
+
+      ctx.strokeStyle = drawTool === 'eraser' ? '#ff4444' : '#a78bfa';
+      ctx.lineWidth = Math.max(1, Math.floor(cellSizePx / 4));
+      ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
+    }
+  }, [pixelGrid, editorGridResW, editorGridResH, cellSizePx, showBorders, hoverCell, isSpaceDown, isEditorPanning, brushSize, drawTool]);
+
+  const updateHoverCell = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const x = Math.floor(mouseX / cellSizePx);
+    const y = Math.floor(mouseY / cellSizePx);
+
+    if (x >= 0 && x < editorGridResW && y >= 0 && y < editorGridResH) {
+      setHoverCell({ x, y });
+    } else {
+      setHoverCell(null);
+    }
+  };
 
   const handlePointerAction = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (isSpaceDown || isEditorPanning || (e.button !== undefined && e.button !== 0 && e.buttons !== 1)) return;
@@ -281,9 +312,11 @@ const PixelEditorCanvas: React.FC<PixelEditorCanvasProps> = ({
       ref={canvasRef}
       onPointerDown={(e) => {
         isDrawingRef.current = true;
+        updateHoverCell(e);
         handlePointerAction(e);
       }}
       onPointerMove={(e) => {
+        updateHoverCell(e);
         if (isDrawingRef.current) {
           handlePointerAction(e);
         }
@@ -293,6 +326,7 @@ const PixelEditorCanvas: React.FC<PixelEditorCanvasProps> = ({
       }}
       onPointerLeave={() => {
         isDrawingRef.current = false;
+        setHoverCell(null);
       }}
       style={{
         width: `${editorGridResW * cellSizePx}px`,
@@ -3955,7 +3989,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
                     <Eraser size={11} /> 지우개
                   </button>
                   <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)', height: '24px', margin: '0 4px' }} />
-                  {[1, 2, 3, 4].map(size => (
+                  {[1, 2, 3, 4, 8, 16, 32].map(size => (
                     <button
                       key={`brush-${size}`}
                       onClick={() => setBrushSize(size)}
