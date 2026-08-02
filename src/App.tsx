@@ -1721,8 +1721,10 @@ export default function App() {
   };
 
   // 2. Map transitioner
-  const handleMapChange = (mapId: string) => {
-    const targetMap = activeMaps[mapId] || maps[mapId];
+  // mapDataOverride lets callers pass a map that was just created in this same tick (e.g.
+  // handleAddMap), since setActiveMaps hasn't flushed into the `activeMaps` closure yet.
+  const handleMapChange = (mapId: string, mapDataOverride?: MapDefinition) => {
+    const targetMap = mapDataOverride || activeMaps[mapId] || maps[mapId];
     const spawn = findValidSpawnPosition(targetMap);
     const newX = spawn.x * 16;
     const newY = spawn.y * 16;
@@ -1811,7 +1813,7 @@ export default function App() {
     // Broadcast new map to all players in H-1002!
     safeBroadcastChannel('map_update', { mapId: newMapId, mapData: newMapObj });
 
-    handleMapChange(newMapId);
+    handleMapChange(newMapId, newMapObj);
     return newMapId;
   };
 
