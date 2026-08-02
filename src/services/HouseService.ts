@@ -550,6 +550,8 @@ export const fetchHouseAssets = async (houseCode: string) => {
       localStorage.setItem(`on_house_custom_char_sprites_${houseCode}`, JSON.stringify(finalCharSprites));
       localStorage.setItem(`on_house_char_image_overrides_${houseCode}`, JSON.stringify(charOverrides));
       localStorage.setItem(`on_house_char_row_actions_${houseCode}`, JSON.stringify(charRowActions));
+
+      window.dispatchEvent(new Event('on_house_sprites_updated'));
     } catch (e) {}
 
     return {

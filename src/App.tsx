@@ -234,7 +234,13 @@ export default function App() {
   // character is selected while the actual game state — and therefore in-game rendering — never
   // switches to it, leaving the player as the placeholder marker.
   useEffect(() => {
-    if (dbCustomCharSprites.length === 0) return;
+    if (dbCustomCharSprites.length === 0) {
+      if (localPlayer.spriteType !== '') {
+        setLocalPlayer((prev) => ({ ...prev, spriteType: '' }));
+        localStorage.removeItem('on_house_sprite');
+      }
+      return;
+    }
     if (!dbCustomCharSprites.some((c) => c.id === localPlayer.spriteType)) {
       setLocalPlayer((prev) => ({ ...prev, spriteType: dbCustomCharSprites[0].id }));
     }
