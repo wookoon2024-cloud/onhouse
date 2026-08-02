@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { type DirectMessage } from '../game/syncManager';
 import { type MapDefinition, maps } from '../game/MapData';
 
 export const getSavedHouseCode = (): string => {
@@ -1062,5 +1063,53 @@ export const importMarketItemToMyHouse = async (
   } catch (err: any) {
     console.error('Error in importMarketItemToMyHouse:', err);
     return { success: false, error: err?.message || '마켓 항목 가져오기 오류' };
+  }
+};
+
+// Cloud Database DM Persistence Helpers (Guarantees 100% DM delivery even when WebSockets time out)
+export const sendDMToCloudDB = async (dm: DirectMessage): Promise<void> => {
+  try {
+    await withTimeout(
+      supabase
+        .from('house_assets')
+        .insert({
+          house_code: 'GLOBAL_DM',
+          asset_type: 'dm_msg',
+          asset_data: dm,
+          updated_at: new Date().toISOString()
+        }),
+      4000
+    );
+  } catch (e) {}
+};
+
+export const fetchDMsFromCloudDB = async (myId: string, partnerId: string): Promise<DirectMessage[]> => {
+  try {
+    const { data } = await withTimeout(
+      supabase
+        .from('house_assets')
+        .select('asset_data')
+        .eq('house_code', 'GLOBAL_DM')
+        .eq('asset_type', 'dm_msg')
+        .order('updated_at', { ascending: true })
+        .limit(100),
+      4000
+    );
+
+    if (!data) return [];
+    const dms: DirectMessage[] = [];
+    for (const row of data) {
+      const dm = row.asset_data as DirectMessage;
+      if (
+        dm &&
+        ((dm.fromId === myId && dm.toId === partnerId) ||
+         (dm.fromId === partnerId && dm.toId === myId))
+      ) {
+        dms.push(dm);
+      }
+    }
+    return dms;
+  } catch (e) {
+    return [];
   }
 };

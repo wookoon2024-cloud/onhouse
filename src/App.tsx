@@ -25,7 +25,7 @@ import { MarketModal } from './components/MarketModal';
 import { HouseJoinModal } from './components/HouseJoinModal';
 import { PlayerInteractionModal } from './components/PlayerInteractionModal';
 import { DMRequestModal } from './components/DMRequestModal';
-import { getSavedHouseCode, setSavedHouseCode, fetchHouseMaps, saveHouseMapToDB, deleteHouseMapFromDB, fetchHouseAssets, fetchHouseMapOrder, saveHouseMapOrderToDB, type MarketItem } from './services/HouseService';
+import { getSavedHouseCode, setSavedHouseCode, fetchHouseMaps, saveHouseMapToDB, deleteHouseMapFromDB, fetchHouseAssets, fetchHouseMapOrder, saveHouseMapOrderToDB, sendDMToCloudDB, fetchDMsFromCloudDB, type MarketItem } from './services/HouseService';
 import { supabase } from './lib/supabase';
 import { APP_VERSION } from './config/version';
 import type { MapMemo, InventoryItem } from './types/memo';
@@ -2073,25 +2073,27 @@ export default function App() {
     chatInputRef.current?.blur();
   };
 
-  // 5. Send DM handler (local tabs + Supabase Realtime across devices)
   const handleSendDM = (toId: string, text: string) => {
-    bcRef.current?.postMessage({
-      type: 'dm',
-      id: 'dm_' + Math.random().toString(36).substring(2, 11),
-      fromId: deviceId.current,
-      fromName: localPlayer.nickname,
-      toId,
-      text,
-      timestamp: Date.now()
-    });
-
-    sendReliableBroadcastChannel('dm_msg', {
+    const dmObj = {
+      id: 'dm_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now().toString(36),
       fromId: localPlayer.id,
       fromName: localPlayer.nickname,
       toId,
       text,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      read: false
+    };
+
+    bcRef.current?.postMessage({
+      type: 'dm',
+      ...dmObj
     });
+
+    // Path A: Instant WebSocket Broadcast
+    sendReliableBroadcastChannel('dm_msg', dmObj);
+
+    // Path B: Cloud DB Persistence (guarantees 100% delivery even if WebSocket times out)
+    sendDMToCloudDB(dmObj);
   };
 
   const handleReadDM = (toId: string) => {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { type DirectMessage, type PlayerState, getDMs, saveDM, markDMsAsRead } from '../game/syncManager';
+import { fetchDMsFromCloudDB } from '../services/HouseService';
 import { Send, MessageSquare, ShieldAlert, X } from 'lucide-react';
 
 interface MessengerProps {
@@ -191,6 +192,39 @@ export const Messenger: React.FC<MessengerProps> = ({
     loadHistory();
     const interval = setInterval(loadHistory, 500);
     return () => clearInterval(interval);
+  }, [activeTarget?.id, localPlayer.id]);
+
+  // Cloud DB sync to recover any DMs missed due to WebSocket iframe timeouts
+  useEffect(() => {
+    if (!activeTarget) return;
+    let isMounted = true;
+
+    const syncCloudDMs = async () => {
+      const cloudDMs = await fetchDMsFromCloudDB(localPlayer.id, activeTarget.id);
+      if (!isMounted || !cloudDMs || cloudDMs.length === 0) return;
+
+      const existingDMs = getDMs();
+      const existingIds = new Set(existingDMs.map(d => d.id));
+      let hasNew = false;
+
+      for (const cloudDM of cloudDMs) {
+        if (!existingIds.has(cloudDM.id)) {
+          saveDM(cloudDM);
+          hasNew = true;
+        }
+      }
+
+      if (hasNew && isMounted) {
+        loadHistory();
+      }
+    };
+
+    syncCloudDMs();
+    const interval = setInterval(syncCloudDMs, 3000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [activeTarget?.id, localPlayer.id]);
 
   // Listen for realtime DM read events & refocus requests from modals
