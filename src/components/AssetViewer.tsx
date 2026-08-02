@@ -156,6 +156,160 @@ const PALETTE_COLORS = [
   '#333333', '#89b4fa', '#f5c2e7', 'transparent'
 ];
 
+interface PixelEditorCanvasProps {
+  pixelGrid: string[][];
+  editorGridResW: number;
+  editorGridResH: number;
+  cellSizePx: number;
+  showBorders: boolean;
+  brushSize: number;
+  drawTool: 'pencil' | 'eraser';
+  selectedColor: string;
+  isSpaceDown: boolean;
+  isEditorPanning: boolean;
+  editorPan: { x: number; y: number };
+  onPixelGridChange: (newGrid: string[][]) => void;
+}
+
+const PixelEditorCanvas: React.FC<PixelEditorCanvasProps> = ({
+  pixelGrid,
+  editorGridResW,
+  editorGridResH,
+  cellSizePx,
+  showBorders,
+  brushSize,
+  drawTool,
+  selectedColor,
+  isSpaceDown,
+  isEditorPanning,
+  editorPan,
+  onPixelGridChange
+}) => {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const isDrawingRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d', { alpha: true });
+    if (!ctx) return;
+
+    const width = editorGridResW * cellSizePx;
+    const height = editorGridResH * cellSizePx;
+
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+
+    ctx.imageSmoothingEnabled = false;
+
+    // Background
+    ctx.fillStyle = '#0d0d14';
+    ctx.fillRect(0, 0, width, height);
+
+    // Non-transparent pixels
+    const resH = pixelGrid.length;
+    for (let r = 0; r < resH; r++) {
+      const row = pixelGrid[r];
+      if (!row) continue;
+      const resW = row.length;
+      for (let c = 0; c < resW; c++) {
+        const color = row[c];
+        if (color && color !== 'transparent') {
+          ctx.fillStyle = color;
+          ctx.fillRect(c * cellSizePx, r * cellSizePx, cellSizePx, cellSizePx);
+        }
+      }
+    }
+
+    // Grid borders
+    if (showBorders && cellSizePx >= 3) {
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let c = 1; c < editorGridResW; c++) {
+        const x = Math.floor(c * cellSizePx) + 0.5;
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+      }
+      for (let r = 1; r < editorGridResH; r++) {
+        const y = Math.floor(r * cellSizePx) + 0.5;
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+      }
+      ctx.stroke();
+    }
+  }, [pixelGrid, editorGridResW, editorGridResH, cellSizePx, showBorders]);
+
+  const handlePointerAction = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (isSpaceDown || isEditorPanning || (e.button !== undefined && e.button !== 0 && e.buttons !== 1)) return;
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    const x = Math.floor(mouseX / cellSizePx);
+    const y = Math.floor(mouseY / cellSizePx);
+
+    if (x < 0 || x >= editorGridResW || y < 0 || y >= editorGridResH) return;
+
+    const newColor = drawTool === 'pencil' ? selectedColor : 'transparent';
+
+    let gridChanged = false;
+    const newGrid = pixelGrid.map((r, ry) => {
+      if (ry >= y && ry < y + brushSize) {
+        return r.map((c, cx) => {
+          if (cx >= x && cx < x + brushSize) {
+            if (c !== newColor) gridChanged = true;
+            return newColor;
+          }
+          return c;
+        });
+      }
+      return r;
+    });
+
+    if (gridChanged) {
+      onPixelGridChange(newGrid);
+    }
+  };
+
+  return (
+    <canvas
+      ref={canvasRef}
+      onPointerDown={(e) => {
+        isDrawingRef.current = true;
+        handlePointerAction(e);
+      }}
+      onPointerMove={(e) => {
+        if (isDrawingRef.current) {
+          handlePointerAction(e);
+        }
+      }}
+      onPointerUp={() => {
+        isDrawingRef.current = false;
+      }}
+      onPointerLeave={() => {
+        isDrawingRef.current = false;
+      }}
+      style={{
+        width: `${editorGridResW * cellSizePx}px`,
+        height: `${editorGridResH * cellSizePx}px`,
+        background: '#222',
+        border: '2px solid var(--accent)',
+        borderRadius: '4px',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+        cursor: isSpaceDown ? (isEditorPanning ? 'grabbing' : 'grab') : 'crosshair',
+        flexShrink: 0,
+        transform: `translate(${editorPan.x}px, ${editorPan.y}px)`,
+        transition: isEditorPanning ? 'none' : 'transform 0.05s ease-out'
+      }}
+    />
+  );
+};
+
 interface AssetViewerProps {
   onClose: () => void;
   onSelectTile?: (index: number) => void;
@@ -4013,54 +4167,20 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
                       </div>
                     )}
 
-                    <div
-                      onMouseDown={() => {
-                        if (!isSpaceDown && !isEditorPanning) setIsMouseDown(true);
-                      }}
-                      onMouseLeave={() => setIsMouseDown(false)}
-                      style={{
-                        width: `${boardW}px`, height: `${boardH}px`,
-                        display: 'grid',
-                        gridTemplateColumns: `repeat(${editorGridResW}, ${cellSizePx}px)`,
-                        gridTemplateRows: `repeat(${editorGridResH}, ${cellSizePx}px)`,
-                        background: '#222', border: '2px solid var(--accent)',
-                        borderRadius: '4px', boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
-                        cursor: isSpaceDown ? (isEditorPanning ? 'grabbing' : 'grab') : 'crosshair',
-                        overflow: 'hidden', flexShrink: 0,
-                        transform: `translate(${editorPan.x}px, ${editorPan.y}px)`,
-                        transition: isEditorPanning ? 'none' : 'transform 0.05s ease-out'
-                      }}
-                    >
-                      {pixelGrid.map((row, y) =>
-                        row.map((color, x) => (
-                          <div
-                            key={`${y}-${x}`}
-                            onMouseDown={(e) => {
-                              if (isSpaceDown || isEditorPanning || e.button === 1) return;
-                              const newGrid = pixelGrid.map((r, ry) =>
-                                r.map((c, cx) => (cx >= x && cx < x + brushSize && ry >= y && ry < y + brushSize ? (drawTool === 'pencil' ? selectedColor : 'transparent') : c))
-                              );
-                              setPixelGrid(newGrid);
-                            }}
-                            onMouseEnter={() => {
-                              if (isMouseDown && !isSpaceDown && !isEditorPanning) {
-                                const newGrid = pixelGrid.map((r, ry) =>
-                                  r.map((c, cx) => (cx >= x && cx < x + brushSize && ry >= y && ry < y + brushSize ? (drawTool === 'pencil' ? selectedColor : 'transparent') : c))
-                                );
-                                setPixelGrid(newGrid);
-                              }
-                            }}
-                            style={{
-                              width: `${cellSizePx}px`, height: `${cellSizePx}px`,
-                              background: color === 'transparent' ? '#0d0d14' : color,
-                              boxSizing: 'border-box',
-                              borderRight: showBorders ? '1px solid rgba(255,255,255,0.08)' : 'none',
-                              borderBottom: showBorders ? '1px solid rgba(255,255,255,0.08)' : 'none'
-                            }}
-                          />
-                        ))
-                      )}
-                    </div>
+                    <PixelEditorCanvas
+                      pixelGrid={pixelGrid}
+                      editorGridResW={editorGridResW}
+                      editorGridResH={editorGridResH}
+                      cellSizePx={cellSizePx}
+                      showBorders={showBorders}
+                      brushSize={brushSize}
+                      drawTool={drawTool}
+                      selectedColor={selectedColor}
+                      isSpaceDown={isSpaceDown}
+                      isEditorPanning={isEditorPanning}
+                      editorPan={editorPan}
+                      onPixelGridChange={setPixelGrid}
+                    />
                   </div>
                 );
               })()}
