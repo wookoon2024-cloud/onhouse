@@ -160,9 +160,10 @@ interface AssetViewerProps {
   onClose: () => void;
   onSelectTile?: (index: number) => void;
   dbCustomCharSprites?: TilesetOption[];
+  dbCharOverrides?: Record<string, { url: string; rows: number; cols: number; size?: number; frameWidth?: number; frameHeight?: number; offsetX?: number; offsetY?: number; spacingX?: number; spacingY?: number }>;
 }
 
-export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile, dbCustomCharSprites }) => {
+export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile, dbCustomCharSprites, dbCharOverrides }) => {
   // Character tab active by default
   const [activeTab, setActiveTab] = useState<MainCategory>('character');
   
@@ -196,47 +197,27 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
     }
   }, [dbCustomCharSprites]);
 
-  // Custom asset uploading & DB sync loading state
-  const [isSavingAsset, setIsSavingAsset] = useState<boolean>(false);
-  const [saveProgressText, setSaveProgressText] = useState<string>('');
-
-  // Sync custom assets from localStorage / Realtime updates
-  useEffect(() => {
-    const syncLocalAssets = () => {
-      try {
-        const savedMaps = localStorage.getItem('on_house_custom_map_tilesets');
-        if (savedMaps) setCustomMapTilesets(prev => JSON.stringify(prev) === savedMaps ? prev : JSON.parse(savedMaps));
-        
-        const savedChars = localStorage.getItem('on_house_custom_char_sprites');
-        if (savedChars) setCustomCharSprites(prev => JSON.stringify(prev) === savedChars ? prev : JSON.parse(savedChars));
-        
-        const savedOverrides = localStorage.getItem('on_house_char_image_overrides');
-        if (savedOverrides) setCharImageOverrides(prev => JSON.stringify(prev) === savedOverrides ? prev : JSON.parse(savedOverrides));
-        
-        const savedActions = localStorage.getItem('on_house_char_row_actions');
-        if (savedActions) setCharRowActions(prev => JSON.stringify(prev) === savedActions ? prev : JSON.parse(savedActions));
-      } catch (e) {}
-    };
-
-    syncLocalAssets();
-
-    window.addEventListener('storage', syncLocalAssets);
-    window.addEventListener('on_house_sprites_updated', syncLocalAssets);
-    return () => {
-      window.removeEventListener('storage', syncLocalAssets);
-      window.removeEventListener('on_house_sprites_updated', syncLocalAssets);
-    };
-  }, []);
-
   // Character Spritesheet Image Overrides (for drawn pixels or added/deleted rows/cols/size)
   const [charImageOverrides, setCharImageOverrides] = useState<Record<string, { url: string; rows: number; cols: number; size?: number; frameWidth?: number; frameHeight?: number; offsetX?: number; offsetY?: number; spacingX?: number; spacingY?: number }>>(() => {
     try {
       const saved = localStorage.getItem('on_house_char_image_overrides');
-      return saved ? JSON.parse(saved) : {};
+      const localMap = saved ? JSON.parse(saved) : {};
+      return { ...localMap, ...(dbCharOverrides || {}) };
     } catch {
-      return {};
+      return dbCharOverrides || {};
     }
   });
+
+  // Keep charImageOverrides synced with DB props
+  useEffect(() => {
+    if (dbCharOverrides && typeof dbCharOverrides === 'object' && Object.keys(dbCharOverrides).length > 0) {
+      console.log(`[AssetViewer Sync] 🔄 Syncing charImageOverrides from DB props (${Object.keys(dbCharOverrides).length} items: ${Object.keys(dbCharOverrides).join(', ')})`);
+      setCharImageOverrides((prev) => ({
+        ...prev,
+        ...dbCharOverrides
+      }));
+    }
+  }, [dbCharOverrides]);
 
   // Character Action Names Mapping State
   const [charRowActions, setCharRowActions] = useState<Record<string, string[]>>(() => {

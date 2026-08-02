@@ -2681,6 +2681,7 @@ export default function App() {
       {showAssetViewer && (
         <AssetViewer
           dbCustomCharSprites={dbCustomCharSprites}
+          dbCharOverrides={dbCharOverrides}
           onClose={() => setShowAssetViewer(false)}
         />
       )}
