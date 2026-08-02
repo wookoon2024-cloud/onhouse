@@ -108,8 +108,8 @@ export default function App() {
   };
 
   // 0.5. Available Map IDs displayed in top bar
-  const [availableMapIds, setAvailableMapIds] = useState<string[]>(getInitialAvailableMapIds);
   const [dbCustomCharSprites, setDbCustomCharSprites] = useState<any[]>([]);
+  const [dbCharOverrides, setDbCharOverrides] = useState<Record<string, any>>({});
 
   // Helper to update activeMaps while strictly preserving user's custom tab order!
   const applyFetchedMapOrder = (mapsData: Record<string, MapDefinition>, dbOrder?: string[]) => {
@@ -684,6 +684,7 @@ export default function App() {
       if (assetsData) {
         const { mapTilesets, charSprites, charOverrides, charRowActions } = assetsData;
         setDbCustomCharSprites(charSprites || []);
+        setDbCharOverrides(charOverrides || {});
         
         try {
           if (mapTilesets && mapTilesets.length > 0) {
@@ -983,11 +984,15 @@ export default function App() {
           setAssetVersion((v) => v + 1);
         } else if (assetType === 'char_image_override') {
           if (assetData && assetData.id) {
+            setDbCharOverrides((prev) => ({
+              ...prev,
+              [assetData.id]: assetData
+            }));
             try {
               const overridesSaved = localStorage.getItem('on_house_char_image_overrides');
               const overrides = overridesSaved ? JSON.parse(overridesSaved) : {};
               overrides[assetData.id] = assetData;
-              localStorage.setItem('on_house_char_image_overrides', JSON.stringify(overrides));
+              safeLocalStorageSetItem('on_house_char_image_overrides', JSON.stringify(overrides));
               window.dispatchEvent(new Event('on_house_sprites_updated'));
               setAssetVersion((v) => v + 1);
             } catch (e) {}
