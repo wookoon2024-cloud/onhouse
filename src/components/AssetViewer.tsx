@@ -1737,8 +1737,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
       const tileW = Math.max(1, Math.floor(naturalW / cols));
       const tileH = Math.max(1, Math.floor(naturalH / oldRows));
 
-      // Cap max frame size to 128px (matches game's maximum 128px display limit for 100% crisp sharpness & 90% memory savings)
-      const maxDim = 128;
+      // Preserve full original resolution (up to 512px safety cap) with high quality WebP encoding
+      const maxDim = 512;
       const scale = (tileW > maxDim || tileH > maxDim) ? maxDim / Math.max(tileW, tileH) : 1;
       const destTileW = Math.max(1, Math.round(tileW * scale));
       const destTileH = Math.max(1, Math.round(tileH * scale));
@@ -1753,7 +1753,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
       canvas.height = destSheetH;
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('Canvas 2D context unavailable');
-      ctx.imageSmoothingEnabled = false;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
 
       // Draw existing image frames scaled to destTileW x destTileH
       for (let r = 0; r < oldRows; r++) {
@@ -2004,8 +2005,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
-        // Cap max frame dimensions to 128px (matches game's maximum 128px display size limit for 1:1 crisp pixel sharpness & 90% storage savings)
-        const maxDim = 128;
+        // Preserve full original resolution (up to 512px safety cap) with high-quality smoothing and WebP compression
+        const maxDim = 512;
         const scale = (frameW > maxDim || frameH > maxDim) ? maxDim / Math.max(frameW, frameH) : 1;
         const destFrameW = Math.max(1, Math.round(frameW * scale));
         const destFrameH = Math.max(1, Math.round(frameH * scale));
@@ -2018,7 +2019,8 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
           resolve({ url: sourceUrl, frameW, frameH });
           return;
         }
-        ctx.imageSmoothingEnabled = false;
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         for (let r = 0; r < rows; r++) {
