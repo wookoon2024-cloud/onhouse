@@ -273,6 +273,7 @@ export const Messenger: React.FC<MessengerProps> = ({
   return (
     <div
       ref={modalRef}
+      onClick={() => inputRef.current?.focus()}
       style={{
         position: 'fixed',
         left: `${pos.x}px`,
@@ -288,7 +289,7 @@ export const Messenger: React.FC<MessengerProps> = ({
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
-        zIndex: 110,
+        zIndex: 10050,
         background: 'rgba(20, 20, 32, 0.96)',
         border: '1px solid rgba(255, 255, 255, 0.2)',
         borderRadius: '14px',
