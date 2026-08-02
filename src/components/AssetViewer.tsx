@@ -1476,6 +1476,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
 
   // Delete an Action Motion Row
   const handleDeleteActionRow = async (rowIdx: number) => {
+    if (!currentSelectedId) return; // No character selected — nothing to delete.
     if (currentOption.rows <= 1) {
       alert("최소 1개의 행은 유지되어야 합니다!");
       return;
@@ -2235,6 +2236,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
 
   // 📏 Update custom character display size on map (in px)
   const handleUpdateCharacterDisplaySize = (charId: string, newSize: number) => {
+    if (!charId) return; // No character selected (e.g. house has none yet) — nothing to save.
     setCharImageOverrides((prev) => {
       const existing = prev[charId] || {
         url: currentOption.url,
@@ -2867,7 +2869,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
             ))}
           </div>
 
-          {activeTab === 'character' && (
+          {activeTab === 'character' && currentSelectedId && (
             <div style={{
               display: 'flex', alignItems: 'center', gap: '6px',
               background: 'rgba(139, 92, 246, 0.12)', border: '1px solid #585b70',
