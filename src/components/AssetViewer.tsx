@@ -3071,17 +3071,35 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
       }
 
       let generatedOptions: TilesetOption[] = [];
-      let nextMapPrefix = customMapTilesets.reduce((max, item) => Math.max(max, item.prefix || 8000), 8000);
 
-      if (uploadCategory === 'map' && rows > 64) {
-        setSaveProgressText(`✂️ 세로 행이 64개를 초과하여 에셋을 자동 분할 중입니다...`);
+      // A tileset owns the global index range [prefix, prefix + cols*rows). Prefixes used to be
+      // handed out a flat 1000 apart, which overlapped that range the moment a sheet held more than
+      // 1000 tiles — and the 64-row auto-split produced exactly that (16 cols x 64 rows = 1024).
+      // Two sheets then answered to the same index and the map drew whichever the lookup hit first,
+      // so a brush stamped tiles from the wrong sheet. Allocate past the end of every existing
+      // range instead, and cap each chunk so no range can reach into its neighbour.
+      const PREFIX_STRIDE = 1000;
+      const allocated = customMapTilesets
+        .filter(t => t.prefix)
+        .map(t => ({ prefix: t.prefix as number, span: Math.max(1, (t.cols || 16) * (t.rows || 16)) }));
+      const allocPrefix = (chunkCols: number, chunkRows: number) => {
+        let end = 9000;
+        for (const t of allocated) end = Math.max(end, t.prefix + t.span);
+        const next = Math.ceil(end / PREFIX_STRIDE) * PREFIX_STRIDE;
+        allocated.push({ prefix: next, span: Math.max(1, chunkCols * chunkRows) });
+        return next;
+      };
+      const maxChunkRows = Math.max(1, Math.min(64, Math.floor(PREFIX_STRIDE / Math.max(1, cols))));
+
+      if (uploadCategory === 'map' && rows > maxChunkRows) {
+        setSaveProgressText(`✂️ 세로 행이 ${maxChunkRows}개를 초과하여 에셋을 자동 분할 중입니다...`);
         const img = await loadLoadedImageElement(finalUrl!);
         let remainingRows = rows;
         let currentRow = 0;
         let partIndex = 1;
 
         while (remainingRows > 0) {
-          const chunkRows = Math.min(64, remainingRows);
+          const chunkRows = Math.min(maxChunkRows, remainingRows);
           const canvas = document.createElement('canvas');
           canvas.width = cols * frameW;
           canvas.height = chunkRows * frameH;
@@ -3091,9 +3109,6 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
             ctx.drawImage(img, 0, currentRow * frameH, cols * frameW, chunkRows * frameH, 0, 0, cols * frameW, chunkRows * frameH);
             const chunkUrl = canvas.toDataURL('image/png');
             
-            const maxPrefix = nextMapPrefix;
-            nextMapPrefix = maxPrefix >= 9000 ? maxPrefix + 1000 : 9000;
-
             generatedOptions.push({
               id: 'custom_map_' + Date.now() + '_p' + partIndex,
               name: `${name} (분할 ${partIndex})`,
@@ -3107,7 +3122,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
               offsetY: offY,
               spacingX: customSpacingInput || 0,
               spacingY: customSpacingInput || 0,
-              prefix: nextMapPrefix,
+              prefix: allocPrefix(cols, chunkRows),
               isCustom: true
             });
           }
@@ -3117,8 +3132,6 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
         }
       } else {
         const newId = (uploadCategory === 'map' ? 'custom_map_' : 'custom_char_') + Date.now();
-        const maxPrefix = customMapTilesets.reduce((max, item) => Math.max(max, item.prefix || 8000), 8000);
-        const nextPrefix = maxPrefix >= 9000 ? maxPrefix + 1000 : 9000;
 
         generatedOptions.push({
           id: newId,
@@ -3133,7 +3146,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
           offsetY: offY,
           spacingX: customSpacingInput || 0,
           spacingY: customSpacingInput || 0,
-          prefix: uploadCategory === 'map' ? nextPrefix : undefined,
+          prefix: uploadCategory === 'map' ? allocPrefix(cols, rows) : undefined,
           isCustom: true
         });
       }

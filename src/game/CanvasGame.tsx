@@ -89,32 +89,46 @@ export const getTileDrawInfo = (idx: number, defaultTileset: string) => {
 
   const customs = getCustomTilesetsCached();
 
+  const tileSpan = (ct: { cols?: number; rows?: number }) => Math.max(1, (ct.cols || 16) * (ct.rows || 16));
+
   // 1. Direct custom tileset ID match (if defaultTileset is explicitly custom_map_...)
   if (defaultTileset && defaultTileset.startsWith('custom_map_')) {
     const found = customs.find(c => c.id === defaultTileset);
     if (found) {
       const p = found.prefix || 9000;
-      const calcIdx = idx >= p ? idx - p : idx;
-      return { tilesetKey: found.id, localIdx: calcIdx };
+      const span = tileSpan(found);
+      // Only claim the index if it actually belongs to this sheet — either a bare local index or
+      // one inside its own range. This used to hand every index to the active tileset regardless,
+      // so a tile belonging to a different sheet was re-read at the wrong offset and drew as some
+      // unrelated tile. Anything else falls through to the range search below.
+      if (idx < span) return { tilesetKey: found.id, localIdx: idx };
+      if (idx >= p && idx < p + span) return { tilesetKey: found.id, localIdx: idx - p };
     }
   }
 
-  // 2. Exact range match for custom tilesets by index range (prevents overlapping prefix conflicts!)
+  // 2. Range match for custom tilesets. Ranges are supposed to be disjoint, but sheets uploaded
+  // before prefixes were allocated by actual tile count can still overlap; resolve those to the
+  // highest matching prefix so the answer is at least deterministic and independent of list order.
+  let bestKey: string | null = null;
+  let bestPrefix = -1;
   for (const ct of customs) {
     const p = ct.prefix || 9000;
-    const totalTiles = (ct.cols || 16) * (ct.rows || 16);
-    if (idx >= p && idx < p + totalTiles) {
-      return { tilesetKey: ct.id, localIdx: idx - p };
+    if (idx >= p && idx < p + tileSpan(ct) && p > bestPrefix) {
+      bestPrefix = p;
+      bestKey = ct.id;
     }
   }
+  if (bestKey) return { tilesetKey: bestKey, localIdx: idx - bestPrefix };
 
-  // 3. Fallback prefix match for custom tilesets
+  // 3. Fallback prefix match for custom tilesets, same highest-prefix-wins rule
   for (const ct of customs) {
     const p = ct.prefix || 9000;
-    if (idx >= p && idx < p + 1000) {
-      return { tilesetKey: ct.id, localIdx: idx - p };
+    if (idx >= p && idx < p + 1000 && p > bestPrefix) {
+      bestPrefix = p;
+      bestKey = ct.id;
     }
   }
+  if (bestKey) return { tilesetKey: bestKey, localIdx: idx - bestPrefix };
 
   if (idx >= 8000) {
     tilesetKey = 'field';
@@ -325,6 +339,7 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
   editLayer,
   onPaintTile,
   mapData,
+  brushSize = 1,
   assetVersion = 0,
   isHouseLoaded = true,
   reactionPrompt,

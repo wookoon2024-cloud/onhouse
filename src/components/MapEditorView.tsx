@@ -2727,12 +2727,20 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
   const getPrefixedIndex = (localIdx: number, tilesetKey: string) => {
     if (localIdx === -1) return -1;
-    // If localIdx is ALREADY a prefixed global index (>= 1000), return it directly to prevent double-prefixing!
-    if (localIdx >= 1000) return localIdx;
     const custom = customMapTilesets.find(ct => ct.id === tilesetKey);
     if (custom && custom.prefix) {
+      // Tell a local index from an already-prefixed one by the sheet's actual tile count, not by a
+      // flat `>= 1000` test. A 16x64 sheet has 1024 tiles, so its own local indices 1000-1023 were
+      // being mistaken for global ones and returned unprefixed — landing them in the built-in
+      // `interior` range (1000+), which is why picking a tile near the bottom of a tall sheet
+      // stamped a piece of indoor furniture instead.
+      const span = Math.max(1, (custom.cols || 16) * (custom.rows || 16));
+      if (localIdx < span) return custom.prefix + localIdx;
+      if (localIdx >= custom.prefix && localIdx < custom.prefix + span) return localIdx;
       return custom.prefix + localIdx;
     }
+    // Built-in sheets are all far below 1000 tiles, so the original guard is still correct for them
+    if (localIdx >= 1000) return localIdx;
     switch (tilesetKey) {
       case 'interior': return 1000 + localIdx;
       case 'outdoor': return 2000 + localIdx;
