@@ -401,6 +401,15 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
   // it rather than blinking it.
   const minimapAlphaRef = useRef<number>(1);
 
+  // The render loop's effect deliberately does not depend on `memos` — restarting it on every memo
+  // change would tear down the animation frame and the baked-map cache. Read them through a ref so
+  // a memo the player just dropped shows up on the very next frame instead of waiting for some
+  // unrelated dependency (a presence or chat update) to re-run the effect seconds later.
+  const memosRef = useRef<MapMemo[]>(memos);
+  useEffect(() => {
+    memosRef.current = memos;
+  }, [memos]);
+
   useEffect(() => {
     const handleSpawnParticle = (e: Event) => {
       const detail = (e as CustomEvent).detail;
@@ -1264,8 +1273,9 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         player
       }));
 
-      if (memos && memos.length > 0) {
-        memos.forEach((memo) => {
+      const liveMemos = memosRef.current;
+      if (liveMemos && liveMemos.length > 0) {
+        liveMemos.forEach((memo) => {
           if (!memo.mapId || memo.mapId === currentMapId) {
             depthList.push({ sortY: memo.y - 0.01, kind: 'memo' as const, memo });
           }
