@@ -1238,7 +1238,12 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         const spriteSheet = images[player.spriteType];
         const hasSprite = !!spriteSheet;
 
-        const dyedSpriteSheet = hasSprite ? getDyedSprite(spriteSheet, player.hue, player.isOnline) : null;
+        // Hue dyeing is retired — no UI has set it for a long time, so a value left in storage from
+        // an older build could only ever miscolor the sprite (a leftover 165 turned the green leaves
+        // purple on the map while the editor, which never dyed, still showed them green). Pinned to 0
+        // here rather than read from the packet so a peer still running an old build looks right too.
+        // Offline grayscaling below is unaffected.
+        const dyedSpriteSheet = hasSprite ? getDyedSprite(spriteSheet, 0, player.isOnline) : null;
 
         // Calculate sprite sheet grid bounds & frame offsets dynamically
         const charInfo = getCustomCharSpriteInfo(player.spriteType);

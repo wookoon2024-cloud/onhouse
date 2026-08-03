@@ -22,7 +22,10 @@ const DEAD_CACHE_KEY_PREFIXES = [
   'on_house_char_image_overrides_',
   'on_house_char_row_actions_'
 ];
-const DEAD_CACHE_KEYS = ['on_house_custom_maps_cache'];
+// 'on_house_hue' is here for correctness rather than space: it drove the retired sprite hue-shift,
+// and since no UI has been able to change it for many versions, a value left over from an old build
+// just silently miscolored the character on the map forever. Purging it heals those clients.
+const DEAD_CACHE_KEYS = ['on_house_custom_maps_cache', 'on_house_hue'];
 
 export const purgeDeadStorageKeys = (): number => {
   let freedBytes = 0;

@@ -209,7 +209,6 @@ export default function App() {
     localStorage.setItem('on_house_nickname', savedName);
 
     const savedSprite = (localStorage.getItem('on_house_sprite') as any) || '';
-    const savedHue = parseInt(localStorage.getItem('on_house_hue') || '0');
     const rawStatus = localStorage.getItem('on_house_status');
     const savedStatus = (rawStatus === '반가워요!' || !rawStatus) ? '' : rawStatus;
 
@@ -235,7 +234,7 @@ export default function App() {
       id: deviceId.current,
       nickname: savedName,
       spriteType: savedSprite,
-      hue: savedHue,
+      hue: 0, // retired: see the getDyedSprite call in CanvasGame
       mapId: firstMapId,
       x: firstSpawn.x * 16,
       y: firstSpawn.y * 16,
@@ -704,7 +703,6 @@ export default function App() {
     // Save settings immediately
     localStorage.setItem('on_house_nickname', localPlayer.nickname);
     localStorage.setItem('on_house_sprite', localPlayer.spriteType);
-    localStorage.setItem('on_house_hue', localPlayer.hue.toString());
     localStorage.setItem('on_house_status', localPlayer.statusMessage);
 
     // Broadcast player update to Supabase Realtime channel
