@@ -2730,6 +2730,154 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
     return { dataUrl: canvas.toDataURL(), cols, rows };
   };
 
+  // 🔄 Transpose the sprite sheet: the frame at (col c, row r) moves to (col r, row c), so cols and
+  // rows swap. The engine reads a sheet as column = facing direction (0 down, 1 up, 2 left,
+  // 3 right) and row = animation frame (row 0 idle, rows 1-3 the walk cycle) — see the drawing
+  // code in CanvasGame. A sheet authored the other way round (directions laid out across a row,
+  // frames running along a column) renders as nonsense in game, and this flips it into the
+  // orientation the engine expects without redrawing anything.
+  const handleTransposeSpriteSheet = async () => {
+    const charId = currentSelectedId;
+    const targetOption = charOptions.find((c) => c.id === charId);
+    if (!targetOption || !targetOption.url) {
+      setToastMessage('⚠️ 먼저 캐릭터를 선택해 주세요!');
+      return;
+    }
+
+    const oldCols = Math.max(1, targetOption.cols || 1);
+    const oldRows = Math.max(1, targetOption.rows || 1);
+    if (oldCols === oldRows) {
+      // Still worth doing (the frames genuinely move), just warn that the grid shape won't change.
+      if (!window.confirm(`가로 ${oldCols} x 세로 ${oldRows} 정사각 시트입니다.\n행과 열을 맞바꾸면 칸 수는 그대로지만 각 프레임의 위치가 바뀝니다.\n계속할까요?`)) return;
+    } else if (!window.confirm(`행과 열을 맞바꿉니다.\n\n가로 ${oldCols} x 세로 ${oldRows}  →  가로 ${oldRows} x 세로 ${oldCols}\n\n지금 각 행에 있는 동작이 세로 열로 내려갑니다. 되돌리려면 한 번 더 실행하면 됩니다.\n계속할까요?`)) return;
+
+    try {
+      setIsSavingAsset(true);
+      setSaveProgressText('🔄 행/열 변환 중...');
+
+      const img = await loadLoadedImageElement(targetOption.url);
+
+      // An override's image is already normalised (frames packed tight, no offset/spacing), so it
+      // must be sampled on a plain grid; only a raw uploaded sheet carries offsets and gaps.
+      const override = charImageOverrides[charId];
+      const hasOverride = !!(override && override.url);
+
+      const srcW = img.naturalWidth || img.width;
+      const srcH = img.naturalHeight || img.height;
+      const tileW = hasOverride
+        ? Math.max(1, Math.floor(srcW / oldCols))
+        : (targetOption.frameWidth || Math.max(1, Math.floor(srcW / oldCols)));
+      const tileH = hasOverride
+        ? Math.max(1, Math.floor(srcH / oldRows))
+        : (targetOption.frameHeight || Math.max(1, Math.floor(srcH / oldRows)));
+
+      const offX = hasOverride ? 0 : (targetOption.offsetX || 0);
+      const offY = hasOverride ? 0 : (targetOption.offsetY || 0);
+      const gapX = hasOverride ? 0 : (targetOption.spacingX || 0);
+      const gapY = hasOverride ? 0 : (targetOption.spacingY || 0);
+
+      const newCols = oldRows;
+      const newRows = oldCols;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = newCols * tileW;
+      canvas.height = newRows * tileH;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas 2D context unavailable');
+      ctx.imageSmoothingEnabled = false;
+
+      for (let r = 0; r < oldRows; r++) {
+        for (let c = 0; c < oldCols; c++) {
+          ctx.drawImage(
+            img,
+            offX + c * (tileW + gapX), offY + r * (tileH + gapY), tileW, tileH,
+            r * tileW, c * tileH, tileW, tileH   // (c,r) -> (col r, row c)
+          );
+        }
+      }
+
+      const webp = canvas.toDataURL('image/webp', 0.92);
+      const updatedUrl = webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/png');
+
+      const newOverrideObj = {
+        url: updatedUrl,
+        cols: newCols,
+        rows: newRows,
+        size: override?.size || targetOption.size || 32,
+        frameWidth: tileW,
+        frameHeight: tileH,
+        offsetX: 0,
+        offsetY: 0,
+        spacingX: 0,
+        spacingY: 0
+      };
+
+      const nextOverrides = { ...charImageOverrides, [charId]: newOverrideObj };
+      const nextChars = customCharSprites.map((opt) =>
+        opt.id === charId
+          ? { ...opt, url: updatedUrl, cols: newCols, rows: newRows, frameWidth: tileW, frameHeight: tileH, offsetX: 0, offsetY: 0, spacingX: 0, spacingY: 0 }
+          : opt
+      );
+
+      try {
+        safeLocalStorageSetItem('on_house_char_image_overrides', JSON.stringify(nextOverrides));
+        safeLocalStorageSetItem('on_house_custom_char_sprites', JSON.stringify(nextChars.map(({ url, ...meta }: any) => meta)));
+      } catch (e) {}
+
+      setCharImageOverrides(nextOverrides);
+      setCustomCharSprites(nextChars);
+
+      // Row action names described the OLD rows, which are now columns — keeping them would label
+      // walk frames with the wrong action. Drop them so the defaults ('대기', '걷기1'...) apply.
+      setCharRowActions((prev) => {
+        const next = { ...prev };
+        delete next[charId];
+        safeLocalStorageSetItem('on_house_char_row_actions', JSON.stringify(next));
+        return next;
+      });
+
+      const houseCode = getSavedHouseCode();
+      const spriteData = {
+        id: charId,
+        name: targetOption.name,
+        url: updatedUrl,
+        cols: newCols,
+        rows: newRows,
+        size: newOverrideObj.size,
+        isCustom: targetOption.isCustom !== false
+      };
+
+      await Promise.all([
+        saveHouseAssetToDB(houseCode, 'char_sprite', spriteData),
+        saveHouseAssetToDB(houseCode, 'char_image_override', { id: charId, ...newOverrideObj })
+      ]);
+      await deleteHouseAssetFromDB(houseCode, 'char_row_actions', charId);
+
+      try {
+        supabase.channel(`house:${houseCode}`).send({
+          type: 'broadcast',
+          event: 'asset_update',
+          payload: { assetType: 'char_sprite', assetData: spriteData }
+        });
+        supabase.channel(`house:${houseCode}`).send({
+          type: 'broadcast',
+          event: 'asset_update',
+          payload: { assetType: 'char_image_override', assetData: { id: charId, ...newOverrideObj } }
+        });
+      } catch (e) {}
+
+      setBoardRenderKey((prev) => prev + 1);
+      window.dispatchEvent(new Event('on_house_sprites_updated'));
+      setToastMessage(`🔄 [${targetOption.name}] 행/열을 바꿨습니다! (${oldCols}x${oldRows} → ${newCols}x${newRows})`);
+    } catch (err: any) {
+      console.error('[Transpose] Failed:', err);
+      setToastMessage(`⚠️ 행/열 변환 실패: ${err?.message || err}`);
+    } finally {
+      setIsSavingAsset(false);
+      setSaveProgressText('');
+    }
+  };
+
   // 📏 Update custom character display size on map (in px)
   const handleUpdateCharacterDisplaySize = (charId: string, newSize: number) => {
     if (!charId) return; // No character selected (e.g. house has none yet) — nothing to save.
@@ -3512,6 +3660,24 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
               </button>
 
               <span style={{ fontSize: '11px', color: '#aaa' }}>px</span>
+
+              <div style={{ width: '1px', background: '#585b70', height: '20px', margin: '0 4px' }} />
+
+              <button
+                type="button"
+                onClick={handleTransposeSpriteSheet}
+                disabled={isSavingAsset}
+                title={`행과 열을 맞바꿉니다 (가로 ${currentOption?.cols || 0} x 세로 ${currentOption?.rows || 0} → 가로 ${currentOption?.rows || 0} x 세로 ${currentOption?.cols || 0}).\n게임 엔진은 "열 = 바라보는 방향, 행 = 걷기 프레임"으로 읽습니다.\n한 번 더 누르면 되돌아갑니다.`}
+                style={{
+                  background: isSavingAsset ? '#252538' : 'rgba(249, 226, 175, 0.15)',
+                  border: '1px solid #f9e2af', color: '#f9e2af',
+                  padding: '3px 8px', borderRadius: '3px', fontSize: '11px',
+                  cursor: isSavingAsset ? 'wait' : 'pointer', whiteSpace: 'nowrap',
+                  display: 'flex', alignItems: 'center', gap: '4px'
+                }}
+              >
+                🔄 행/열 바꾸기
+              </button>
             </div>
           )}
         </div>
