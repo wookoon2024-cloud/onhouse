@@ -8,6 +8,7 @@ import {
 import { DEFAULT_CHAR_ROW_ACTIONS, getCharRowActions } from '../game/MapData';
 import { saveHouseAssetToDB, deleteHouseAssetFromDB, getSavedHouseCode, publishItemToMarket } from '../services/HouseService';
 import { supabase } from '../lib/supabase';
+import { useEditLock } from '../hooks/useEditLock';
 
 class AssetViewerErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null, info: any}> {
   constructor(props: {children: React.ReactNode}) {
@@ -1007,6 +1008,12 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
     ? (currentOptionList.find((opt) => opt.id === currentSelectedId) || currentOptionList[0])
     : defaultFallbackOption;
 
+  // Claim the selected asset for editing while it is open here. Only custom assets are locked —
+  // the built-in tilesets cannot be saved over, so locking them would just block two people from
+  // browsing the same one.
+  const lockableId = currentSelectedId && currentSelectedId.startsWith('custom_') ? currentSelectedId : null;
+  const editLock = useEditLock(activeTab === 'character' ? 'char' : 'map_tileset', lockableId);
+
   const activeDisplayTile = selectedTileState || hoveredTile;
 
   const [spriteNaturalSize, setSpriteNaturalSize] = useState<{ width: number; height: number } | null>(null);
@@ -1791,6 +1798,10 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
   // Save painted frame back onto spritesheet canvas with exact chosen resolution!
   const handleSavePixelEditor = async () => {
     if (!editingTile) return;
+    if (editLock.isReadOnly) {
+      alert(`🔒 ${editLock.lockedBy}님이 편집 중이라 저장할 수 없습니다.`);
+      return;
+    }
     const { charId, col, row } = editingTile;
     const resW = editorGridResW;
     const resH = editorGridResH;
@@ -3361,6 +3372,10 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
 
   // Delete custom asset
   const handleDeleteCustomAsset = async (id: string) => {
+    if (editLock.isReadOnly && id === lockableId) {
+      alert(`🔒 ${editLock.lockedBy}님이 편집 중이라 삭제할 수 없습니다.`);
+      return;
+    }
     if (!window.confirm("정말로 이 커스텀 에셋을 영구 삭제하시겠습니까?")) return;
 
     const currentHouse = getSavedHouseCode();
@@ -3537,6 +3552,17 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
           <X size={14} /> 닫기
         </button>
       </div>
+
+      {/* Edit lock banner — someone else opened this asset first, so this session is read-only */}
+      {editLock.isReadOnly && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '8px',
+          background: 'rgba(250, 179, 135, 0.14)', border: '1px solid #fab387',
+          borderRadius: '4px', padding: '8px 12px', fontSize: '12px', color: '#fab387'
+        }}>
+          🔒 <strong>{editLock.lockedBy}</strong>님이 편집 중입니다 — 읽기 전용으로 열렸습니다. 저장·삭제가 잠겨 있으며, 상대가 편집을 마치면 자동으로 풀립니다.
+        </div>
+      )}
 
       {/* 2. Sub-Control Toolbar */}
       <div style={{

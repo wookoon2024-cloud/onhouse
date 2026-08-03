@@ -30,6 +30,7 @@ import { supabase } from './lib/supabase';
 import { APP_VERSION } from './config/version';
 import { safeLocalStorageSetItem, purgeDeadStorageKeys } from './lib/safeStorage';
 import type { MapMemo, InventoryItem } from './types/memo';
+import { clearLockChannel, notifyLocksChanged, registerLockChannel, trackPresence } from './services/editLock';
 import { fetchHouseMemos, saveMemoToDB, deleteMemoFromDB, deleteLocalMemo, getLocalMemos, saveLocalMemos, getLocalInventory, saveLocalInventory } from './services/MemoService';
 import { CreateMemoModal } from './components/CreateMemoModal';
 import { ViewMemoModal } from './components/ViewMemoModal';
@@ -805,6 +806,7 @@ export default function App() {
         const stale = activeChannel;
         activeChannel = null;
         if (channelRef.current === stale) channelRef.current = null;
+        clearLockChannel(stale);
         try { supabase.removeChannel(stale); } catch (e) {}
       }
 
@@ -1345,6 +1347,10 @@ export default function App() {
           delete pendingPingCallbacksRef.current[payload.fromId];
         }
       })
+      // Edit locks ride along on the presence payload — see services/editLock.ts
+      .on('presence', { event: 'sync' }, () => notifyLocksChanged())
+      .on('presence', { event: 'join' }, () => notifyLocksChanged())
+      .on('presence', { event: 'leave' }, () => notifyLocksChanged())
       .subscribe((status) => {
         if (activeChannel === channel) connecting = false;
 
@@ -1377,13 +1383,11 @@ export default function App() {
 
         {
           channelRef.current = channel;
-          try {
-            channel.track({
-              id: deviceId.current,
-              nickname: localPlayerRef.current.nickname,
-              online_at: new Date().toISOString()
-            });
-          } catch (e) {}
+          // Presence is tracked through editLock so the payload always carries our current lock
+          // alongside the id/nickname the online check reads. track() replaces the whole payload,
+          // so these must not be sent from two places.
+          registerLockChannel(channel, deviceId.current, () => localPlayerRef.current.nickname);
+          trackPresence();
 
           // Broadcast player_join to all clients
           channel.send({
@@ -1522,7 +1526,10 @@ export default function App() {
       if (channelRef.current === last) {
         channelRef.current = null;
       }
-      if (last) supabase.removeChannel(last);
+      if (last) {
+        clearLockChannel(last);
+        supabase.removeChannel(last);
+      }
     };
   }, [houseCode]);
 

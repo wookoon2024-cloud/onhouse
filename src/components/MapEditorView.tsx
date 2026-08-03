@@ -3,6 +3,7 @@ import { type MapDefinition, type MapObjectInstance, type CustomTileLayer, clean
 import { Trash2, Save, X, Undo, Redo, Pipette, Paintbrush, PaintBucket, Eraser, Info, Sparkles, Plus, Download, Upload, Pencil, MousePointer, Copy, Layers, MoveUp, MoveDown, ShieldAlert } from 'lucide-react';
 import { getTileDrawInfo, getTilesetInfo } from '../game/CanvasGame';
 import { publishItemToMarket, getSavedHouseCode } from '../services/HouseService';
+import { useEditLock } from '../hooks/useEditLock';
 
 import interiorTilesUrl from '../assets/interior_tiles.png';
 import outdoorTilesUrl from '../assets/outdoor_tiles.png';
@@ -106,6 +107,8 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
     setDragOverTabId(null);
   };
   const [selectedMapId, setSelectedMapId] = useState<string>(initialMapId && activeMaps[initialMapId] ? initialMapId : (availableMapIds[0] || 'room'));
+  // Claim the map being edited. Whoever opened it first keeps write access; everyone else views.
+  const editLock = useEditLock('map', selectedMapId);
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [customNameInput, setCustomNameInput] = useState<string>('');
   const [editLayer, setEditLayer] = useState<'base' | 'decor' | 'collision'>('decor');
@@ -1557,13 +1560,20 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
       isInitialMount.current = false;
       return;
     }
+    // The autosave is the dangerous one under a lock: without this guard a read-only viewer would
+    // quietly push its own copy over whatever the actual editor is doing, 500ms after any change.
+    if (editLock.isReadOnly) return;
     const timer = setTimeout(() => {
       onSaveMap(selectedMapId, localMap);
     }, 500);
     return () => clearTimeout(timer);
-  }, [localMap, selectedMapId, onSaveMap]);
+  }, [localMap, selectedMapId, onSaveMap, editLock.isReadOnly]);
 
   const handleSave = () => {
+    if (editLock.isReadOnly) {
+      alert(`🔒 ${editLock.lockedBy}님이 편집 중이라 저장할 수 없습니다.`);
+      return;
+    }
     onSaveMap(selectedMapId, localMap);
     setOriginalMap(localMap);
     alert('디자인 변경 사항이 성공적으로 클라우드에 저장되었습니다!');
@@ -2823,14 +2833,28 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
           </button>
           <button
             onClick={handleSave}
+            disabled={editLock.isReadOnly}
+            title={editLock.isReadOnly ? `${editLock.lockedBy}님이 편집 중입니다` : '저장하기'}
             style={{
-              padding: "4px 12px", background: "var(--primary)", border: "1px solid var(--primary-hover)",
-              borderRadius: "4px", color: "#fff", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px",
-              fontWeight: "normal", cursor: "pointer"
+              padding: "4px 12px",
+              background: editLock.isReadOnly ? "#45475a" : "var(--primary)",
+              border: `1px solid ${editLock.isReadOnly ? "#585b70" : "var(--primary-hover)"}`,
+              borderRadius: "4px", color: editLock.isReadOnly ? "#8a8a9e" : "#fff",
+              fontSize: "11px", display: "flex", alignItems: "center", gap: "4px",
+              fontWeight: "normal", cursor: editLock.isReadOnly ? "not-allowed" : "pointer"
             }}
           >
-            <Save size={13} /> 저장하기
+            <Save size={13} /> {editLock.isReadOnly ? '읽기 전용' : '저장하기'}
           </button>
+
+          {editLock.isReadOnly && (
+            <span style={{
+              padding: "4px 10px", background: "rgba(250, 179, 135, 0.14)", border: "1px solid #fab387",
+              borderRadius: "4px", color: "#fab387", fontSize: "11px", whiteSpace: "nowrap"
+            }}>
+              🔒 <strong>{editLock.lockedBy}</strong>님이 편집 중 — 저장이 잠겼습니다
+            </span>
+          )}
 
           {/* Undo & Redo Icons attached right next to 저장하기 */}
           <div style={{ display: "flex", alignItems: "center", gap: "2px", marginLeft: "6px" }}>
