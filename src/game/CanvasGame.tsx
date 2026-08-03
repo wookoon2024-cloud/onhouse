@@ -1249,6 +1249,29 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
 
       renderList.sort((a, b) => a.y - b.y);
 
+      // 2.1 Memos share the character depth list, so a memo behaves exactly like another
+      // character on the map: someone standing further down covers it, someone standing
+      // further up is covered by it. Anchored a hair above the tile's own top so a character
+      // sharing the memo's tile walks in front of the note rather than behind it.
+      type DepthEntity =
+        | { sortY: number; kind: 'player'; player: PlayerState }
+        | { sortY: number; kind: 'memo'; memo: MapMemo };
+
+      const depthList: DepthEntity[] = renderList.map((player) => ({
+        sortY: player.y,
+        kind: 'player' as const,
+        player
+      }));
+
+      if (memos && memos.length > 0) {
+        memos.forEach((memo) => {
+          if (!memo.mapId || memo.mapId === currentMapId) {
+            depthList.push({ sortY: memo.y - 0.01, kind: 'memo' as const, memo });
+          }
+        });
+        depthList.sort((a, b) => a.sortY - b.sortY);
+      }
+
       // Helper to render a single player on canvas
       const renderPlayer = (player: PlayerState) => {
         // No built-in sprites ship anymore — a player only has an image once they register a
@@ -1525,6 +1548,106 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         ctx.restore();
       };
 
+      // Helper to render a single memo marker on canvas.
+      // Deliberately shows NO content and NO author name — the note is sealed until someone
+      // walks up and opens it. Drawn in world units (16 = one tile) scaled by tileScale so it
+      // stays crisp at every zoom level.
+      const renderMemo = (memo: MapMemo) => {
+        const isNotice = memo.memoType === 'notice';
+        const bounce = isNotice ? 0 : Math.sin(performance.now() / 320 + memo.x * 0.7) * 0.8;
+
+        // Tile origin in canvas px, plus the same half-tile centering the hit tests use
+        const cx = (memo.x / 16) * vSize + vSize / 2;
+        const groundY = (memo.y / 16) * vSize + vSize;
+        const u = (n: number) => n * tileScale; // world unit -> canvas px
+
+        const accent = isNotice ? '#f5c2e7' : '#a78bfa';
+        const accentDark = isNotice ? '#b4568f' : '#6d4bc4';
+        const paperTop = isNotice ? '#fff1f7' : '#f4f1ff';
+        const paperBottom = isNotice ? '#f2d7e7' : '#ded6ff';
+
+        const cardW = u(11);
+        const cardH = u(13);
+        const cardX = Math.round(cx - cardW / 2);
+        const cardY = Math.round(groundY - u(3) - cardH + u(bounce));
+
+        ctx.save();
+
+        // 1. Ground shadow so the note reads as sitting on the tile
+        ctx.beginPath();
+        ctx.ellipse(cx, groundY - u(2), u(4.5), u(1.6), 0, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.fill();
+
+        // 2. Soft attention glow, breathing slowly
+        const pulse = 0.35 + Math.sin(performance.now() / 420) * 0.15;
+        ctx.globalAlpha = pulse;
+        ctx.beginPath();
+        ctx.ellipse(cx, cardY + cardH / 2, u(8), u(8), 0, 0, Math.PI * 2);
+        ctx.fillStyle = accent;
+        ctx.filter = 'blur(4px)';
+        ctx.fill();
+        ctx.filter = 'none';
+        ctx.globalAlpha = 1;
+
+        // 3. Paper card with a folded bottom-right corner
+        const fold = u(4);
+        const cardPath = new Path2D();
+        cardPath.moveTo(cardX, cardY);
+        cardPath.lineTo(cardX + cardW, cardY);
+        cardPath.lineTo(cardX + cardW, cardY + cardH - fold);
+        cardPath.lineTo(cardX + cardW - fold, cardY + cardH);
+        cardPath.lineTo(cardX, cardY + cardH);
+        cardPath.closePath();
+
+        const grad = ctx.createLinearGradient(0, cardY, 0, cardY + cardH);
+        grad.addColorStop(0, paperTop);
+        grad.addColorStop(1, paperBottom);
+        ctx.fillStyle = grad;
+        ctx.fill(cardPath);
+
+        ctx.lineWidth = Math.max(1, u(0.9));
+        ctx.strokeStyle = accentDark;
+        ctx.stroke(cardPath);
+
+        // Fold flap
+        ctx.beginPath();
+        ctx.moveTo(cardX + cardW - fold, cardY + cardH);
+        ctx.lineTo(cardX + cardW - fold, cardY + cardH - fold);
+        ctx.lineTo(cardX + cardW, cardY + cardH - fold);
+        ctx.closePath();
+        ctx.fillStyle = accentDark;
+        ctx.globalAlpha = 0.35;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+        // 4. Abstract "written lines" — shape only, never the real text
+        ctx.fillStyle = accentDark;
+        ctx.globalAlpha = 0.55;
+        const lineH = Math.max(1, u(1));
+        const lineX = cardX + u(2);
+        [u(3), u(5.5), u(8)].forEach((offset, i) => {
+          ctx.fillRect(lineX, cardY + offset, cardW - u(4) - (i === 2 ? u(2.5) : 0), lineH);
+        });
+        ctx.globalAlpha = 1;
+
+        // 5. Type badge: a pin head for notices, a ribbon tie for one-time notes
+        if (isNotice) {
+          ctx.beginPath();
+          ctx.arc(cx, cardY, u(2.2), 0, Math.PI * 2);
+          ctx.fillStyle = '#e64980';
+          ctx.fill();
+          ctx.lineWidth = Math.max(1, u(0.7));
+          ctx.strokeStyle = '#ffffff';
+          ctx.stroke();
+        } else {
+          ctx.fillStyle = accent;
+          ctx.fillRect(cardX, cardY + u(1.5), cardW, u(1.6));
+        }
+
+        ctx.restore();
+      };
+
       // 2.5 Render Base Layer Objects (obj.layer === 'base' - Ground Overlay Objects like Stepping Stones, Rugs)
       // 2.5 Render Base Layer Objects (obj.layer === 'base' - Ground Overlay Objects like Stepping Stones, Rugs)
       if (map.objects && map.objects.length > 0) {
@@ -1656,6 +1779,11 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         });
       }
 
+      const drawDepthEntity = (entity: DepthEntity) => {
+        if (entity.kind === 'player') renderPlayer(entity.player);
+        else renderMemo(entity.memo);
+      };
+
       let renderPlayerIdx = 0;
       for (let ty = 0; ty < map.height; ty++) {
         // A. Render Objects rooted at this row (ty), sorted by zIndex ascending
@@ -1735,17 +1863,17 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
           });
         }
 
-        // B. Render all players whose feet Y falls within or before current row ty
+        // B. Render all players/memos whose feet Y falls within or before current row ty
         const rowBottomY = (ty + 1) * 16;
-        while (renderPlayerIdx < renderList.length && renderList[renderPlayerIdx].y < rowBottomY) {
-          renderPlayer(renderList[renderPlayerIdx]);
+        while (renderPlayerIdx < depthList.length && depthList[renderPlayerIdx].sortY < rowBottomY) {
+          drawDepthEntity(depthList[renderPlayerIdx]);
           renderPlayerIdx++;
         }
       }
 
-      // Render any remaining players beyond bottom map boundary
-      while (renderPlayerIdx < renderList.length) {
-        renderPlayer(renderList[renderPlayerIdx]);
+      // Render any remaining players/memos beyond bottom map boundary
+      while (renderPlayerIdx < depthList.length) {
+        drawDepthEntity(depthList[renderPlayerIdx]);
         renderPlayerIdx++;
       }
 
@@ -1779,60 +1907,6 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
           }
         }
       });
-
-      // 3.5. Render Memos on Map Canvas
-      if (memos && memos.length > 0) {
-        const currentMapMemos = memos.filter(m => !m.mapId || m.mapId === currentMapId);
-        const floatBounce = Math.sin(performance.now() / 250) * 3;
-
-        currentMapMemos.forEach((memo) => {
-          ctx.save();
-
-          const memoCanvasX = (memo.x / 16) * vSize + vSize / 2;
-          const memoCanvasY = (memo.y / 16) * vSize + vSize / 2 + (memo.memoType === 'notice' ? 0 : floatBounce);
-          const isNotice = memo.memoType === 'notice';
-
-          // 1. Glowing outer ring / shadow
-          ctx.beginPath();
-          ctx.arc(memoCanvasX, memoCanvasY, isNotice ? 12 : 10, 0, Math.PI * 2);
-          ctx.fillStyle = isNotice ? 'rgba(245, 194, 231, 0.35)' : 'rgba(167, 139, 250, 0.35)';
-          ctx.fill();
-
-          ctx.lineWidth = 1.5;
-          ctx.strokeStyle = isNotice ? '#f5c2e7' : '#a78bfa';
-          ctx.stroke();
-
-          // 2. Icon Badge
-          ctx.font = '14px Arial, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(isNotice ? '📌' : '📜', memoCanvasX, memoCanvasY);
-
-          // 3. Text Tag above Memo Icon
-          const previewText = memo.content ? (memo.content.length > 10 ? memo.content.slice(0, 10) + '...' : memo.content) : '메모';
-          const tagText = `${memo.authorName || '익명'}: ${previewText}`;
-          
-          ctx.font = '10px "DungGeunMo", monospace, sans-serif';
-          const textW = ctx.measureText(tagText).width + 10;
-          const tagH = 16;
-          const tagX = memoCanvasX - textW / 2;
-          const tagY = memoCanvasY - 24;
-
-          ctx.fillStyle = 'rgba(15, 15, 25, 0.88)';
-          ctx.strokeStyle = isNotice ? '#f5c2e7' : '#a78bfa';
-          ctx.lineWidth = 1;
-
-          ctx.beginPath();
-          ctx.roundRect(tagX, tagY, textW, tagH, 4);
-          ctx.fill();
-          ctx.stroke();
-
-          ctx.fillStyle = isNotice ? '#f5c2e7' : '#ffffff';
-          ctx.fillText(tagText, memoCanvasX, tagY + tagH / 2);
-
-          ctx.restore();
-        });
-      }
 
       // 3.6. Render Animated RPG Movement Click Target Markers
       const nowMs = performance.now();

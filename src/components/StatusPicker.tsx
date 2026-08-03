@@ -1,5 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Smile, HelpCircle } from 'lucide-react';
+
+const POPOVER_WIDTH = 240;
+const TOOLTIP_WIDTH = 220;
 
 interface StatusPickerProps {
   currentStatus: string;
@@ -17,14 +21,18 @@ export const StatusPicker: React.FC<StatusPickerProps> = ({ currentStatus, onSta
   const [coords, setCoords] = useState<{ bottom: number; left: number }>({ bottom: 50, left: 10 });
   const [tooltipCoords, setTooltipCoords] = useState<{ bottom: number; left: number }>({ bottom: 50, left: 200 });
 
+  // Anchor the popover right above the status button (viewport coords)
+  const syncCoords = () => {
+    if (!buttonRef.current) return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    setCoords({
+      bottom: Math.max(10, window.innerHeight - rect.top + 6),
+      left: Math.max(10, Math.min(rect.left, window.innerWidth - POPOVER_WIDTH - 10))
+    });
+  };
+
   const toggleOpen = () => {
-    if (!isOpen && buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect();
-      setCoords({
-        bottom: Math.max(10, window.innerHeight - rect.top + 6),
-        left: Math.max(10, Math.min(rect.left, window.innerWidth - 250))
-      });
-    }
+    if (!isOpen) syncCoords();
     setIsOpen(!isOpen);
   };
 
@@ -33,7 +41,7 @@ export const StatusPicker: React.FC<StatusPickerProps> = ({ currentStatus, onSta
       const rect = helpRef.current.getBoundingClientRect();
       setTooltipCoords({
         bottom: Math.max(10, window.innerHeight - rect.top + 8),
-        left: Math.max(10, Math.min(rect.left - 100, window.innerWidth - 230))
+        left: Math.max(10, Math.min(rect.left - 100, window.innerWidth - TOOLTIP_WIDTH - 10))
       });
     }
     setShowTooltip(true);
@@ -47,6 +55,13 @@ export const StatusPicker: React.FC<StatusPickerProps> = ({ currentStatus, onSta
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  // Keep the popover glued to the button when the layout shifts
+  useEffect(() => {
+    if (!isOpen) return;
+    window.addEventListener('resize', syncCoords);
+    return () => window.removeEventListener('resize', syncCoords);
+  }, [isOpen]);
 
   const handleSelect = (status: string) => {
     onStatusChange(status);
@@ -90,21 +105,24 @@ export const StatusPicker: React.FC<StatusPickerProps> = ({ currentStatus, onSta
         >
           <HelpCircle size={14} style={{ color: 'rgba(255, 255, 255, 0.4)' }} />
           
-          {showTooltip && (
+          {showTooltip && createPortal(
             <div style={{
               position: 'fixed', bottom: `${tooltipCoords.bottom}px`, left: `${tooltipCoords.left}px`,
-              width: '220px', padding: '10px 12px', zIndex: 99999, fontSize: '11px', lineHeight: '1.4',
+              width: `${TOOLTIP_WIDTH}px`, padding: '10px 12px', zIndex: 99999, fontSize: '11px', lineHeight: '1.4',
               color: '#cdd6f4', background: 'rgba(15, 15, 25, 0.96)', border: '1px solid rgba(255,255,255,0.22)',
               borderRadius: '6px', pointerEvents: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.6)'
             }}>
               💡 <strong>오프라인 상태 유지</strong>: 브라우저를 닫더라도 설정하신 상태가 캐릭터 머리 위에 계속 유지됩니다!
-            </div>
+            </div>,
+            document.body
           )}
         </div>
       </div>
 
-      {/* Fixed position popover - NEVER clipped by chat container overflow! */}
-      {isOpen && (
+      {/* Portalled to <body>: the chat box uses transform/backdrop-filter, which would
+          otherwise make it the containing block for position:fixed and shove this popover
+          away from the button. */}
+      {isOpen && createPortal(
         <>
           {/* Overlay to close when clicking outside */}
           <div
@@ -117,7 +135,7 @@ export const StatusPicker: React.FC<StatusPickerProps> = ({ currentStatus, onSta
 
           <div 
             style={{
-              position: 'fixed', bottom: `${coords.bottom}px`, left: `${coords.left}px`, width: '240px',
+              position: 'fixed', bottom: `${coords.bottom}px`, left: `${coords.left}px`, width: `${POPOVER_WIDTH}px`,
               padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px',
               zIndex: 99999, border: '1px solid rgba(255, 255, 255, 0.25)',
               borderRadius: '6px', background: 'rgba(20, 20, 32, 0.96)',
@@ -189,7 +207,8 @@ export const StatusPicker: React.FC<StatusPickerProps> = ({ currentStatus, onSta
               </button>
             </form>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );
