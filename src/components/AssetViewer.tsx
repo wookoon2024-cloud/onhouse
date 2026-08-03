@@ -755,6 +755,10 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
   const [isBoxDragging, setIsBoxDragging] = useState<boolean>(false);
   const [boxDragStart, setBoxDragStart] = useState<{ startX: number; startY: number; initRectX: number; initRectY: number } | null>(null);
   const cropViewportRef = useRef<HTMLDivElement | null>(null);
+  // The panel root carries `transform: translate(-50%, -50%)` for centering, which makes it the
+  // containing block for its position:fixed descendants. Anything anchored to the cursor therefore
+  // has to be expressed relative to this element, not to the viewport.
+  const panelRef = useRef<HTMLDivElement | null>(null);
 
   // New Action Row Prompt State
   const [showAddRowModal, setShowAddRowModal] = useState<boolean>(false);
@@ -1062,9 +1066,20 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
     e.preventDefault();
     e.stopPropagation();
     setSelectedTileState({ col, row, index: row * currentOption.cols + col });
+
+    // clientX/clientY are viewport coordinates, but the menu is a fixed child of the transformed
+    // panel, so they have to be rebased onto the panel's box — otherwise the menu is pushed away
+    // from the cursor by exactly the panel's offset from the top-left of the screen.
+    // Clamp in viewport space first so a right-click near an edge doesn't push the menu offscreen.
+    const MENU_W = 176;
+    const MENU_H = 216;
+    const vx = Math.min(e.clientX, window.innerWidth - MENU_W - 8);
+    const vy = Math.min(e.clientY, window.innerHeight - MENU_H - 8);
+    const rect = panelRef.current?.getBoundingClientRect();
+
     setContextMenuTile({
-      x: e.clientX,
-      y: e.clientY,
+      x: vx - (rect?.left ?? 0),
+      y: vy - (rect?.top ?? 0),
       col,
       row
     });
@@ -3459,7 +3474,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
 
   return (
     <AssetViewerErrorBoundary>
-    <div style={{
+    <div ref={panelRef} style={{
       position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
       width: '920px', maxWidth: '85vw', height: '72vh', maxHeight: '660px',
       zIndex: 150, padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: '10px',
