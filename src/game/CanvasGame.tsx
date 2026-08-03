@@ -1944,6 +1944,66 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
       });
 
       ctx.restore(); // Restore camera translation
+
+      // 5. Minimap HUD (top-right). Drawn after the camera restore so it stays pinned to the screen,
+      // and before the DPR restore so the numbers below are plain CSS pixels. The whole map is
+      // already baked into offCanvas at 16px/tile for the background pass, so the cost here is one
+      // extra scaled drawImage plus a dot per player — the map is never re-rasterized for this.
+      // Hidden on mobile (it would eat scarce screen) and in edit mode (the editor has its own
+      // whole-map view and its panels overlap this corner).
+      if (!isMobile && !isEditMode && targetW > 0 && targetH > 0) {
+        const MM_MAX = 140; // longest side, in CSS px
+        const MM_PAD = 10;
+        const mmScale = Math.min(MM_MAX / targetW, MM_MAX / targetH);
+        const mmW = Math.max(1, Math.round(targetW * mmScale));
+        const mmH = Math.max(1, Math.round(targetH * mmScale));
+        const mmX = Math.round(dimensions.width - mmW - MM_PAD);
+        const mmY = MM_PAD;
+
+        ctx.save();
+
+        // Same translucent slate as the chat box, so it reads as one HUD
+        ctx.beginPath();
+        ctx.roundRect(mmX - 3, mmY - 3, mmW + 6, mmH + 6, 6);
+        ctx.fillStyle = 'rgba(15, 15, 25, 0.88)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(mmX, mmY, mmW, mmH, 4);
+        ctx.clip(); // keep the scaled map inside the rounded corners
+        // Smoothing is enabled for this one draw: the baked canvas is many times larger than the
+        // destination, and nearest-neighbour at that reduction turns the tiles into shimmering
+        // noise that crawls whenever anything re-bakes.
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(offCanvas, 0, 0, targetW, targetH, mmX, mmY, mmW, mmH);
+        ctx.restore();
+
+        // Player dots. renderList already holds everyone on this map and carries the same smoothed
+        // remote positions the sprites are drawn at, so the dots never lag the characters.
+        renderList.forEach((mp) => {
+          const isSelf = mp.id === p.id;
+          const cx = mmX + Math.min(mmW, Math.max(0, (mp.x + 8) * mmScale));
+          const cy = mmY + Math.min(mmH, Math.max(0, (mp.y + 8) * mmScale));
+          const r = isSelf ? 3.2 : 2.2;
+
+          ctx.beginPath();
+          ctx.arc(cx, cy, r + 1, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; // outline, so a dot never vanishes into the floor
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          ctx.fillStyle = isSelf ? '#ffd93d' : (mp.isOnline ? '#6ee7ff' : 'rgba(255, 255, 255, 0.45)');
+          ctx.fill();
+        });
+
+        ctx.restore();
+      }
+
       ctx.restore(); // Restore DPR scaling
 
       animId = requestAnimationFrame(render);
@@ -1954,7 +2014,9 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
     return () => {
       cancelAnimationFrame(animId);
     };
-  }, [assetsLoaded, images, currentMapId, dimensions, otherPlayers, offlinePlayers, chatBubbles, isEditMode, mapData]);
+    // isMobile is resolved in its own effect after mount, so it has to be a dependency here or the
+    // very first render loop would close over `false` and show the minimap on a phone.
+  }, [assetsLoaded, images, currentMapId, dimensions, otherPlayers, offlinePlayers, chatBubbles, isEditMode, mapData, isMobile]);
 
   // Click on Canvas handler to interact with characters, memos, or walk to floor destination
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
