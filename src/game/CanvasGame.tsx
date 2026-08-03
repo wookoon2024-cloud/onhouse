@@ -396,6 +396,10 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
   const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const offscreenKeyRef = useRef<string>('');
 
+  // Current minimap opacity, eased toward its target every frame so walking under the panel fades
+  // it rather than blinking it.
+  const minimapAlphaRef = useRef<number>(1);
+
   useEffect(() => {
     const handleSpawnParticle = (e: Event) => {
       const detail = (e as CustomEvent).detail;
@@ -1989,7 +1993,24 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         const mmX = panelX + MM_INNER;
         const mmY = panelY + MM_TITLE;
 
+        // The character is drawn in world space and this panel in screen space, so nothing stops
+        // them overlapping — walk into the top-right corner of a map and the HUD sits on top of you.
+        // Fade the panel down while the local player is under it: the minimap stays readable enough
+        // to keep your bearings, and the character stays visible. Only the local player counts;
+        // reacting to everyone would make it flicker whenever somebody walked past that corner.
+        const pScreenX = p.x * tileScale - cameraX;
+        const pScreenY = p.y * tileScale - cameraY;
+        const overlaps =
+          pScreenX + vSize * 1.5 > panelX && pScreenX - vSize * 0.5 < panelX + panelW &&
+          pScreenY + vSize > panelY && pScreenY - vSize * 2 < panelY + panelH;
+
+        // Generous vertical margin above the feet covers tall custom sprites and the nickname tag.
+        const targetAlpha = overlaps ? 0.28 : 1;
+        minimapAlphaRef.current += (targetAlpha - minimapAlphaRef.current) * 0.18;
+        if (Math.abs(targetAlpha - minimapAlphaRef.current) < 0.01) minimapAlphaRef.current = targetAlpha;
+
         ctx.save();
+        ctx.globalAlpha = minimapAlphaRef.current;
 
         // Frame: same translucent slate as the chat box so it belongs to the same HUD, but a touch
         // more opaque and a heavier border — at this size the thin 1px chat border read as a plain
