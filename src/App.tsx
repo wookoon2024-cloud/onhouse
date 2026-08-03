@@ -2946,6 +2946,7 @@ export default function App() {
       {/* 6.5. Asset Viewer (Dev Tool) */}
       {showAssetViewer && (
         <AssetViewer
+          currentSpriteType={localPlayer.spriteType}
           dbCustomCharSprites={dbCustomCharSprites}
           dbCharOverrides={dbCharOverrides}
           onClose={() => setShowAssetViewer(false)}

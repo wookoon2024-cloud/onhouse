@@ -3,7 +3,7 @@ import {
   Layers, User, X, Sparkles, ZoomIn, Plus, Trash2, Upload, Download,
   Pin, Pencil, Eraser, Palette, Save, RotateCcw, Grid, Minus,
   Copy, Clipboard, Trash, Crop, Check, Move, FlipHorizontal, Loader2, Scissors,
-  ArrowUp, ArrowDown, ArrowLeft, ArrowRight
+  ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Pipette
 } from 'lucide-react';
 import { DEFAULT_CHAR_ROW_ACTIONS, getCharRowActions } from '../game/MapData';
 import { saveHouseAssetToDB, deleteHouseAssetFromDB, getSavedHouseCode, publishItemToMarket } from '../services/HouseService';
@@ -156,6 +156,21 @@ const PALETTE_COLORS = [
   '#333333', '#89b4fa', '#f5c2e7', 'transparent'
 ];
 
+export type PixelDrawTool = 'pencil' | 'eraser' | 'chroma';
+
+// '#rrggbb' -> {r,g,b}. Returns null for 'transparent' or anything not in that form, which is
+// what keeps the chroma tool from ever matching against already-cleared cells.
+const parseHexColor = (color: string): { r: number; g: number; b: number } | null => {
+  if (!color || typeof color !== 'string') return null;
+  const hex = color.trim().toLowerCase();
+  if (!/^#[0-9a-f]{6}$/.test(hex)) return null;
+  return {
+    r: parseInt(hex.slice(1, 3), 16),
+    g: parseInt(hex.slice(3, 5), 16),
+    b: parseInt(hex.slice(5, 7), 16)
+  };
+};
+
 interface PixelEditorCanvasProps {
   pixelGrid: string[][];
   editorGridResW: number;
@@ -164,8 +179,12 @@ interface PixelEditorCanvasProps {
   showBorders: boolean;
   showCenterCrosshair?: boolean;
   brushSize: number;
-  drawTool: 'pencil' | 'eraser';
+  drawTool: PixelDrawTool;
   selectedColor: string;
+  /** Max per-channel RGB distance still treated as "the same colour" by the chroma tool.
+   *  0 clears only exact matches, which is what you want for flat pixel art; raise it to catch
+   *  the near-identical shades an imported/anti-aliased image leaves behind. */
+  chromaTolerance: number;
   isSpaceDown: boolean;
   isEditorPanning: boolean;
   editorPan: { x: number; y: number };
@@ -182,6 +201,7 @@ const PixelEditorCanvas: React.FC<PixelEditorCanvasProps> = ({
   brushSize,
   drawTool,
   selectedColor,
+  chromaTolerance,
   isSpaceDown,
   isEditorPanning,
   editorPan,
@@ -268,17 +288,25 @@ const PixelEditorCanvas: React.FC<PixelEditorCanvasProps> = ({
       ctx.setLineDash([]); // Reset line dash
     }
 
-    // Hover Brush Size Box Preview Overlay
+    // Hover Brush Size Box Preview Overlay.
+    // Chroma ignores brush size (it acts on the whole board), so it previews a single cell —
+    // showing a 16px square for a tool that clears by colour would badly misrepresent the click.
     if (hoverCell && !isSpaceDown && !isEditorPanning) {
+      const isChroma = drawTool === 'chroma';
+      const previewCells = isChroma ? 1 : brushSize;
       const bx = hoverCell.x * cellSizePx;
       const by = hoverCell.y * cellSizePx;
-      const bw = Math.min(brushSize, editorGridResW - hoverCell.x) * cellSizePx;
-      const bh = Math.min(brushSize, editorGridResH - hoverCell.y) * cellSizePx;
+      const bw = Math.min(previewCells, editorGridResW - hoverCell.x) * cellSizePx;
+      const bh = Math.min(previewCells, editorGridResH - hoverCell.y) * cellSizePx;
 
-      ctx.fillStyle = drawTool === 'eraser' ? 'rgba(255, 99, 99, 0.35)' : 'rgba(167, 139, 250, 0.35)';
+      ctx.fillStyle = isChroma
+        ? 'rgba(255, 121, 198, 0.35)'
+        : drawTool === 'eraser'
+          ? 'rgba(255, 99, 99, 0.35)'
+          : 'rgba(167, 139, 250, 0.35)';
       ctx.fillRect(bx, by, bw, bh);
 
-      ctx.strokeStyle = drawTool === 'eraser' ? '#ff4444' : '#a78bfa';
+      ctx.strokeStyle = isChroma ? '#ff79c6' : drawTool === 'eraser' ? '#ff4444' : '#a78bfa';
       ctx.lineWidth = Math.max(1, Math.floor(cellSizePx / 4));
       ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
     }
@@ -299,7 +327,7 @@ const PixelEditorCanvas: React.FC<PixelEditorCanvasProps> = ({
     }
   };
 
-  const handlePointerAction = (e: React.PointerEvent<HTMLCanvasElement>) => {
+  const handlePointerAction = (e: React.PointerEvent<HTMLCanvasElement>, isInitialPress = false) => {
     if (isSpaceDown || isEditorPanning || (e.button !== undefined && e.button !== 0 && e.buttons !== 1)) return;
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -311,6 +339,34 @@ const PixelEditorCanvas: React.FC<PixelEditorCanvasProps> = ({
     const y = Math.floor(mouseY / cellSizePx);
 
     if (x < 0 || x >= editorGridResW || y < 0 || y >= editorGridResH) return;
+
+    // Chroma: sample the clicked pixel and clear every pixel of that colour on the board at once.
+    // Press-only — dragging must not keep sampling, or sweeping the cursor after the click would
+    // wipe one colour after another with no way to see it coming.
+    if (drawTool === 'chroma') {
+      if (!isInitialPress) return;
+
+      const picked = parseHexColor(pixelGrid[y]?.[x]);
+      if (!picked) return; // clicked an already-transparent cell — nothing to key out
+
+      let cleared = 0;
+      const nextGrid = pixelGrid.map((row) =>
+        row.map((cell) => {
+          const c = parseHexColor(cell);
+          if (!c) return cell;
+          const withinTolerance =
+            Math.abs(c.r - picked.r) <= chromaTolerance &&
+            Math.abs(c.g - picked.g) <= chromaTolerance &&
+            Math.abs(c.b - picked.b) <= chromaTolerance;
+          if (!withinTolerance) return cell;
+          cleared++;
+          return 'transparent';
+        })
+      );
+
+      if (cleared > 0) onPixelGridChange(nextGrid);
+      return;
+    }
 
     const newColor = drawTool === 'pencil' ? selectedColor : 'transparent';
 
@@ -339,7 +395,7 @@ const PixelEditorCanvas: React.FC<PixelEditorCanvasProps> = ({
       onPointerDown={(e) => {
         isDrawingRef.current = true;
         updateHoverCell(e);
-        handlePointerAction(e);
+        handlePointerAction(e, true);
       }}
       onPointerMove={(e) => {
         updateHoverCell(e);
@@ -425,11 +481,14 @@ const PixelPreviewCanvas: React.FC<{
 interface AssetViewerProps {
   onClose: () => void;
   onSelectTile?: (index: number) => void;
+  /** The sprite the local player is currently wearing, so the editor opens on their own
+   *  character instead of whichever one happens to sort first. */
+  currentSpriteType?: string;
   dbCustomCharSprites?: TilesetOption[];
   dbCharOverrides?: Record<string, { url: string; rows: number; cols: number; size?: number; frameWidth?: number; frameHeight?: number; offsetX?: number; offsetY?: number; spacingX?: number; spacingY?: number }>;
 }
 
-export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile, dbCustomCharSprites, dbCharOverrides }) => {
+export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile, currentSpriteType, dbCustomCharSprites, dbCharOverrides }) => {
   // Character tab active by default
   const [activeTab, setActiveTab] = useState<MainCategory>('character');
   
@@ -548,19 +607,25 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
   });
 
   const [selectedMapId, setSelectedMapId] = useState<string>('interior');
-  const [selectedCharId, setSelectedCharId] = useState<string>('');
+  const [selectedCharId, setSelectedCharId] = useState<string>(currentSpriteType || '');
   const [gridZoom, setGridZoom] = useState<number>(1.5);
 
   // Keep selectedCharId pointing at a real character whenever one exists. Without this, the
   // dropdown/board can visually show the first available character (currentOption falls back to
   // currentOptionList[0] for display) while selectedCharId itself stays '' — every save handler
   // that keys off selectedCharId then silently writes/reads under an empty id.
+  //
+  // Preference order is the player's own sprite first, then the head of the list. The character
+  // list usually arrives a beat after mount (it's fetched from the DB), so the initial state
+  // above can't do this on its own. This only runs when the current selection isn't a real
+  // character, so it never overrides a pick the user just made in the dropdown.
   useEffect(() => {
     if (customCharSprites.length === 0) return;
     if (!customCharSprites.some((c) => c.id === selectedCharId)) {
-      setSelectedCharId(customCharSprites[0].id);
+      const ownSprite = customCharSprites.find((c) => c.id === currentSpriteType);
+      setSelectedCharId(ownSprite ? ownSprite.id : customCharSprites[0].id);
     }
-  }, [customCharSprites, selectedCharId]);
+  }, [customCharSprites, selectedCharId, currentSpriteType]);
 
   // Temporary string state for direct typing in 맵 출력 크기 input box
   const [sizeInputText, setSizeInputText] = useState<string | null>(null);
@@ -625,8 +690,11 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
   const [editorZoom, setEditorZoom] = useState<number>(1.0); // Board zoom scale (1x, 1.5x, 2x, 3x, 4x)
   const [pixelGrid, setPixelGrid] = useState<string[][]>(Array.from({ length: 32 }, () => Array(32).fill('transparent')));
   const [selectedColor, setSelectedColor] = useState<string>('#ff0000');
-  const [drawTool, setDrawTool] = useState<'pencil' | 'eraser'>('pencil');
+  const [drawTool, setDrawTool] = useState<PixelDrawTool>('pencil');
   const [brushSize, setBrushSize] = useState<number>(1);
+  // Tolerance for the pixel board's own chroma tool. Separate from chromaTolerance, which belongs
+  // to the upload modal and operates on the source image rather than the drawn grid.
+  const [pixelChromaTolerance, setPixelChromaTolerance] = useState<number>(0);
   const [showCenterCrosshair, setShowCenterCrosshair] = useState<boolean>(true);
   const [isMouseDown, setIsMouseDown] = useState<boolean>(false);
   const [editorPan, setEditorPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -4089,8 +4157,36 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
                   >
                     <Eraser size={11} /> 지우개
                   </button>
+                  <button
+                    onClick={() => setDrawTool('chroma')}
+                    style={{
+                      padding: '4px 8px', fontSize: '10px', borderRadius: '4px',
+                      background: drawTool === 'chroma' ? '#ff79c6' : 'rgba(255,255,255,0.08)',
+                      color: drawTool === 'chroma' ? '#000' : '#fff', border: 'none', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: '3px', fontWeight: drawTool === 'chroma' ? 'bold' : 'normal'
+                    }}
+                    title="클릭한 픽셀과 같은 색을 보드 전체에서 한 번에 지웁니다 (배경 투명화)"
+                  >
+                    <Pipette size={11} /> 배경 투명화
+                  </button>
+                  {drawTool === 'chroma' && (
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: '5px', padding: '2px 8px',
+                      background: 'rgba(255, 121, 198, 0.12)', border: '1px solid #ff79c6', borderRadius: '4px'
+                    }}>
+                      <span style={{ fontSize: '9px', color: '#ff79c6', whiteSpace: 'nowrap' }}>
+                        허용 오차 {pixelChromaTolerance}
+                      </span>
+                      <input
+                        type="range" min={0} max={80} value={pixelChromaTolerance}
+                        onChange={(e) => setPixelChromaTolerance(parseInt(e.target.value, 10))}
+                        style={{ width: '70px', accentColor: '#ff79c6', cursor: 'pointer' }}
+                        title="0이면 완전히 같은 색만, 값을 올리면 비슷한 색까지 함께 지웁니다"
+                      />
+                    </div>
+                  )}
                   <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)', height: '24px', margin: '0 4px' }} />
-                  {[1, 2, 3, 4, 16, 20, 32].map(size => (
+                  {[1, 2, 4, 16, 32].map(size => (
                     <button
                       key={`brush-${size}`}
                       onClick={() => setBrushSize(size)}
@@ -4339,6 +4435,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
                           brushSize={brushSize}
                           drawTool={drawTool}
                           selectedColor={selectedColor}
+                          chromaTolerance={pixelChromaTolerance}
                           isSpaceDown={isSpaceDown}
                           isEditorPanning={isEditorPanning}
                           editorPan={editorPan}
