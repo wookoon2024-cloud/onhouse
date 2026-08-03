@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { type MapDefinition, type MapObjectInstance, cleanDuplicateObjects, getCharRowActions, getCharGridDimensions, getCharDisplaySize, getCustomCharSpriteInfo, getNormalizedLayers, findValidSpawnPosition, isPlayerCollidingAt } from './MapData';
 import type { PlayerState } from './syncManager';
 import { getDyedSprite } from './spriteDyer';
+import { getMemoCard, getMemoGlow, memoCardOrigin, memoCardSize, memoGlowRadius } from './memoMarker';
 
 // Image asset paths (relative to root)
 import interiorTilesUrl from '../assets/interior_tiles.png';
@@ -1550,8 +1551,12 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
 
       // Helper to render a single memo marker on canvas.
       // Deliberately shows NO content and NO author name — the note is sealed until someone
-      // walks up and opens it. Drawn in world units (16 = one tile) scaled by tileScale so it
-      // stays crisp at every zoom level.
+      // walks up and opens it. The art itself is baked once per zoom level in memoMarker.ts;
+      // only the bounce offset and the glow alpha change per frame.
+      const memoCardOffset = memoCardOrigin(tileScale);
+      const memoCardDims = memoCardSize(tileScale);
+      const glowR = memoGlowRadius(tileScale);
+
       const renderMemo = (memo: MapMemo) => {
         const isNotice = memo.memoType === 'notice';
         const bounce = isNotice ? 0 : Math.sin(performance.now() / 320 + memo.x * 0.7) * 0.8;
@@ -1561,89 +1566,32 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         const groundY = (memo.y / 16) * vSize + vSize;
         const u = (n: number) => n * tileScale; // world unit -> canvas px
 
-        const accent = isNotice ? '#f5c2e7' : '#a78bfa';
-        const accentDark = isNotice ? '#b4568f' : '#6d4bc4';
-        const paperTop = isNotice ? '#fff1f7' : '#f4f1ff';
-        const paperBottom = isNotice ? '#f2d7e7' : '#ded6ff';
-
-        const cardW = u(11);
-        const cardH = u(13);
-        const cardX = Math.round(cx - cardW / 2);
-        const cardY = Math.round(groundY - u(3) - cardH + u(bounce));
+        const cardX = Math.round(cx - memoCardDims.width / 2);
+        const cardY = Math.round(groundY - u(3) - memoCardDims.height + u(bounce));
 
         ctx.save();
 
-        // 1. Ground shadow so the note reads as sitting on the tile
+        // 1. Ground shadow so the note reads as sitting on the tile (stays put while it floats)
         ctx.beginPath();
         ctx.ellipse(cx, groundY - u(2), u(4.5), u(1.6), 0, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
         ctx.fill();
 
         // 2. Soft attention glow, breathing slowly
-        const pulse = 0.35 + Math.sin(performance.now() / 420) * 0.15;
-        ctx.globalAlpha = pulse;
-        ctx.beginPath();
-        ctx.ellipse(cx, cardY + cardH / 2, u(8), u(8), 0, 0, Math.PI * 2);
-        ctx.fillStyle = accent;
-        ctx.filter = 'blur(4px)';
-        ctx.fill();
-        ctx.filter = 'none';
+        ctx.globalAlpha = 0.35 + Math.sin(performance.now() / 420) * 0.15;
+        ctx.drawImage(
+          getMemoGlow(memo.memoType, tileScale),
+          Math.round(cx - glowR),
+          Math.round(cardY + memoCardDims.height / 2 - glowR)
+        );
         ctx.globalAlpha = 1;
 
-        // 3. Paper card with a folded bottom-right corner
-        const fold = u(4);
-        const cardPath = new Path2D();
-        cardPath.moveTo(cardX, cardY);
-        cardPath.lineTo(cardX + cardW, cardY);
-        cardPath.lineTo(cardX + cardW, cardY + cardH - fold);
-        cardPath.lineTo(cardX + cardW - fold, cardY + cardH);
-        cardPath.lineTo(cardX, cardY + cardH);
-        cardPath.closePath();
-
-        const grad = ctx.createLinearGradient(0, cardY, 0, cardY + cardH);
-        grad.addColorStop(0, paperTop);
-        grad.addColorStop(1, paperBottom);
-        ctx.fillStyle = grad;
-        ctx.fill(cardPath);
-
-        ctx.lineWidth = Math.max(1, u(0.9));
-        ctx.strokeStyle = accentDark;
-        ctx.stroke(cardPath);
-
-        // Fold flap
-        ctx.beginPath();
-        ctx.moveTo(cardX + cardW - fold, cardY + cardH);
-        ctx.lineTo(cardX + cardW - fold, cardY + cardH - fold);
-        ctx.lineTo(cardX + cardW, cardY + cardH - fold);
-        ctx.closePath();
-        ctx.fillStyle = accentDark;
-        ctx.globalAlpha = 0.35;
-        ctx.fill();
-        ctx.globalAlpha = 1;
-
-        // 4. Abstract "written lines" — shape only, never the real text
-        ctx.fillStyle = accentDark;
-        ctx.globalAlpha = 0.55;
-        const lineH = Math.max(1, u(1));
-        const lineX = cardX + u(2);
-        [u(3), u(5.5), u(8)].forEach((offset, i) => {
-          ctx.fillRect(lineX, cardY + offset, cardW - u(4) - (i === 2 ? u(2.5) : 0), lineH);
-        });
-        ctx.globalAlpha = 1;
-
-        // 5. Type badge: a pin head for notices, a ribbon tie for one-time notes
-        if (isNotice) {
-          ctx.beginPath();
-          ctx.arc(cx, cardY, u(2.2), 0, Math.PI * 2);
-          ctx.fillStyle = '#e64980';
-          ctx.fill();
-          ctx.lineWidth = Math.max(1, u(0.7));
-          ctx.strokeStyle = '#ffffff';
-          ctx.stroke();
-        } else {
-          ctx.fillStyle = accent;
-          ctx.fillRect(cardX, cardY + u(1.5), cardW, u(1.6));
-        }
+        // 3. The card itself
+        ctx.drawImage(
+          getMemoCard(memo.memoType, tileScale),
+          cardX + memoCardOffset.x,
+          cardY + memoCardOffset.y
+        );
 
         ctx.restore();
       };
