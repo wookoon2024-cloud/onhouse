@@ -755,10 +755,6 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
   const [isBoxDragging, setIsBoxDragging] = useState<boolean>(false);
   const [boxDragStart, setBoxDragStart] = useState<{ startX: number; startY: number; initRectX: number; initRectY: number } | null>(null);
   const cropViewportRef = useRef<HTMLDivElement | null>(null);
-  // The panel root carries `transform: translate(-50%, -50%)` for centering, which makes it the
-  // containing block for its position:fixed descendants. Anything anchored to the cursor therefore
-  // has to be expressed relative to this element, not to the viewport.
-  const panelRef = useRef<HTMLDivElement | null>(null);
 
   // New Action Row Prompt State
   const [showAddRowModal, setShowAddRowModal] = useState<boolean>(false);
@@ -1067,19 +1063,15 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
     e.stopPropagation();
     setSelectedTileState({ col, row, index: row * currentOption.cols + col });
 
-    // clientX/clientY are viewport coordinates, but the menu is a fixed child of the transformed
-    // panel, so they have to be rebased onto the panel's box — otherwise the menu is pushed away
-    // from the cursor by exactly the panel's offset from the top-left of the screen.
-    // Clamp in viewport space first so a right-click near an edge doesn't push the menu offscreen.
+    // The panel no longer creates a containing block, so these viewport coordinates land the menu
+    // on the cursor directly. Clamped so a right-click near the bottom or right edge doesn't push
+    // the menu off screen.
     const MENU_W = 176;
     const MENU_H = 216;
-    const vx = Math.min(e.clientX, window.innerWidth - MENU_W - 8);
-    const vy = Math.min(e.clientY, window.innerHeight - MENU_H - 8);
-    const rect = panelRef.current?.getBoundingClientRect();
 
     setContextMenuTile({
-      x: vx - (rect?.left ?? 0),
-      y: vy - (rect?.top ?? 0),
+      x: Math.max(8, Math.min(e.clientX, window.innerWidth - MENU_W - 8)),
+      y: Math.max(8, Math.min(e.clientY, window.innerHeight - MENU_H - 8)),
       col,
       row
     });
@@ -3474,8 +3466,13 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
 
   return (
     <AssetViewerErrorBoundary>
-    <div ref={panelRef} style={{
-      position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
+    <div style={{
+      // Centred with auto margins rather than translate(-50%, -50%): a transform would make this
+      // element the containing block for every position:fixed descendant, which quietly trapped the
+      // full-screen modal backdrops inside the panel and pushed the cursor-anchored context menu
+      // away from the pointer. Auto margins centre the same way without creating that containing
+      // block, so fixed children resolve against the viewport as intended.
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, margin: 'auto',
       width: '920px', maxWidth: '85vw', height: '72vh', maxHeight: '660px',
       zIndex: 150, padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: '10px',
       border: '1px solid #585b70', background: '#161622',
