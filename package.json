@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "clean": "node -e \"require('fs').promises.rm('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && vite build",
     "lint": "oxlint",
     "preview": "vite preview"
   },

@@ -540,8 +540,22 @@ export const fetchHouseAssets = async (houseCode: string) => {
 
     console.log(`[OnHouse DB Sync] ✨ Active DB Assets Loaded -> charSprites: ${charSprites.length} (${charSprites.map(c => c.name || c.id).join(', ')}), mapTilesets: ${mapTilesets.length}`);
 
+    // Drop char_sprite rows that have no image anywhere. A healthy character is always a PAIR:
+    // the char_sprite row (metadata; its DataURL is deliberately stripped on save, see
+    // doSaveHouseAssetToDB) plus a char_image_override row holding the actual sheet. A sprite row
+    // with neither its own url nor a matching override cannot render — it shows up in the picker
+    // as a broken image labelled with its own raw id. These orphans are left behind when a delete
+    // removes the image row while a concurrent save re-inserts the metadata row. Hiding them here
+    // means existing garbage disappears from every client without touching the DB.
+    const usableCharSprites = charSprites.filter((c) => {
+      if (c.url || charOverrides[c.id]?.url) return true;
+      console.warn(`[OnHouse DB Sync] 🗑️ Skipping image-less char_sprite "${c.name || c.id}" (no url and no char_image_override row).`);
+      return false;
+    });
+    console.log(`[OnHouse DB Sync] ✨ Usable charSprites after image check: ${usableCharSprites.length} of ${charSprites.length}`);
+
     // Supabase DB is 100% Single Source of Truth for all house assets!
-    const finalCharSprites = [...charSprites];
+    const finalCharSprites = [...usableCharSprites];
     const finalMapTilesets = [...mapTilesets];
 
     // Safely restore any custom map tilesets from local cache if missing from DB, and re-sync to DB!

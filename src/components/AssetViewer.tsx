@@ -732,17 +732,26 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
     
     Object.entries(charImageOverrides).forEach(([id, override]) => {
       if (!id) return; // No character selected — never persist a blank-id row.
+      const foundOpt = customCharSprites.find((c) => c.id === id);
+      // An override with no matching entry in the character list is a leftover: the character was
+      // deleted (this effect runs on every override-map change, so it sweeps up stale keys long
+      // after the delete) or the DB sync replaced the list without it. Writing it out anyway used
+      // to invent a char_sprite row named after its own raw id — `name: id`, `isCustom: false` —
+      // while the matching char_image_override row stayed deleted, producing an unrenderable
+      // "custom_char_<timestamp>" entry that no longer maps to any real character. Confirmed live
+      // in house H-1001: three such rows, all carrying exactly that signature. Never resurrect a
+      // character the list does not know about.
+      if (!foundOpt) return;
       const prevOverride = prevOverrides[id];
       if (override && override.url && (!prevOverride || prevOverride.url !== override.url || prevOverride.cols !== override.cols || prevOverride.rows !== override.rows || prevOverride.size !== override.size)) {
-        const foundOpt = customCharSprites.find((c) => c.id === id);
         const assetData = {
           id,
-          name: foundOpt?.name || id,
+          name: foundOpt.name || id,
           url: override.url,
-          cols: override.cols || foundOpt?.cols || 4,
-          rows: override.rows || foundOpt?.rows || 7,
+          cols: override.cols || foundOpt.cols || 4,
+          rows: override.rows || foundOpt.rows || 7,
           size: override.size || 32,
-          isCustom: foundOpt?.isCustom || false
+          isCustom: foundOpt.isCustom || false
         };
 
         // Save to Supabase DB
@@ -2656,11 +2665,23 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
   // 📏 Update custom character display size on map (in px)
   const handleUpdateCharacterDisplaySize = (charId: string, newSize: number) => {
     if (!charId) return; // No character selected (e.g. house has none yet) — nothing to save.
+
+    // Resolve the character being resized from its own id. `currentOption` falls back to
+    // currentOptionList[0] whenever selectedCharId doesn't match a list entry, so reading the
+    // payload off it could write this size onto a completely different character. Bail out if the
+    // id isn't a real character — resizing an entry that no longer exists used to insert a
+    // char_sprite row with no matching char_image_override, i.e. more unrenderable garbage.
+    const targetOption = charOptions.find((c) => c.id === charId);
+    if (!targetOption) {
+      console.warn(`[OnHouse DisplaySize] Ignoring resize for unknown character id "${charId}".`);
+      return;
+    }
+
     setCharImageOverrides((prev) => {
       const existing = prev[charId] || {
-        url: currentOption.url,
-        rows: currentOption.rows,
-        cols: currentOption.cols,
+        url: targetOption.url,
+        rows: targetOption.rows,
+        cols: targetOption.cols,
         size: newSize
       };
       const updated = {
@@ -2687,14 +2708,14 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
     });
 
     const currentHouse = getSavedHouseCode();
-    
+
     const updatedOption = {
-      ...currentOption,
+      ...targetOption,
       size: newSize
     };
-    
+
     saveHouseAssetToDB(currentHouse, 'char_sprite', updatedOption);
-    
+
     try {
       supabase.channel(`house:${currentHouse}`).send({
         type: 'broadcast',
@@ -2707,7 +2728,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
     } catch (e) {}
 
     window.dispatchEvent(new Event('on_house_sprites_updated'));
-    setToastMessage(`📏 [${currentOption.name}] 맵 출력 크기가 ${newSize}px로 설정되었습니다!`);
+    setToastMessage(`📏 [${targetOption.name}] 맵 출력 크기가 ${newSize}px로 설정되었습니다!`);
   };
 
   // Save new custom asset (Supports character creation by Name Only & Shows Upload Progress!)

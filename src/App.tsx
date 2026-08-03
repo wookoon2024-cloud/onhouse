@@ -898,7 +898,13 @@ export default function App() {
             let next: any[];
             if (idx >= 0) {
               next = [...current];
-              next[idx] = { ...next[idx], ...customCharData };
+              // getCustomCharData falls back to `name: spriteType` when the sender's own list is
+              // missing the metadata, so an incoming name can literally be the raw id. Merging
+              // that in would overwrite a perfectly good local name with "custom_char_<ts>" every
+              // time that player syncs. Keep whatever we already have in that case.
+              const incoming = { ...customCharData };
+              if (incoming.name === incoming.id && next[idx]?.name) delete incoming.name;
+              next[idx] = { ...next[idx], ...incoming };
             } else {
               next = [...current, customCharData];
             }
