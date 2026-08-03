@@ -30,6 +30,10 @@ interface CanvasGameProps {
   onInteractMemo?: (memo: MapMemo) => void;
   onCreateMemoRequest?: (x: number, y: number) => void;
 
+  // Follow Props — id of the player to walk after, or null
+  followTargetId?: string | null;
+  onStopFollow?: (reason: 'manual' | 'gone') => void;
+
   // Editor Props
   isEditMode: boolean;
   isEditorOpen?: boolean;
@@ -333,7 +337,9 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
   memos = [],
   onInteractMemo,
   onCreateMemoRequest,
-  
+  followTargetId = null,
+  onStopFollow,
+
   isEditMode,
   isEditorOpen = false,
   selectedTile,
@@ -409,6 +415,15 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
   useEffect(() => {
     memosRef.current = memos;
   }, [memos]);
+
+  // Follow mode. Held in a ref so the movement loop can clear it the instant the player takes over
+  // with the keyboard, without waiting for a React round trip.
+  const followTargetIdRef = useRef<string | null>(followTargetId);
+  useEffect(() => {
+    followTargetIdRef.current = followTargetId;
+    followRepathRef.current = { at: 0, tx: -1, ty: -1 };
+  }, [followTargetId]);
+  const followRepathRef = useRef<{ at: number; tx: number; ty: number }>({ at: 0, tx: -1, ty: -1 });
 
   useEffect(() => {
     const handleSpawnParticle = (e: Event) => {
@@ -527,6 +542,11 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
       const detail = (e as CustomEvent).detail;
       if (detail && detail.x !== undefined && detail.y !== undefined) {
         const p = localPlayerRef.current;
+        // Walking somewhere by hand ends the follow, same as pressing a movement key.
+        if (followTargetIdRef.current) {
+          followTargetIdRef.current = null;
+          onStopFollow?.('manual');
+        }
         const waypoints = findPathAroundObstacles(p.x, p.y, detail.x, detail.y, mapDataRef.current);
         autoWalkPathRef.current = {
           waypoints,
@@ -898,6 +918,63 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
 
       if (moveUp || moveDown || moveLeft || moveRight) {
         autoWalkPathRef.current = null;
+      }
+
+      // FOLLOW MODE — keep re-pathing toward the followed player.
+      // This runs before the waypoint walker below and simply keeps feeding it fresh waypoints,
+      // so following reuses the same obstacle-aware walking the click-to-move path already uses.
+      if (followTargetIdRef.current) {
+        const FOLLOW_STOP_DIST = 24; // stop 1.5 tiles out so we stand beside them, not on them
+        const REPATH_MS = 350;
+
+        if (moveUp || moveDown || moveLeft || moveRight) {
+          // Manual input always wins — walking away should not fight the follow.
+          followTargetIdRef.current = null;
+          onStopFollow?.('manual');
+        } else {
+          const target = otherPlayers[followTargetIdRef.current];
+
+          if (!target || target.mapId !== currentMapId || target.isOnline === false) {
+            // They left the map, went offline, or disconnected — nothing to follow.
+            followTargetIdRef.current = null;
+            autoWalkPathRef.current = null;
+            onStopFollow?.('gone');
+          } else {
+            const gap = Math.hypot(target.x - p.x, target.y - p.y);
+
+            if (gap <= FOLLOW_STOP_DIST) {
+              // Caught up. Stand still and turn to face them.
+              autoWalkPathRef.current = null;
+              const dx = target.x - p.x;
+              const dy = target.y - p.y;
+              const faceDir = Math.abs(dx) > Math.abs(dy)
+                ? (dx > 0 ? 'right' : 'left')
+                : (dy > 0 ? 'down' : 'up');
+              if (p.dir !== faceDir || p.isMoving) {
+                localPlayerRef.current = { ...p, dir: faceDir, isMoving: false };
+                onMove(p.x, p.y, faceDir, false);
+              }
+              return;
+            }
+
+            const now = performance.now();
+            const fr = followRepathRef.current;
+            const targetMoved = Math.hypot(target.x - fr.tx, target.y - fr.ty) > 8;
+            const idle = !autoWalkPathRef.current || autoWalkPathRef.current.waypoints.length === 0;
+
+            if ((targetMoved || idle) && now - fr.at > REPATH_MS) {
+              fr.at = now;
+              fr.tx = target.x;
+              fr.ty = target.y;
+              const waypoints = findPathAroundObstacles(p.x, p.y, target.x, target.y, mapDataRef.current);
+              if (waypoints && waypoints.length > 0) {
+                // Drop the final step so we halt next to them instead of trying to occupy their tile
+                if (waypoints.length > 1) waypoints.pop();
+                autoWalkPathRef.current = { waypoints };
+              }
+            }
+          }
+        }
       }
 
       // AUTOMATIC WALK WAYPOINT PATH (A* / BFS Pathfinding Around Obstacles!)

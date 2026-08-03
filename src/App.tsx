@@ -401,6 +401,18 @@ export default function App() {
   const [showInventoryModal, setShowInventoryModal] = useState<boolean>(false);
   const memoChannelRef = useRef<any>(null);
 
+  // Follow mode: id of the player we are walking after, or null
+  const [followTarget, setFollowTarget] = useState<{ id: string; nickname: string } | null>(null);
+
+  const handleFollowPlayer = (target: PlayerState) => {
+    setFollowTarget({ id: target.id, nickname: target.nickname });
+  };
+
+  // Changing map ends the follow — the target is no longer somewhere we can walk to.
+  useEffect(() => {
+    setFollowTarget(null);
+  }, [localPlayer.mapId]);
+
   // Load Memos from DB per map
   useEffect(() => {
     fetchHouseMemos(houseCode, localPlayer.mapId).then(setMemos);
@@ -2785,6 +2797,8 @@ export default function App() {
           memos={memos}
           onInteractMemo={(memo) => setActiveViewMemo(memo)}
           onCreateMemoRequest={(x, y) => setActiveCreateMemoPos({ x, y })}
+          followTargetId={followTarget?.id ?? null}
+          onStopFollow={() => setFollowTarget(null)}
           isEditMode={false}
           isEditorOpen={showAssetViewer || isCustomizing || isMarketOpen || showHouseModal || !!activeCreateMemoPos || !!activeViewMemo}
           selectedTile={0}
@@ -2886,6 +2900,29 @@ export default function App() {
         </div>
       )}
 
+      {/* Follow mode indicator — also the way out, since the other exits are movement inputs */}
+      {followTarget && (
+        <div style={{
+          position: 'absolute', top: '14px', left: '50%', transform: 'translateX(-50%)',
+          zIndex: 140, display: 'flex', alignItems: 'center', gap: '10px',
+          background: 'rgba(20, 20, 32, 0.92)', border: '1px solid #89b4fa',
+          borderRadius: '6px', padding: '6px 10px', backdropFilter: 'blur(8px)',
+          fontFamily: 'var(--font-pixel)', fontSize: '11px', color: '#cdd6f4'
+        }}>
+          <span>👣 <strong style={{ color: '#89b4fa' }}>{followTarget.nickname}</strong> 님을 따라가는 중</span>
+          <button
+            onClick={() => setFollowTarget(null)}
+            style={{
+              background: 'rgba(243, 139, 168, 0.18)', border: '1px solid #f38ba8',
+              borderRadius: '4px', color: '#f38ba8', fontSize: '10px',
+              padding: '3px 8px', cursor: 'pointer', fontFamily: 'var(--font-pixel)'
+            }}
+          >
+            해제
+          </button>
+        </div>
+      )}
+
       {/* Player Interaction Modal (Clicked Player Options Popup) */}
       {interactionTargetPlayer && (
         <PlayerInteractionModal
@@ -2895,6 +2932,7 @@ export default function App() {
           onRequestDMChat={handleRequestDMChat}
           onSendReaction={handleSendReaction}
           onLeaveNote={handleLeaveNote}
+          onFollowPlayer={handleFollowPlayer}
         />
       )}
 

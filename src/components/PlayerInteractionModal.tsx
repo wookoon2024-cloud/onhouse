@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { PlayerState } from '../game/syncManager';
-import { User, MessageSquare, StickyNote, Heart, X } from 'lucide-react';
+import { Footprints, MessageSquare, StickyNote, Heart, X } from 'lucide-react';
 
 interface PlayerInteractionModalProps {
   localPlayer: PlayerState;
@@ -9,16 +9,22 @@ interface PlayerInteractionModalProps {
   onRequestDMChat: (target: PlayerState) => void;
   onSendReaction: (targetId: string, reactionEmoji: string) => void;
   onLeaveNote: (targetId: string, noteText: string) => void;
+  onFollowPlayer: (target: PlayerState) => void;
 }
 
 export const PlayerInteractionModal: React.FC<PlayerInteractionModalProps> = ({
+  localPlayer,
   targetPlayer,
   onClose,
   onRequestDMChat,
   onSendReaction,
-  onLeaveNote
+  onLeaveNote,
+  onFollowPlayer
 }) => {
-  const [activeTab, setActiveTab] = useState<'menu' | 'info' | 'note' | 'reaction'>('menu');
+  const [activeTab, setActiveTab] = useState<'menu' | 'note' | 'reaction'>('menu');
+
+  // Following only makes sense for someone online and standing on the same map as us
+  const canFollow = targetPlayer.isOnline !== false && targetPlayer.mapId === localPlayer.mapId;
   const [noteInput, setNoteInput] = useState('');
   const [noteSentToast, setNoteSentToast] = useState(false);
 
@@ -116,18 +122,29 @@ export const PlayerInteractionModal: React.FC<PlayerInteractionModalProps> = ({
         {/* Tab Views */}
         {activeTab === 'menu' && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            {/* 1. View Info */}
+            {/* 1. Follow this player */}
             <button
-              onClick={() => setActiveTab('info')}
-              style={{
-                padding: '10px 8px', background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '6px',
-                color: '#fff', fontSize: '11px', fontWeight: 'normal', display: 'flex', flexDirection: 'column',
-                alignItems: 'center', gap: '5px', cursor: 'pointer'
+              onClick={() => {
+                onFollowPlayer(targetPlayer);
+                onClose();
               }}
+              disabled={!canFollow}
+              style={{
+                padding: '10px 8px',
+                background: canFollow ? 'rgba(137, 180, 250, 0.18)' : 'rgba(255, 255, 255, 0.02)',
+                border: canFollow ? '1px solid #89b4fa' : '1px solid rgba(255, 255, 255, 0.05)',
+                borderRadius: '6px', color: canFollow ? '#fff' : '#6c7086',
+                fontSize: '11px', fontWeight: 'normal', display: 'flex', flexDirection: 'column',
+                alignItems: 'center', gap: '5px', cursor: canFollow ? 'pointer' : 'not-allowed'
+              }}
+              title={
+                canFollow
+                  ? '이 사용자를 자동으로 따라다닙니다 (직접 움직이면 해제)'
+                  : '같은 맵에 접속한 온라인 사용자만 따라다닐 수 있습니다'
+              }
             >
-              <User size={18} style={{ color: '#89b4fa' }} />
-              <span>정보보기</span>
+              <Footprints size={18} style={{ color: canFollow ? '#89b4fa' : '#6c7086' }} />
+              <span>따라다니기</span>
             </button>
 
             {/* 2. Request 1:1 Chat */}
@@ -180,28 +197,7 @@ export const PlayerInteractionModal: React.FC<PlayerInteractionModalProps> = ({
           </div>
         )}
 
-        {/* Sub-Tab 1: Detailed Info */}
-        {activeTab === 'info' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ fontSize: '11px', color: '#cdd6f4', display: 'flex', flexDirection: 'column', gap: '6px', background: 'rgba(0,0,0,0.3)', padding: '10px', borderRadius: '6px' }}>
-              <div>• 닉네임: {targetPlayer.nickname}</div>
-              <div>• 아바타 타입: {targetPlayer.spriteType || '닌자'}</div>
-              <div>• 현재 접속 맵: {targetPlayer.mapId.toUpperCase()}</div>
-              <div>• 상태 메시지: {targetPlayer.statusMessage || '없음'}</div>
-            </div>
-            <button
-              onClick={() => setActiveTab('menu')}
-              style={{
-                padding: '8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '4px', color: '#fff', fontSize: '11px', fontWeight: 'normal', cursor: 'pointer'
-              }}
-            >
-              ◀ 메뉴로 돌아가기
-            </button>
-          </div>
-        )}
-
-        {/* Sub-Tab 2: Leave Note */}
+        {/* Sub-Tab: Leave Note */}
         {activeTab === 'note' && (
           <form onSubmit={handleNoteSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{ fontSize: '11px', color: '#f9e2af' }}>
