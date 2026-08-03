@@ -1952,28 +1952,67 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
       // Hidden on mobile (it would eat scarce screen) and in edit mode (the editor has its own
       // whole-map view and its panels overlap this corner).
       if (!isMobile && !isEditMode && targetW > 0 && targetH > 0) {
-        const MM_MAX = 140; // longest side, in CSS px
-        const MM_PAD = 10;
+        // Longest side in CSS px. Tied to the viewport rather than fixed, so it stays readable on a
+        // big monitor without swallowing a small window — capped at roughly a quarter of the width
+        // and a third of the height, whichever binds first.
+        const MM_MAX = Math.round(
+          Math.max(150, Math.min(230, dimensions.width * 0.24, dimensions.height * 0.34))
+        );
+        const MM_PAD = 18;    // inset from the screen edge
+        const MM_INNER = 5;   // frame thickness around the map image
+        const MM_TITLE = 17;  // title strip height
         const mmScale = Math.min(MM_MAX / targetW, MM_MAX / targetH);
         const mmW = Math.max(1, Math.round(targetW * mmScale));
         const mmH = Math.max(1, Math.round(targetH * mmScale));
-        const mmX = Math.round(dimensions.width - mmW - MM_PAD);
-        const mmY = MM_PAD;
+
+        // Panel wraps a title strip above the map image, so the frame is sized from those rather
+        // than from the image alone.
+        const panelW = mmW + MM_INNER * 2;
+        const panelH = mmH + MM_TITLE + MM_INNER;
+        const panelX = Math.round(dimensions.width - panelW - MM_PAD);
+        const panelY = MM_PAD;
+        const mmX = panelX + MM_INNER;
+        const mmY = panelY + MM_TITLE;
 
         ctx.save();
 
-        // Same translucent slate as the chat box, so it reads as one HUD
+        // Frame: same translucent slate as the chat box so it belongs to the same HUD, but a touch
+        // more opaque and a heavier border — at this size the thin 1px chat border read as a plain
+        // rectangle rather than as a map panel.
         ctx.beginPath();
-        ctx.roundRect(mmX - 3, mmY - 3, mmW + 6, mmH + 6, 6);
-        ctx.fillStyle = 'rgba(15, 15, 25, 0.88)';
+        ctx.roundRect(panelX, panelY, panelW, panelH, 7);
+        ctx.fillStyle = 'rgba(12, 12, 20, 0.92)';
         ctx.fill();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Title strip: current map name, truncated rather than allowed to overflow the frame.
+        ctx.font = 'bold 10px "DungGeunMo", monospace, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        let mapLabel = map.name || '';
+        const labelMax = panelW - 10;
+        if (ctx.measureText(mapLabel).width > labelMax) {
+          while (mapLabel.length > 1 && ctx.measureText(mapLabel + '…').width > labelMax) {
+            mapLabel = mapLabel.slice(0, -1);
+          }
+          mapLabel += '…';
+        }
+        ctx.fillStyle = 'rgba(248, 249, 250, 0.95)';
+        ctx.fillText(mapLabel, panelX + panelW / 2, panelY + MM_TITLE / 2 + 1);
+
+        // Hairline under the title, so the strip reads as a header instead of floating text
+        ctx.beginPath();
+        ctx.moveTo(panelX + 5, panelY + MM_TITLE - 2.5);
+        ctx.lineTo(panelX + panelW - 5, panelY + MM_TITLE - 2.5);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
         ctx.lineWidth = 1;
         ctx.stroke();
 
         ctx.save();
         ctx.beginPath();
-        ctx.roundRect(mmX, mmY, mmW, mmH, 4);
+        ctx.roundRect(mmX, mmY, mmW, mmH, 3);
         ctx.clip(); // keep the scaled map inside the rounded corners
         // Smoothing is enabled for this one draw: the baked canvas is many times larger than the
         // destination, and nearest-neighbour at that reduction turns the tiles into shimmering
@@ -1982,13 +2021,41 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         ctx.drawImage(offCanvas, 0, 0, targetW, targetH, mmX, mmY, mmW, mmH);
         ctx.restore();
 
+        // Recessed edge around the image, so the map sits inside the frame rather than on top of it
+        ctx.beginPath();
+        ctx.roundRect(mmX - 0.5, mmY - 0.5, mmW + 1, mmH + 1, 3);
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Corner brackets — the bit that actually says "minimap" at a glance
+        const brk = Math.max(6, Math.round(mmW * 0.055));
+        ctx.strokeStyle = 'rgba(167, 139, 250, 0.95)'; // --primary-hover
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ([
+          [mmX + 1, mmY + 1, 1, 1],
+          [mmX + mmW - 1, mmY + 1, -1, 1],
+          [mmX + 1, mmY + mmH - 1, 1, -1],
+          [mmX + mmW - 1, mmY + mmH - 1, -1, -1]
+        ] as const).forEach(([bx, by, sx, sy]) => {
+          ctx.beginPath();
+          ctx.moveTo(bx, by + sy * brk);
+          ctx.lineTo(bx, by);
+          ctx.lineTo(bx + sx * brk, by);
+          ctx.stroke();
+        });
+
         // Player dots. renderList already holds everyone on this map and carries the same smoothed
         // remote positions the sprites are drawn at, so the dots never lag the characters.
         renderList.forEach((mp) => {
           const isSelf = mp.id === p.id;
           const cx = mmX + Math.min(mmW, Math.max(0, (mp.x + 8) * mmScale));
           const cy = mmY + Math.min(mmH, Math.max(0, (mp.y + 8) * mmScale));
-          const r = isSelf ? 3.2 : 2.2;
+          // Grow the dots with the panel, or they'd read as smaller than before on a larger minimap.
+          // Capped so they stay dots and don't blob together in a crowd.
+          const dotK = Math.min(1.5, MM_MAX / 140);
+          const r = (isSelf ? 3.2 : 2.2) * dotK;
 
           ctx.beginPath();
           ctx.arc(cx, cy, r + 1, 0, Math.PI * 2);
