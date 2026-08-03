@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { type DirectMessage, type PlayerState, getDMs, saveDM, markDMsAsRead } from '../game/syncManager';
-import { fetchDMsFromCloudDB } from '../services/HouseService';
 import { Send, MessageSquare, ShieldAlert, X } from 'lucide-react';
 
 interface MessengerProps {
@@ -194,38 +193,12 @@ export const Messenger: React.FC<MessengerProps> = ({
     return () => clearInterval(interval);
   }, [activeTarget?.id, localPlayer.id]);
 
-  // Cloud DB sync to recover any DMs missed due to WebSocket iframe timeouts
-  useEffect(() => {
-    if (!activeTarget) return;
-    let isMounted = true;
-
-    const syncCloudDMs = async () => {
-      const cloudDMs = await fetchDMsFromCloudDB(localPlayer.id, activeTarget.id);
-      if (!isMounted || !cloudDMs || cloudDMs.length === 0) return;
-
-      const existingDMs = getDMs();
-      const existingIds = new Set(existingDMs.map(d => d.id));
-      let hasNew = false;
-
-      for (const cloudDM of cloudDMs) {
-        if (!existingIds.has(cloudDM.id)) {
-          saveDM(cloudDM);
-          hasNew = true;
-        }
-      }
-
-      if (hasNew && isMounted) {
-        loadHistory();
-      }
-    };
-
-    syncCloudDMs();
-    const interval = setInterval(syncCloudDMs, 3000);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, [activeTarget?.id, localPlayer.id]);
+  // The 3s Cloud DB sync that used to sit here is gone. It read every 'GLOBAL_DM' row in
+  // house_assets and matched fromId/toId in the browser, so the server never filtered by
+  // recipient — the publishable anon key baked into the bundle was enough for anyone to read
+  // every user's private messages. It was also already ineffective: the query paged the OLDEST
+  // 100 rows (ascending + limit 100), so once the table grew past 100 it could no longer see any
+  // recent message. DMs now travel over the realtime socket and live in localStorage only.
 
   // Listen for realtime DM read events & refocus requests from modals
   useEffect(() => {

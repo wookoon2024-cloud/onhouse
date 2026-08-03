@@ -25,7 +25,7 @@ import { MarketModal } from './components/MarketModal';
 import { HouseJoinModal } from './components/HouseJoinModal';
 import { PlayerInteractionModal } from './components/PlayerInteractionModal';
 import { DMRequestModal } from './components/DMRequestModal';
-import { getSavedHouseCode, setSavedHouseCode, fetchHouseMaps, saveHouseMapToDB, deleteHouseMapFromDB, fetchHouseAssets, fetchHouseMapOrder, saveHouseMapOrderToDB, sendDMToCloudDB, fetchDMsFromCloudDB, type MarketItem } from './services/HouseService';
+import { getSavedHouseCode, setSavedHouseCode, fetchHouseMaps, saveHouseMapToDB, deleteHouseMapFromDB, fetchHouseAssets, fetchHouseMapOrder, saveHouseMapOrderToDB, type MarketItem } from './services/HouseService';
 import { supabase } from './lib/supabase';
 import { APP_VERSION } from './config/version';
 import { safeLocalStorageSetItem, purgeDeadStorageKeys } from './lib/safeStorage';
@@ -2246,15 +2246,17 @@ export default function App() {
       ...dmObj
     });
 
-    // Path A: Instant WebSocket Broadcast
+    // Delivered over the realtime socket only (with the built-in send retries), plus the
+    // BroadcastChannel above for this browser's other tabs. DMs are NOT persisted to Supabase:
+    // every message used to be inserted into house_assets under house_code 'GLOBAL_DM' as a
+    // delivery backstop, but the reader fetched the whole table and matched sender/recipient in
+    // the browser — so the anon key that ships in the bundle was enough to read anyone's private
+    // conversations. That backstop had also stopped working (it paged the OLDEST 100 rows, so it
+    // went blind once the table passed 100), which is why dropping it costs nothing in practice.
     sendReliableBroadcastChannel('dm_msg', dmObj);
 
-    // Path B: Cloud DB Persistence (guarantees 100% delivery even if WebSocket times out)
-    sendDMToCloudDB(dmObj);
-
-    // Hand the message back so the sender stores this exact object. The caller used to build its
-    // own copy with a different id, which then failed to match the Cloud DB copy during the 3s
-    // sync and reappeared as a second message in the sender's own conversation.
+    // Hand the message back so the sender stores this exact object rather than building its own
+    // copy with a different id, which would show up twice in the sender's own conversation.
     return dmObj;
   };
 

@@ -1,6 +1,5 @@
 import { supabase } from '../lib/supabase';
 import { safeLocalStorageSetItem } from '../lib/safeStorage';
-import { type DirectMessage } from '../game/syncManager';
 import { type MapDefinition, maps } from '../game/MapData';
 
 export const getSavedHouseCode = (): string => {
@@ -1084,50 +1083,12 @@ export const importMarketItemToMyHouse = async (
   }
 };
 
-// Cloud Database DM Persistence Helpers (Guarantees 100% DM delivery even when WebSockets time out)
-export const sendDMToCloudDB = async (dm: DirectMessage): Promise<void> => {
-  try {
-    await withTimeout(
-      supabase
-        .from('house_assets')
-        .insert({
-          house_code: 'GLOBAL_DM',
-          asset_type: 'dm_msg',
-          asset_data: dm,
-          updated_at: new Date().toISOString()
-        }),
-      4000
-    );
-  } catch (e) {}
-};
-
-export const fetchDMsFromCloudDB = async (myId: string, partnerId: string): Promise<DirectMessage[]> => {
-  try {
-    const { data } = await withTimeout(
-      supabase
-        .from('house_assets')
-        .select('asset_data')
-        .eq('house_code', 'GLOBAL_DM')
-        .eq('asset_type', 'dm_msg')
-        .order('updated_at', { ascending: true })
-        .limit(100),
-      4000
-    );
-
-    if (!data) return [];
-    const dms: DirectMessage[] = [];
-    for (const row of data) {
-      const dm = row.asset_data as DirectMessage;
-      if (
-        dm &&
-        ((dm.fromId === myId && dm.toId === partnerId) ||
-         (dm.fromId === partnerId && dm.toId === myId))
-      ) {
-        dms.push(dm);
-      }
-    }
-    return dms;
-  } catch (e) {
-    return [];
-  }
-};
+// DMs are deliberately NOT persisted to Supabase. sendDMToCloudDB/fetchDMsFromCloudDB used to
+// live here as a delivery backstop, inserting every message into house_assets under house_code
+// 'GLOBAL_DM'. The reader selected the whole table and compared fromId/toId in the browser, so
+// the server applied no per-recipient filtering — the publishable anon key that ships inside the
+// JS bundle was enough to read every user's private conversation. It had also silently stopped
+// working: the query ordered ascending with limit 100, so it kept re-reading the OLDEST 100 rows
+// and went blind to new messages once the table passed that mark. Delivery is the realtime
+// socket's job (sendReliableBroadcastChannel already retries), and history lives in localStorage
+// via saveDM/getDMs. Do not reintroduce a global DM table without row-level security.
