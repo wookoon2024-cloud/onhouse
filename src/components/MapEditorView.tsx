@@ -1208,6 +1208,15 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
 
     const normLayers = getNormalizedLayers(localMap);
 
+    // Source frames are not always 16px. Custom sheets are routinely 32px — the office sheet is
+    // 512x2048 over a 16x64 grid — and assuming 16 samples the wrong part of the image for every
+    // index past the first row, drifting further the further down the sheet the tile sits. Derive
+    // the frame size from the image the way CanvasGame's renderer does.
+    const frameOf = (image: HTMLImageElement, info: { cols?: number; rows?: number } | null) => ({
+      w: Math.max(1, Math.floor(image.width / Math.max(1, (info && info.cols) || 16))),
+      h: Math.max(1, Math.floor(image.height / Math.max(1, (info && info.rows) || 16)))
+    });
+
     // Helper to draw an object list
     const drawObjectList = (objsList: MapObjectInstance[]) => {
       if (objsList.length === 0) return;
@@ -1243,11 +1252,12 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                         const bgImg = images[bgDrawInfo.tilesetKey];
                         if (bgImg) {
                           const bgTsInfo = getTilesetInfoLocal(bgDrawInfo.tilesetKey);
-                          const srcX = (bgDrawInfo.localIdx % bgTsInfo.cols) * 16;
-                          const srcY = Math.floor(bgDrawInfo.localIdx / bgTsInfo.cols) * 16;
+                          const bgF = frameOf(bgImg, bgTsInfo);
+                          const srcX = (bgDrawInfo.localIdx % bgTsInfo.cols) * bgF.w;
+                          const srcY = Math.floor(bgDrawInfo.localIdx / bgTsInfo.cols) * bgF.h;
                           ctx.drawImage(
                             bgImg,
-                            srcX, srcY, 16, 16,
+                            srcX, srcY, bgF.w, bgF.h,
                             targetTx * tileSize, targetTy * tileSize, tileSize, tileSize
                           );
                         }
@@ -1264,11 +1274,12 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                       const tImg = images[drawInfo.tilesetKey];
                       if (tImg) {
                         const tsInfo = getTilesetInfoLocal(drawInfo.tilesetKey);
-                        const srcX = (drawInfo.localIdx % tsInfo.cols) * 16;
-                        const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * 16;
+                        const tF = frameOf(tImg, tsInfo);
+                        const srcX = (drawInfo.localIdx % tsInfo.cols) * tF.w;
+                        const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * tF.h;
                         ctx.drawImage(
                           tImg,
-                          srcX, srcY, 16, 16,
+                          srcX, srcY, tF.w, tF.h,
                           targetTx * tileSize, targetTy * tileSize, tileSize, tileSize
                         );
                       }
@@ -1317,11 +1328,12 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                   if (img) {
                     const tsInfo = getTilesetInfoLocal(drawInfo.tilesetKey);
                     if (tsInfo && tsInfo.cols) {
-                      const srcX = (drawInfo.localIdx % tsInfo.cols) * 16;
-                      const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * 16;
+                      const f = frameOf(img, tsInfo);
+                      const srcX = (drawInfo.localIdx % tsInfo.cols) * f.w;
+                      const srcY = Math.floor(drawInfo.localIdx / tsInfo.cols) * f.h;
                       ctx.drawImage(
                         img,
-                        srcX, srcY, 16, 16,
+                        srcX, srcY, f.w, f.h,
                         x * tileSize, y * tileSize, tileSize, tileSize
                       );
                     }
@@ -1458,9 +1470,10 @@ export const MapEditorView: React.FC<MapEditorViewProps> = ({
                   const targetCol = pStartCol + dx;
                   const targetRow = pStartRow + dy;
                   if (px < localMap.width && py < localMap.height && targetCol < tsInfo.cols && targetRow < tsInfo.rows) {
+                    const pf = frameOf(img, tsInfo);
                     ctx.drawImage(
                       img,
-                      targetCol * 16, targetRow * 16, 16, 16,
+                      targetCol * pf.w, targetRow * pf.h, pf.w, pf.h,
                       px * tileSize, py * tileSize, tileSize, tileSize
                     );
                   }
