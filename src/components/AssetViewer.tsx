@@ -185,6 +185,9 @@ interface PixelEditorCanvasProps {
    *  0 clears only exact matches, which is what you want for flat pixel art; raise it to catch
    *  the near-identical shades an imported/anti-aliased image leaves behind. */
   chromaTolerance: number;
+  /** 'region' floods outward from the click and stops at the first pixel out of tolerance, so an
+   *  outline contains it. 'all' clears that colour everywhere on the board. */
+  chromaScope: 'region' | 'all';
   isSpaceDown: boolean;
   isEditorPanning: boolean;
   editorPan: { x: number; y: number };
@@ -202,6 +205,7 @@ const PixelEditorCanvas: React.FC<PixelEditorCanvasProps> = ({
   drawTool,
   selectedColor,
   chromaTolerance,
+  chromaScope,
   isSpaceDown,
   isEditorPanning,
   editorPan,
@@ -340,7 +344,7 @@ const PixelEditorCanvas: React.FC<PixelEditorCanvasProps> = ({
 
     if (x < 0 || x >= editorGridResW || y < 0 || y >= editorGridResH) return;
 
-    // Chroma: sample the clicked pixel and clear every pixel of that colour on the board at once.
+    // Chroma: sample the clicked pixel and clear it away as transparent.
     // Press-only — dragging must not keep sampling, or sweeping the cursor after the click would
     // wipe one colour after another with no way to see it coming.
     if (drawTool === 'chroma') {
@@ -349,20 +353,56 @@ const PixelEditorCanvas: React.FC<PixelEditorCanvasProps> = ({
       const picked = parseHexColor(pixelGrid[y]?.[x]);
       if (!picked) return; // clicked an already-transparent cell — nothing to key out
 
+      const matches = (cell: string) => {
+        const c = parseHexColor(cell);
+        if (!c) return false;
+        return (
+          Math.abs(c.r - picked.r) <= chromaTolerance &&
+          Math.abs(c.g - picked.g) <= chromaTolerance &&
+          Math.abs(c.b - picked.b) <= chromaTolerance
+        );
+      };
+
+      const nextGrid = pixelGrid.map((row) => [...row]);
       let cleared = 0;
-      const nextGrid = pixelGrid.map((row) =>
-        row.map((cell) => {
-          const c = parseHexColor(cell);
-          if (!c) return cell;
-          const withinTolerance =
-            Math.abs(c.r - picked.r) <= chromaTolerance &&
-            Math.abs(c.g - picked.g) <= chromaTolerance &&
-            Math.abs(c.b - picked.b) <= chromaTolerance;
-          if (!withinTolerance) return cell;
+
+      if (chromaScope === 'all') {
+        for (let ry = 0; ry < nextGrid.length; ry++) {
+          const row = nextGrid[ry];
+          for (let cx = 0; cx < row.length; cx++) {
+            if (matches(row[cx])) {
+              row[cx] = 'transparent';
+              cleared++;
+            }
+          }
+        }
+      } else {
+        // Region mode: flood fill outward from the clicked cell, 4-connected, stopping wherever the
+        // colour leaves tolerance. Matching globally used to eat everything of a similar shade
+        // across the whole board — clicking the grey backdrop on a character with a near-white body
+        // erased the body too and left only the outline. Spreading from the click means an outline
+        // walls the fill in, so only the area you pointed at disappears.
+        const stack: Array<[number, number]> = [[x, y]];
+        const seen = new Set<number>([y * editorGridResW + x]);
+
+        while (stack.length > 0) {
+          const [cx, cy] = stack.pop()!;
+          const row = nextGrid[cy];
+          if (!row || !matches(row[cx])) continue;
+
+          row[cx] = 'transparent';
           cleared++;
-          return 'transparent';
-        })
-      );
+
+          const neighbours: Array<[number, number]> = [[cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]];
+          for (const [nx, ny] of neighbours) {
+            if (nx < 0 || nx >= editorGridResW || ny < 0 || ny >= editorGridResH) continue;
+            const flat = ny * editorGridResW + nx;
+            if (seen.has(flat)) continue;
+            seen.add(flat);
+            stack.push([nx, ny]);
+          }
+        }
+      }
 
       if (cleared > 0) onPixelGridChange(nextGrid);
       return;
@@ -695,6 +735,10 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
   // Tolerance for the pixel board's own chroma tool. Separate from chromaTolerance, which belongs
   // to the upload modal and operates on the source image rather than the drawn grid.
   const [pixelChromaTolerance, setPixelChromaTolerance] = useState<number>(0);
+  // Default to the contained fill: a global colour match is the destructive one (it happily eats a
+  // near-white body along with the grey backdrop behind it), so make the safe behaviour the one
+  // you get without thinking about it.
+  const [pixelChromaScope, setPixelChromaScope] = useState<'region' | 'all'>('region');
   const [showCenterCrosshair, setShowCenterCrosshair] = useState<boolean>(true);
   const [isMouseDown, setIsMouseDown] = useState<boolean>(false);
   const [editorPan, setEditorPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -4349,6 +4393,23 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
                         style={{ width: '70px', accentColor: '#ff79c6', cursor: 'pointer' }}
                         title="0이면 완전히 같은 색만, 값을 올리면 비슷한 색까지 함께 지웁니다"
                       />
+                      <button
+                        type="button"
+                        onClick={() => setPixelChromaScope((prev) => (prev === 'region' ? 'all' : 'region'))}
+                        style={{
+                          padding: '2px 6px', fontSize: '9px', borderRadius: '3px', cursor: 'pointer',
+                          background: pixelChromaScope === 'region' ? '#ff79c6' : 'transparent',
+                          color: pixelChromaScope === 'region' ? '#000' : '#ff79c6',
+                          border: '1px solid #ff79c6', fontWeight: 'bold', whiteSpace: 'nowrap'
+                        }}
+                        title={
+                          pixelChromaScope === 'region'
+                            ? '영역만: 클릭한 자리에서 번져나가다 경계선(외곽선)을 만나면 멈춥니다.'
+                            : '전체: 보드 전체에서 같은 색을 모두 지웁니다. 몸통이 배경과 비슷한 색이면 몸통까지 지워질 수 있습니다.'
+                        }
+                      >
+                        {pixelChromaScope === 'region' ? '영역만' : '전체'}
+                      </button>
                     </div>
                   )}
                   <div style={{ width: '1px', background: 'rgba(255,255,255,0.1)', height: '24px', margin: '0 4px' }} />
@@ -4602,6 +4663,7 @@ export const AssetViewer: React.FC<AssetViewerProps> = ({ onClose, onSelectTile,
                           drawTool={drawTool}
                           selectedColor={selectedColor}
                           chromaTolerance={pixelChromaTolerance}
+                          chromaScope={pixelChromaScope}
                           isSpaceDown={isSpaceDown}
                           isEditorPanning={isEditorPanning}
                           editorPan={editorPan}
