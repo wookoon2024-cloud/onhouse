@@ -313,18 +313,25 @@ export const saveHouseMapToDB = async (
 
     console.warn('[OnHouse Sync] Upsert fallback triggered:', upsertRes.error.message);
 
-    // Fallback check if existing row exists
+    // Fallback: find the existing row and update it in place.
+    // Deliberately NOT .maybeSingle() — that errors out ("more than one row returned") the moment
+    // this house has two rows for the same map, and the error path below reads as "no row exists"
+    // and INSERTS another one, so each save after the first duplicate would breed one more. Take
+    // the newest row instead; ids ascend, so highest id == most recently written.
     const selectRes = await withTimeout(
       supabase
         .from('house_maps')
         .select('id')
         .eq('house_code', houseCode)
         .eq('map_id', mapId)
-        .maybeSingle(),
+        .order('id', { ascending: false })
+        .limit(1),
       3500
     );
 
-    if (selectRes.data && selectRes.data.id) {
+    const existingRow = Array.isArray(selectRes.data) ? selectRes.data[0] : null;
+
+    if (existingRow && existingRow.id) {
       const updateRes = await withTimeout(
         supabase
           .from('house_maps')
@@ -332,7 +339,7 @@ export const saveHouseMapToDB = async (
             map_data: mapData,
             updated_at: new Date().toISOString()
           })
-          .eq('id', selectRes.data.id),
+          .eq('id', existingRow.id),
         3500
       );
 
