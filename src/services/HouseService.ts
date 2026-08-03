@@ -432,7 +432,7 @@ export const fetchHouseAssets = async (houseCode: string) => {
         .from('house_assets')
         .select('id, asset_type, updated_at')
         .eq('house_code', houseCode)
-        .eq('asset_type', 'map_tileset')
+        .in('asset_type', ['map_tileset', 'asset_delete'])
         .order('id', { ascending: false })
         .limit(300),
       supabase
@@ -491,9 +491,12 @@ export const fetchHouseAssets = async (houseCode: string) => {
     const seenMapTilesetIds = new Set<string>();
 
     if (combinedData.length > 0) {
-      // Pass 1: Collect all delete records first
+      // Pass 1: Collect all delete records first. 'asset_delete' is the generic tombstone written
+      // by deleteHouseAssetFromDB; 'char_delete' is the older char-only name, still read so any
+      // existing rows keep working.
       combinedData.forEach((row: any) => {
-        if (row.asset_data && row.asset_type === 'char_delete' && row.asset_data.id) {
+        if (!row.asset_data || !row.asset_data.id) return;
+        if (row.asset_type === 'asset_delete' || row.asset_type === 'char_delete') {
           deletedAssetIds.add(row.asset_data.id);
         }
       });
@@ -560,17 +563,24 @@ export const fetchHouseAssets = async (houseCode: string) => {
     const finalCharSprites = [...usableCharSprites];
     const finalMapTilesets = [...mapTilesets];
 
-    // Safely restore any custom map tilesets from local cache if missing from DB, and re-sync to DB!
+    // Safely restore any custom map tilesets from local cache if missing from DB, and re-sync to DB.
+    // This exists so a tileset whose DB write failed is not lost, but "missing from the DB" is also
+    // exactly what a deleted tileset looks like — so without the tombstone check below, any client
+    // still holding a stale local cache re-uploads everything the user just deleted, and the assets
+    // come back for everyone. Never restore an id that has a delete record.
     try {
       const savedLocalMapStr = localStorage.getItem('on_house_custom_map_tilesets');
       if (savedLocalMapStr) {
         const savedLocalMaps: any[] = JSON.parse(savedLocalMapStr);
         savedLocalMaps.forEach((loc) => {
-          if (loc && loc.id && !seenMapTilesetIds.has(loc.id)) {
-            seenMapTilesetIds.add(loc.id);
-            finalMapTilesets.push(loc);
-            saveHouseAssetToDB(houseCode, 'map_tileset', loc).catch(() => {});
+          if (!loc || !loc.id || seenMapTilesetIds.has(loc.id)) return;
+          if (deletedAssetIds.has(loc.id)) {
+            console.log(`[OnHouse DB Sync] 🪦 Not restoring locally cached tileset "${loc.name || loc.id}" — it has a delete record.`);
+            return;
           }
+          seenMapTilesetIds.add(loc.id);
+          finalMapTilesets.push(loc);
+          saveHouseAssetToDB(houseCode, 'map_tileset', loc).catch(() => {});
         });
       }
     } catch (e) {}
@@ -691,6 +701,18 @@ const doSaveHouseAssetToDB = async (
     }
     console.log(`[OnHouse DB Save SUCCESS] ✅ Asset "${assetName}" saved to Supabase DB! Result row ID:`, data);
 
+    // Saving an asset un-deletes it, mirroring how saveHouseMapToDB clears a map's deleted flag.
+    // Ids are timestamped so this normally matches nothing, but a market re-download can bring
+    // back a previously deleted id — without this the tombstone would silently hide it forever.
+    if (assetId) {
+      await supabase
+        .from('house_assets')
+        .delete()
+        .eq('house_code', houseCode)
+        .in('asset_type', ['asset_delete', 'char_delete'])
+        .filter('asset_data->>id', 'eq', assetId);
+    }
+
     // 2. Now that the new row is safely in, delete older duplicate rows for the same asset ID.
     // Filtered at the DB level (asset_type + jsonb id) instead of pulling every asset_data blob
     // for the house, which was slow/timeout-prone and reintroduced the TOAST issue we fixed before.
@@ -768,6 +790,32 @@ export const deleteHouseAssetFromDB = async (
           return { success: false, error: error.message };
         }
         console.log(`[OnHouse DB Delete SUCCESS] ✅ Permanently deleted ${idsToDelete.length} rows from DB for asset "${assetId}"`);
+      }
+    }
+
+    // Leave a tombstone. Hard-deleting the row is not enough on its own: every other client still
+    // holds this asset in its localStorage cache, and fetchHouseAssets restores anything cached
+    // that the DB does not have — so the next client to sync would re-upload it and the asset
+    // would come back for everyone. The tombstone is what tells them the absence is deliberate.
+    // One tombstone per asset id, not per asset_type — deleting a character calls this three
+    // times (sprite, image override, row actions) for the same id.
+    const { data: existingTomb } = await supabase
+      .from('house_assets')
+      .select('id')
+      .eq('house_code', houseCode)
+      .eq('asset_type', 'asset_delete')
+      .filter('asset_data->>id', 'eq', assetId)
+      .limit(1);
+
+    if (!existingTomb || existingTomb.length === 0) {
+      const { error: tombErr } = await supabase.from('house_assets').insert({
+        house_code: houseCode,
+        asset_type: 'asset_delete',
+        asset_data: { id: assetId, deletedAssetType: assetType, deletedAt: new Date().toISOString() },
+        updated_at: new Date().toISOString()
+      });
+      if (tombErr) {
+        console.error('[OnHouse DB Delete] Tombstone write failed, asset may be resurrected by another client:', tombErr.message);
       }
     }
 
