@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { safeLocalStorageSetItem } from '../lib/safeStorage';
 import { type DirectMessage } from '../game/syncManager';
 import { type MapDefinition, maps } from '../game/MapData';
 
@@ -449,11 +450,6 @@ export const fetchHouseAssets = async (houseCode: string) => {
         localStorage.setItem('on_house_char_image_overrides', JSON.stringify({}));
         localStorage.setItem('on_house_char_row_actions', JSON.stringify({}));
 
-        localStorage.setItem(`on_house_custom_map_tilesets_${houseCode}`, JSON.stringify([]));
-        localStorage.setItem(`on_house_custom_char_sprites_${houseCode}`, JSON.stringify([]));
-        localStorage.setItem(`on_house_char_image_overrides_${houseCode}`, JSON.stringify({}));
-        localStorage.setItem(`on_house_char_row_actions_${houseCode}`, JSON.stringify({}));
-
         window.dispatchEvent(new Event('on_house_sprites_updated'));
       } catch (e) {}
       return { mapTilesets: [], charSprites: [], charOverrides: {}, charRowActions: {} };
@@ -592,10 +588,11 @@ export const fetchHouseAssets = async (houseCode: string) => {
     safeCacheSet('on_house_char_image_overrides', JSON.stringify(charOverrides));
     safeCacheSet('on_house_char_row_actions', JSON.stringify(charRowActions));
 
-    safeCacheSet(`on_house_custom_map_tilesets_${houseCode}`, JSON.stringify(finalMapTilesets));
-    safeCacheSet(`on_house_custom_char_sprites_${houseCode}`, JSON.stringify(lightweightCharSprites));
-    safeCacheSet(`on_house_char_image_overrides_${houseCode}`, JSON.stringify(charOverrides));
-    safeCacheSet(`on_house_char_row_actions_${houseCode}`, JSON.stringify(charRowActions));
+    // The `_${houseCode}`-suffixed twins of the four keys above used to be written here too, but
+    // nothing ever read them back — they were a byte-for-byte duplicate of the unsuffixed copy.
+    // On a house with real tilesets and pixel-edited characters that was ~5MB of a ~10MB budget,
+    // which is what finally pushed localStorage over quota and made the map editor throw. See
+    // purgeDeadStorageKeys() in lib/safeStorage.ts, which clears the ones already written.
 
     try {
       window.dispatchEvent(new Event('on_house_sprites_updated'));
@@ -1056,7 +1053,7 @@ export const importMarketItemToMyHouse = async (
       importedMap.decorLayer = importedMap.decorLayer.map((row: number[]) => row.map(remapTileIndex));
 
       // Save map locally & to DB
-      localStorage.setItem('on_house_map_' + newMapId, JSON.stringify(importedMap));
+      safeLocalStorageSetItem('on_house_map_' + newMapId, JSON.stringify(importedMap));
       await saveHouseMapToDB(houseCode, newMapId, importedMap);
 
       // Save available map IDs

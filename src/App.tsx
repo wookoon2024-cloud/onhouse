@@ -28,6 +28,7 @@ import { DMRequestModal } from './components/DMRequestModal';
 import { getSavedHouseCode, setSavedHouseCode, fetchHouseMaps, saveHouseMapToDB, deleteHouseMapFromDB, fetchHouseAssets, fetchHouseMapOrder, saveHouseMapOrderToDB, sendDMToCloudDB, fetchDMsFromCloudDB, type MarketItem } from './services/HouseService';
 import { supabase } from './lib/supabase';
 import { APP_VERSION } from './config/version';
+import { safeLocalStorageSetItem, purgeDeadStorageKeys } from './lib/safeStorage';
 import type { MapMemo, InventoryItem } from './types/memo';
 import { fetchHouseMemos, saveMemoToDB, deleteMemoFromDB, deleteLocalMemo, getLocalMemos, saveLocalMemos, getLocalInventory, saveLocalInventory } from './services/MemoService';
 import { CreateMemoModal } from './components/CreateMemoModal';
@@ -115,9 +116,9 @@ export default function App() {
   // Helper to update activeMaps while strictly preserving user's custom tab order!
   const applyFetchedMapOrder = (mapsData: Record<string, MapDefinition>, dbOrder?: string[]) => {
     setActiveMaps(mapsData);
-    try {
-      localStorage.setItem('on_house_custom_maps_cache', JSON.stringify(mapsData));
-    } catch (e) {}
+    // No local cache write here: this used to mirror every map into
+    // 'on_house_custom_maps_cache', which nothing ever read back — a straight duplicate of
+    // `on_house_custom_house_maps_${houseCode}`, which fetchHouseMaps does read.
     const fetchedMapIds = Object.keys(mapsData);
     let savedOrder: string[] = dbOrder && dbOrder.length > 0 ? dbOrder : [];
 
@@ -1829,7 +1830,7 @@ export default function App() {
               collision: newCollision
             };
 
-            localStorage.setItem('on_house_map_' + msg.mapId, JSON.stringify(updatedMap));
+            safeLocalStorageSetItem('on_house_map_' + msg.mapId, JSON.stringify(updatedMap));
 
             return {
               ...prev,
@@ -1841,7 +1842,7 @@ export default function App() {
         case 'map_full_update':
           if (msg.mapId && msg.mapData) {
             setActiveMaps((prev) => {
-              localStorage.setItem('on_house_map_' + msg.mapId, JSON.stringify(msg.mapData));
+              safeLocalStorageSetItem('on_house_map_' + msg.mapId, JSON.stringify(msg.mapData));
               return {
                 ...prev,
                 [msg.mapId]: msg.mapData
@@ -1882,7 +1883,7 @@ export default function App() {
               ...targetMap,
               baseLayer: newBase
             };
-            localStorage.setItem('on_house_map_' + msg.mapId, JSON.stringify(updatedMap));
+            safeLocalStorageSetItem('on_house_map_' + msg.mapId, JSON.stringify(updatedMap));
             return {
               ...prev,
               [msg.mapId]: updatedMap
@@ -3430,7 +3431,7 @@ export default function App() {
           onSaveMap={(mapId, updatedMap) => {
             setActiveMaps((prev) => {
               const next = { ...prev, [mapId]: updatedMap };
-              localStorage.setItem('on_house_map_' + mapId, JSON.stringify(updatedMap));
+              safeLocalStorageSetItem('on_house_map_' + mapId, JSON.stringify(updatedMap));
               
               if (mapId === localPlayer.mapId) {
                 setLocalPlayer((p) => ({
