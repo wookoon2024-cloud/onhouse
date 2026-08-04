@@ -3094,8 +3094,14 @@ export default function App() {
                     }}
                   >
                     <span style={{
-                      color: 'rgba(255,255,255,0.45)',
+                      color: 'rgba(255,255,255,0.34)',
+                      // Stated rather than inherited: Galmuri11 ships a real 700 face, so any
+                      // ancestor that ever turns bold on would drag the timestamp with it.
+                      fontWeight: 400,
                       whiteSpace: 'nowrap', flexShrink: 0,
+                      // Galmuri11's digits are not equal width on their own — "[11:11]" measures
+                      // 36px against "[00:00]" at 44px — so without this the column jitters as the
+                      // clock ticks.
                       fontVariantNumeric: 'tabular-nums'
                     }}>
                       [{formatChatTime(log.time)}]
