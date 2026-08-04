@@ -47,6 +47,11 @@ interface ChatLogMessage {
   time: number;
   channel?: 'global' | 'map';
   mapName?: string;
+  // Stable across sender and receivers, so a line can be recognised as already-seen when peers
+  // replay their recent history after a reconnect.
+  msgId?: string;
+  // Set while a line is sitting in the outbound queue because the socket was down when it was typed
+  pending?: boolean;
 }
 
 // Chat timestamps as 24-hour HH:MM. `time` is a Date.now() epoch, so a line relayed from another
@@ -522,6 +527,10 @@ export default function App() {
 
   // 4. In-game logs & popups
   const [chatLogs, setChatLogs] = useState<ChatLogMessage[]>([]);
+  // The realtime handlers are built once when the channel is created, so they need a ref to read
+  // the current log rather than the array captured at subscribe time.
+  const chatLogsRef = useRef<ChatLogMessage[]>([]);
+  useEffect(() => { chatLogsRef.current = chatLogs; }, [chatLogs]);
   const [chatBubbles, setChatBubbles] = useState<Record<string, { text: string; time: number }>>({});
   const [chatInput, setChatInput] = useState('');
   const [chatChannel, setChatChannel] = useState<'global' | 'map'>('global');
@@ -648,24 +657,70 @@ export default function App() {
 
   const channelRef = useRef<RealtimeChannel | null>(null);
 
-  const safeBroadcastChannel = (event: string, payload: any) => {
-    if (channelRef.current && (channelRef.current.state === 'SUBSCRIBED' || (channelRef.current as any).state === 'joined')) {
+  const isChannelReady = () => {
+    const ch = channelRef.current as any;
+    return !!ch && (ch.state === 'SUBSCRIBED' || ch.state === 'joined');
+  };
+
+  // Anything typed while the socket is down used to be dropped on the floor here, silently, while
+  // the sender's own log showed it as sent. Messages worth keeping are parked instead and flushed
+  // the moment the channel is back. Position updates deliberately do NOT queue: replaying a stale
+  // coordinate is worse than skipping it, and the reconnect re-announce covers that case.
+  const PENDING_MAX = 50;
+  const PENDING_TTL_MS = 120000;
+  const pendingSendsRef = useRef<Array<{ event: string; payload: any; queuedAt: number }>>([]);
+
+  const safeBroadcastChannel = (event: string, payload: any, opts?: { queueIfDown?: boolean }) => {
+    if (isChannelReady()) {
       try {
-        channelRef.current.send({
-          type: 'broadcast',
-          event,
-          payload
-        });
+        channelRef.current.send({ type: 'broadcast', event, payload });
+        return true;
       } catch (e) {}
     }
+    if (opts?.queueIfDown) {
+      const q = pendingSendsRef.current;
+      q.push({ event, payload, queuedAt: Date.now() });
+      if (q.length > PENDING_MAX) q.splice(0, q.length - PENDING_MAX);
+    }
+    return false;
+  };
+
+  const flushPendingSends = () => {
+    if (!isChannelReady() || pendingSendsRef.current.length === 0) return;
+    const now = Date.now();
+    const queued = pendingSendsRef.current;
+    pendingSendsRef.current = [];
+    let sent = 0;
+    for (const item of queued) {
+      // Long-stale chat is dropped rather than surfacing minutes late out of context
+      if (now - item.queuedAt > PENDING_TTL_MS) continue;
+      try {
+        channelRef.current.send({ type: 'broadcast', event: item.event, payload: item.payload });
+        sent++;
+      } catch (e) {}
+    }
+    if (sent > 0) setChatLogs((prev) => prev.map((l) => (l.pending ? { ...l, pending: false } : l)));
   };
 
   // Guaranteed delivery with auto-retry for critical one-time events (DM messages, DM requests, read receipts)
   const sendReliableBroadcastChannel = (event: string, payload: any) => {
-    if (!channelRef.current) return;
+    // Three retries 300ms apart only ever covered ~900ms. A socket that died while the tab sat in
+    // the background is down far longer than that, so exhausting the retries now parks the message
+    // for the reconnect flush instead of discarding it.
+    if (!channelRef.current || !isChannelReady()) {
+      safeBroadcastChannel(event, payload, { queueIfDown: true });
+      return;
+    }
 
     const attemptSend = (attemptsLeft: number) => {
-      if (!channelRef.current) return;
+      if (!channelRef.current) {
+        safeBroadcastChannel(event, payload, { queueIfDown: true });
+        return;
+      }
+      if (attemptsLeft <= 0) {
+        safeBroadcastChannel(event, payload, { queueIfDown: true });
+        return;
+      }
       try {
         channelRef.current.send({
           type: 'broadcast',
@@ -1026,18 +1081,47 @@ export default function App() {
             }));
           }
 
-          setChatLogs((prev) => [
-            ...prev,
-            {
-              id: 'chat_rec_' + Date.now() + Math.random(),
-              senderName: payload.senderName || '다른 플레이어',
-              text: payload.text,
-              time: Date.now(),
-              channel: payload.channel || 'global',
-              mapName: payload.mapName
-            }
-          ]);
+          setChatLogs((prev) => {
+            // A backfill replay can deliver a line we already have; msgId is what tells them apart.
+            if (payload.msgId && prev.some((l) => l.msgId === payload.msgId)) return prev;
+            return [
+              ...prev,
+              {
+                id: 'chat_rec_' + (payload.msgId || Date.now() + '' + Math.random()),
+                msgId: payload.msgId,
+                senderName: payload.senderName || '다른 플레이어',
+                text: payload.text,
+                // Keep the sender's clock so a replayed line sits at the time it was said
+                time: payload.timestamp || Date.now(),
+                channel: payload.channel || 'global',
+                mapName: payload.mapName
+              }
+            ].sort((a, b) => a.time - b.time);
+          });
         }
+      })
+      // Someone coming back from a dead socket asks for whatever they missed. Broadcast keeps no
+      // history server-side, so the only copy of those lines is in the peers that were present.
+      // Each client answers for its own messages only, which keeps one gap from being answered
+      // N times over.
+      .on('broadcast', { event: 'request_chat_backfill' }, ({ payload }) => {
+        if (!payload || payload.fromId === deviceId.current) return;
+        const since = typeof payload.since === 'number' ? payload.since : Date.now() - 180000;
+        const mine = chatLogsRef.current
+          .filter((l) => l.msgId && l.msgId.startsWith(deviceId.current + ':') && l.time >= since)
+          .slice(-30);
+        if (mine.length === 0) return;
+        safeBroadcastChannel('chat_backfill', { toId: payload.fromId, messages: mine });
+      })
+      .on('broadcast', { event: 'chat_backfill' }, ({ payload }) => {
+        if (!payload || payload.toId !== deviceId.current || !Array.isArray(payload.messages)) return;
+        setChatLogs((prev) => {
+          const seen = new Set(prev.map((l) => l.msgId).filter(Boolean));
+          const added = payload.messages.filter((m: ChatLogMessage) => m.msgId && !seen.has(m.msgId));
+          if (added.length === 0) return prev;
+          return [...prev, ...added.map((m: ChatLogMessage) => ({ ...m, pending: false }))]
+            .sort((a, b) => a.time - b.time);
+        });
       })
       .on('broadcast', { event: 'map_update' }, ({ payload }) => {
         if (!payload || !payload.mapId || !payload.mapData) return;
@@ -1372,7 +1456,27 @@ export default function App() {
       // Edit locks ride along on the presence payload — see services/editLock.ts
       .on('presence', { event: 'sync' }, () => notifyLocksChanged())
       .on('presence', { event: 'join' }, () => notifyLocksChanged())
-      .on('presence', { event: 'leave' }, () => notifyLocksChanged())
+      // Presence leave replaces the old 3-second liveness ping. The server keeps this list, so a
+      // client whose socket died in a background tab is reported gone by the server's clock instead
+      // of being inferred from a browser timer that the browser itself throttles. It also covers the
+      // cases no event can reach — a closed lid or a pulled cable runs no code.
+      .on('presence', { event: 'leave' }, ({ leftPresences }: any) => {
+        notifyLocksChanged();
+        const goneIds = (leftPresences || []).map((p: any) => p && p.id).filter(Boolean);
+        if (goneIds.length === 0) return;
+        setOtherPlayers((prev) => {
+          let changed = false;
+          const next = { ...prev };
+          for (const id of goneIds) {
+            if (next[id]) {
+              saveOfflineUser({ ...next[id], isOnline: false });
+              delete next[id];
+              changed = true;
+            }
+          }
+          return changed ? next : prev;
+        });
+      })
       .subscribe((status) => {
         if (activeChannel === channel) connecting = false;
 
@@ -1429,6 +1533,22 @@ export default function App() {
             payload: { fromId: deviceId.current }
           });
 
+          // Anything typed while the socket was down goes out now, in the order it was typed.
+          flushPendingSends();
+
+          // And ask the room for whatever was said while we were gone. Cut off at the newest line
+          // we already hold so peers only resend what we are actually missing, with a floor of
+          // three minutes so a long absence does not drag the whole session back.
+          const newestSeen = chatLogsRef.current.reduce((max, l) => Math.max(max, l.time || 0), 0);
+          channel.send({
+            type: 'broadcast',
+            event: 'request_chat_backfill',
+            payload: {
+              fromId: deviceId.current,
+              since: Math.max(newestSeen, Date.now() - 180000)
+            }
+          });
+
           // Re-announce what we are (or are no longer) viewing. If the channel was down when the
           // user closed a video/page, that close update was dropped and the partner would still
           // be showing "보는중"; resending the current state on every join clears it.
@@ -1450,12 +1570,18 @@ export default function App() {
     // Periodic heartbeat sync interval every 8 seconds to ensure position alignment across computers.
     // Doubles as a safety net: if the channel died without ever reporting a status (which happens
     // when the browser silently kills a backgrounded socket), rebuild it here.
+    // Connection watchdog only — it no longer re-sends position. That was the periodic repair for a
+    // dropped movement packet, and it is now handled by events: handleMove sends the final position
+    // on stop, and anyone joining or reconnecting asks everyone to re-announce.
+    //
+    // This one timer stays because it is the fallback for an event that the platform does not
+    // reliably fire: a socket killed while backgrounded can leave the channel dead without ever
+    // reporting a status. Nothing client-side can observe that except by looking. It only ever
+    // rebuilds a connection, so it does no work in the normal case.
     const syncInterval = setInterval(() => {
       if (disposed) return;
-      if (isChannelUsable()) {
-        sendPlayerSync(localPlayerRef.current);
-      } else if (isChannelDead() && !reconnectTimer && (document.visibilityState === 'visible' || document.hasFocus())) {
-        scheduleReconnect('heartbeat found channel dead');
+      if (isChannelDead() && !reconnectTimer && (document.visibilityState === 'visible' || document.hasFocus())) {
+        scheduleReconnect('watchdog found channel dead');
       }
     }, 8000);
 
@@ -1507,6 +1633,18 @@ export default function App() {
               type: 'broadcast',
               event: 'request_player_sync',
               payload: { fromId: deviceId.current }
+            });
+            // The socket survived the tab being hidden, but sends attempted while it was throttled
+            // may still be parked, and messages may have been missed either way.
+            flushPendingSends();
+            const newestSeen = chatLogsRef.current.reduce((max, l) => Math.max(max, l.time || 0), 0);
+            ch.send({
+              type: 'broadcast',
+              event: 'request_chat_backfill',
+              payload: {
+                fromId: deviceId.current,
+                since: Math.max(newestSeen, Date.now() - 180000)
+              }
             });
           } catch (e) {
             console.warn('[OnHouse Realtime] Wakeup sync failed, rebuilding channel:', e);
@@ -1920,14 +2058,10 @@ export default function App() {
       }
     };
 
-    // Heartbeat check (every 3 seconds, ping other players)
-    const pingInterval = setInterval(() => {
-      safeBroadcastChannel('player_sync', {
-        id: deviceId.current,
-        ...localPlayerRef.current,
-        lastActive: Date.now()
-      });
-    }, 3000);
+    // The 3-second liveness broadcast that used to live here is gone. Presence leave now reports a
+    // disconnect, handleMove already sends the authoritative position the moment movement stops,
+    // and joins/reconnects re-announce through request_player_sync — all of them events. Re-sending
+    // the whole player state twice a second was also the noisiest thing on the channel.
 
     // Read initial DMs and offline users
     updateUnreadCount();
@@ -1945,7 +2079,6 @@ export default function App() {
     window.addEventListener('unload', handleLeave);
 
     return () => {
-      clearInterval(pingInterval);
       handleLeave();
       bc.close();
     };
@@ -2219,29 +2352,38 @@ export default function App() {
     const mapName = currentMapObj ? currentMapObj.name : localPlayer.mapId;
     const formattedSenderName = `${localPlayer.isMobile ? '📱 ' : ''}${localPlayer.nickname}`;
 
-    // Add to logs
-    setChatLogs((prev) => [
-      ...prev,
-      {
-        id: 'chat_me_' + Date.now(),
-        senderName: formattedSenderName,
-        text,
-        time: Date.now(),
-        channel: chatChannel,
-        mapName: mapName
-      }
-    ]);
+    // One id shared by the sender's copy and every receiver's, so replays after a reconnect can be
+    // recognised as the same line instead of arriving as duplicates.
+    const msgId = `${deviceId.current}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+    const sentAt = Date.now();
 
-    // Broadcast chat via Supabase Realtime channel for cross-device users
-    safeBroadcastChannel('chat', {
+    // Broadcast first so the local log can record whether it actually went out. Queued rather than
+    // dropped if the socket is down — that silent drop is what made messages vanish when the tab
+    // had been in the background.
+    const delivered = safeBroadcastChannel('chat', {
       id: deviceId.current,
+      msgId,
       senderName: formattedSenderName,
       text,
       channel: chatChannel,
       mapId: localPlayer.mapId,
       mapName: mapName,
-      timestamp: Date.now()
-    });
+      timestamp: sentAt
+    }, { queueIfDown: true });
+
+    setChatLogs((prev) => [
+      ...prev,
+      {
+        id: 'chat_me_' + msgId,
+        msgId,
+        senderName: formattedSenderName,
+        text,
+        time: sentAt,
+        channel: chatChannel,
+        mapName: mapName,
+        pending: !delivered
+      }
+    ]);
 
     // Broadcast chat to other local tabs
     bcRef.current?.postMessage({
@@ -3093,6 +3235,14 @@ export default function App() {
                       flexWrap: 'wrap'
                     }}
                   >
+                    {log.pending && (
+                      <span
+                        title="연결이 끊겨 대기 중입니다. 다시 연결되면 자동으로 전송됩니다."
+                        style={{ color: '#f9e2af', whiteSpace: 'nowrap', flexShrink: 0, fontSize: '10px' }}
+                      >
+                        ⧗
+                      </span>
+                    )}
                     <span style={{
                       color: 'rgba(255,255,255,0.34)',
                       // Stated rather than inherited: Galmuri11 ships a real 700 face, so any
