@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { type MapDefinition, type MapObjectInstance, cleanDuplicateObjects, getCharRowActions, getCharGridDimensions, getCharDisplaySize, getCustomCharSpriteInfo, getNormalizedLayers, findValidSpawnPosition, isPlayerCollidingAt } from './MapData';
+import { type MapDefinition, type MapObjectInstance, cleanDuplicateObjects, getCharRowActions, getCharGridDimensions, getCharDisplaySize, getCustomCharSpriteInfo, getNormalizedLayers, findValidSpawnPosition, isPlayerCollidingAt, isCellCollision } from './MapData';
 import type { PlayerState } from './syncManager';
 import { getDyedSprite } from './spriteDyer';
 import { getMemoCard, getMemoGlow, memoCardOrigin, memoCardSize, memoGlowRadius } from './memoMarker';
@@ -273,9 +273,14 @@ export const findPathAroundObstacles = (
     return [{ x: targetX, y: targetY }];
   }
 
+  // `collision` is a boolean grid. The previous test compared it against the number 0, and
+  // `false === 0` is false in JS, so every tile read as impassable: the search never expanded a
+  // single step and every call fell through to the straight-line fallback. That is why walking and
+  // following pressed into walls instead of going around them. Defer to isCellCollision, which is
+  // the same truthy test movement itself uses, so the two can no longer disagree.
   const isPassable = (tx: number, ty: number) => {
     if (tx < 0 || tx >= map.width || ty < 0 || ty >= map.height) return false;
-    return map.collision[ty][tx] === 0;
+    return !isCellCollision(map, tx, ty);
   };
 
   // If destination tile is impassable, find nearest open neighbor
@@ -293,11 +298,12 @@ export const findPathAroundObstacles = (
     }
   }
 
-  const queue: { x: number; y: number; path: { x: number; y: number }[] }[] = [
-    { x: startTileX, y: startTileY, path: [] }
-  ];
-  const visited = new Set<string>();
-  visited.add(`${startTileX},${startTileY}`);
+  // Breadth-first over tile indices with parent links. The old version carried a copied path array
+  // on every queue entry and dequeued with shift(); now that the search actually expands, both of
+  // those are quadratic on a real map — 공원도심 alone is 80x50, well past the old 1200-step cap.
+  const w = map.width;
+  const startIdx = startTileY * w + startTileX;
+  const destIdx = destTileY * w + destTileX;
 
   const dirs = [
     { x: 0, y: -1 },
@@ -306,40 +312,73 @@ export const findPathAroundObstacles = (
     { x: 1, y: 0 }
   ];
 
-  let foundPath: { x: number; y: number }[] | null = null;
-  let maxSteps = 1200;
+  const cameFrom = new Map<number, number>();
+  const seen = new Set<number>([startIdx]);
+  const queue: number[] = [startIdx];
+  let head = 0;
 
-  while (queue.length > 0 && maxSteps > 0) {
-    maxSteps--;
-    const curr = queue.shift()!;
+  // Closest point reached so far, so a blocked or unreachable goal still yields useful movement
+  // instead of nothing. Re-pathing from there each tick is what walks the player around an
+  // obstruction rather than into it.
+  let bestIdx = startIdx;
+  let bestDist = Infinity;
+  let reachedDest = false;
 
-    if (curr.x === destTileX && curr.y === destTileY) {
-      foundPath = curr.path;
+  const budget = Math.min(40000, Math.max(2000, map.width * map.height));
+
+  while (head < queue.length && head < budget) {
+    const cur = queue[head++];
+    if (cur === destIdx) {
+      bestIdx = cur;
+      reachedDest = true;
       break;
     }
 
-    for (const d of dirs) {
-      const nx = curr.x + d.x;
-      const ny = curr.y + d.y;
-      const key = `${nx},${ny}`;
+    const cx = cur % w;
+    const cy = (cur - cx) / w;
 
-      if (isPassable(nx, ny) && !visited.has(key)) {
-        visited.add(key);
-        queue.push({
-          x: nx,
-          y: ny,
-          path: [...curr.path, { x: nx * 16, y: ny * 16 }]
-        });
-      }
+    const d2 = (cx - destTileX) * (cx - destTileX) + (cy - destTileY) * (cy - destTileY);
+    if (d2 < bestDist) {
+      bestDist = d2;
+      bestIdx = cur;
+    }
+
+    for (const d of dirs) {
+      const nx = cx + d.x;
+      const ny = cy + d.y;
+      if (!isPassable(nx, ny)) continue;
+      const ni = ny * w + nx;
+      if (seen.has(ni)) continue;
+      seen.add(ni);
+      cameFrom.set(ni, cur);
+      queue.push(ni);
     }
   }
 
-  if (foundPath && foundPath.length > 0) {
-    foundPath[foundPath.length - 1] = { x: targetX, y: targetY };
-    return foundPath;
+  // Walk the parent links back to the start
+  const tiles: number[] = [];
+  let cur = bestIdx;
+  while (cur !== startIdx) {
+    tiles.push(cur);
+    const prev = cameFrom.get(cur);
+    if (prev === undefined) break;
+    cur = prev;
   }
+  tiles.reverse();
 
-  return [{ x: targetX, y: targetY }];
+  // Already standing on the best tile we can reach — report no route rather than handing back a
+  // beeline the walker would only grind into a wall.
+  if (tiles.length === 0) return [];
+
+  const path = tiles.map((i) => {
+    const x = i % w;
+    return { x: x * 16, y: ((i - x) / w) * 16 };
+  });
+
+  // Land on the exact requested point only when the destination tile was genuinely reached;
+  // otherwise stop on the closest tile we could get to.
+  if (reachedDest) path[path.length - 1] = { x: targetX, y: targetY };
+  return path;
 };
 
 export const CanvasGame: React.FC<CanvasGameProps> = ({
