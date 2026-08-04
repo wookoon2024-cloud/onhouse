@@ -58,6 +58,22 @@ interface CanvasGameProps {
   } | null;
 }
 
+// Movement keys collapsed onto the direction they mean, so the double-tap check compares headings
+// rather than keycaps and a W/ArrowUp mix still counts as the same direction tapped twice.
+const DIR_BY_KEY: Record<string, string> = {
+  w: 'up', arrowup: 'up',
+  s: 'down', arrowdown: 'down',
+  a: 'left', arrowleft: 'left',
+  d: 'right', arrowright: 'right'
+};
+
+// Gap allowed between the two taps. Long enough not to demand a sharp double-tap, short enough that
+// ordinary tap-step-tap-step walking doesn't break into a run by accident.
+const DOUBLE_TAP_MS = 280;
+
+const WALK_SPEED = 96;   // px/s
+const RUN_SPEED = 163;   // px/s, ~1.7x
+
 let cachedCustoms: any[] | null = null;
 
 export const refreshCustomTilesetsCache = () => {
@@ -361,6 +377,11 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
 
   // Key states
   const keysPressed = useRef<Record<string, boolean>>({});
+
+  // Double-tap-to-run. Held in refs rather than state because the movement loop reads them every
+  // frame and re-rendering on each tap would be pointless churn.
+  const isRunningRef = useRef<boolean>(false);
+  const lastDirTapRef = useRef<{ dir: string; at: number } | null>(null);
 
   // Editor Camera coordinates
   const editCameraX = useRef(0);
@@ -774,10 +795,26 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
       }
 
       const key = e.key.toLowerCase();
-      if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+      const tappedDir = DIR_BY_KEY[key];
+      if (tappedDir) {
         // Prevent default scrolling for arrow keys/WASD & dismiss context menu
         e.preventDefault();
+
+        // Only a fresh press counts — holding a key fires keydown repeatedly, and counting those
+        // would start a run the moment auto-repeat kicked in. Compare direction rather than key so
+        // W followed by ArrowUp still reads as a double tap.
+        const isFreshPress = !keysPressed.current[key];
         keysPressed.current[key] = true;
+
+        if (isFreshPress) {
+          const now = performance.now();
+          const last = lastDirTapRef.current;
+          if (last && last.dir === tappedDir && now - last.at < DOUBLE_TAP_MS) {
+            isRunningRef.current = true;
+          }
+          lastDirTapRef.current = { dir: tappedDir, at: now };
+        }
+
         setMapContextMenu(null);
       }
 
@@ -1080,9 +1117,14 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         }
       }
 
-      // Walk speed: 96 pixels per second (smooth 1.6px per frame at 60fps)
-      const MOVE_SPEED = 96;
-      const moveDist = MOVE_SPEED * dt;
+      // Running lasts only as long as the player keeps moving — letting go of every direction key
+      // drops back to a walk, so the next run has to be asked for again with a fresh double tap.
+      // Changing direction mid-run is fine; only stopping ends it.
+      if (!moveUp && !moveDown && !moveLeft && !moveRight) {
+        isRunningRef.current = false;
+      }
+
+      const moveDist = (isRunningRef.current ? RUN_SPEED : WALK_SPEED) * dt;
 
       let dx = 0;
       let dy = 0;
