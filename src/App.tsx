@@ -809,16 +809,50 @@ export default function App() {
 
   // Keep player state ref up-to-date for event handlers
   const localPlayerRef = useRef<PlayerState>(localPlayer);
+  // Everything about the player that is not where they are standing. Movement changes localPlayer
+  // ~30 times a second, and this effect used to fire on all of it: three localStorage writes and a
+  // full, unthrottled player_sync per frame, on top of the throttled position packet handleMove
+  // already sends. One person walking was therefore ~60 broadcasts a second, and Realtime's budget
+  // is per project with disconnection — not dropped messages — as the penalty for exceeding it. Two
+  // people running, or following each other, is where it started showing: both ends stall, the
+  // client reconnects, and the catch-up jumps past the 160px snap threshold so the other character
+  // teleports rather than walks.
+  //
+  // Position already has its own path. This one announces only what that path leaves out — name,
+  // sprite, status, emote, size — which changes on user action, not per frame.
+  const playerIdentityKey = [
+    houseCode,
+    localPlayer.nickname,
+    localPlayer.spriteType,
+    localPlayer.hue,
+    localPlayer.mapId,
+    localPlayer.isOnline,
+    localPlayer.isMobile,
+    localPlayer.statusMessage,
+    localPlayer.currentEmote,
+    localPlayer.emoteUntil,
+    localPlayer.charSize,
+    localPlayer.personalCharSize
+  ].join('|');
+  const lastIdentityKeyRef = useRef<string | null>(null);
+
   useEffect(() => {
     localPlayerRef.current = localPlayer;
+  }, [localPlayer]);
+
+  useEffect(() => {
+    if (lastIdentityKeyRef.current === playerIdentityKey) return;
+    lastIdentityKeyRef.current = playerIdentityKey;
+
     // Save settings immediately
     localStorage.setItem('on_house_nickname', localPlayer.nickname);
     localStorage.setItem('on_house_sprite', localPlayer.spriteType);
     localStorage.setItem('on_house_status', localPlayer.statusMessage);
 
-    // Broadcast player update to Supabase Realtime channel
-    sendPlayerSync(localPlayer);
-  }, [localPlayer, houseCode]);
+    // Broadcast player update to Supabase Realtime channel. Carries customCharData, which the
+    // position packet does not, so a sprite change still reaches everyone the moment it happens.
+    sendPlayerSync(localPlayerRef.current);
+  }, [playerIdentityKey]);
 
   // Supabase House DB fetch & Realtime WebSocket Channel
   useEffect(() => {
@@ -2150,9 +2184,16 @@ export default function App() {
       mapId: localPlayer.mapId
     });
 
-    // Broadcast movement real-time over WebSocket to OTHER computers! (~30 updates/sec when moving, immediately when stopping)
+    // Broadcast movement real-time over WebSocket to OTHER computers (~16 updates/sec while moving,
+    // immediately when stopping).
+    //
+    // 30ms was ~33 packets a second per moving player, which two people running at each other turns
+    // into 66 against a project-wide budget. The receiver does not draw these positions directly —
+    // it eases toward them at 0.28 per frame — so it reaches the same place either way; the extra
+    // packets bought nothing but headroom spent. The stop is still sent the instant it happens,
+    // which is the one position that has to be exact.
     const now = Date.now();
-    if (!isMoving || now - lastSyncTimeRef.current > 30) {
+    if (!isMoving || now - lastSyncTimeRef.current > 60) {
       lastSyncTimeRef.current = now;
       safeBroadcastChannel('player_sync', {
         id: deviceId.current,
