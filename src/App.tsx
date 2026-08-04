@@ -49,6 +49,16 @@ interface ChatLogMessage {
   mapName?: string;
 }
 
+// Chat timestamps as 24-hour HH:MM. `time` is a Date.now() epoch, so a line relayed from another
+// client renders in the reader's own clock rather than the sender's — which is what you want when
+// people are in different time zones. Falls back rather than printing "NaN:NaN" for an entry that
+// arrived without a usable time.
+const formatChatTime = (time?: number): string => {
+  const d = new Date(time ?? NaN);
+  if (Number.isNaN(d.getTime())) return '--:--';
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
 // Helper function to extract YouTube video ID from various YouTube URL formats
 const extractYouTubeId = (text: string): string | null => {
   if (!text) return null;
@@ -3083,6 +3093,13 @@ export default function App() {
                       flexWrap: 'wrap'
                     }}
                   >
+                    <span style={{
+                      color: 'rgba(255,255,255,0.45)',
+                      whiteSpace: 'nowrap', flexShrink: 0,
+                      fontVariantNumeric: 'tabular-nums'
+                    }}>
+                      [{formatChatTime(log.time)}]
+                    </span>
                     <span style={{
                       color: log.channel === 'map' ? '#a6e3a1' : '#fab387',
                       whiteSpace: 'nowrap', flexShrink: 0
