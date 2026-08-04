@@ -8,13 +8,23 @@ interface MessengerProps {
   onClose: () => void;
   onSendDM: (toId: string, text: string) => DirectMessage | void;
   onReadDM?: (toId: string) => void;
-  onWatchYouTube?: (videoId: string) => void;
-  onOpenWebUrl?: (url: string) => void;
-  partnerViewingState?: { videoId?: string; webUrl?: string; syncEnabled?: boolean } | null;
+  onWatchYouTube?: (videoId: string, sourceId?: string) => void;
+  onOpenWebUrl?: (url: string, sourceId?: string) => void;
+  partnerViewingState?: { videoId?: string; webUrl?: string; videoSourceId?: string; webSourceId?: string; syncEnabled?: boolean } | null;
   activeYouTubeVideoId?: string | null;
   activeWebUrl?: string | null;
+  activeYouTubeSourceId?: string | null;
+  activeWebSourceId?: string | null;
   isPartnerClosed?: boolean;
 }
+
+// Which message a "보는 중" marker belongs to. The same link pasted twice used to light up both
+// copies, because only the link was compared. `sourceId` is the message the click came from — the
+// sender-assigned DM id, which both clients share, so the marker lands on the same bubble on either
+// side. Falls back to the old link-only match when either side has no id, so a peer on an older
+// build shows the marker it always did rather than none at all.
+const isSameMediaSource = (stateSourceId?: string | null, messageSourceId?: string | null): boolean =>
+  !stateSourceId || !messageSourceId || stateSourceId === messageSourceId;
 
 const extractYouTubeId = (text: string): string | null => {
   if (!text) return null;
@@ -62,6 +72,8 @@ export const Messenger: React.FC<MessengerProps> = ({
   partnerViewingState,
   activeYouTubeVideoId,
   activeWebUrl,
+  activeYouTubeSourceId,
+  activeWebSourceId,
   isPartnerClosed
 }) => {
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
@@ -431,17 +443,17 @@ export const Messenger: React.FC<MessengerProps> = ({
                   }}>
                     <div>{msg.text}</div>
                     {ytId && (() => {
-                      const isPartnerViewing = partnerViewingState?.videoId === ytId;
-                      const isMeViewing = activeYouTubeVideoId === ytId;
+                      const isPartnerViewing = partnerViewingState?.videoId === ytId && isSameMediaSource(partnerViewingState?.videoSourceId, msg.id);
+                      const isMeViewing = activeYouTubeVideoId === ytId && isSameMediaSource(activeYouTubeSourceId, msg.id);
                       return (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', alignSelf: isMe ? 'flex-end' : 'flex-start', flexWrap: 'wrap' }}>
                           <button
                             type="button"
                             onClick={() => {
                               if (onWatchYouTube) {
-                                onWatchYouTube(ytId);
+                                onWatchYouTube(ytId, msg.id);
                               } else {
-                                window.dispatchEvent(new CustomEvent('on_house_watch_youtube', { detail: { videoId: ytId } }));
+                                window.dispatchEvent(new CustomEvent('on_house_watch_youtube', { detail: { videoId: ytId, sourceId: msg.id } }));
                               }
                             }}
                             style={{
@@ -484,17 +496,17 @@ export const Messenger: React.FC<MessengerProps> = ({
                       );
                     })()}
                     {webUrl && !ytId && (() => {
-                      const isPartnerViewing = partnerViewingState?.webUrl === webUrl;
-                      const isMeViewing = activeWebUrl === webUrl;
+                      const isPartnerViewing = partnerViewingState?.webUrl === webUrl && isSameMediaSource(partnerViewingState?.webSourceId, msg.id);
+                      const isMeViewing = activeWebUrl === webUrl && isSameMediaSource(activeWebSourceId, msg.id);
                       return (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', alignSelf: isMe ? 'flex-end' : 'flex-start', flexWrap: 'wrap' }}>
                           <button
                             type="button"
                             onClick={() => {
                               if (onOpenWebUrl) {
-                                onOpenWebUrl(webUrl);
+                                onOpenWebUrl(webUrl, msg.id);
                               } else {
-                                window.dispatchEvent(new CustomEvent('on_house_open_web_url', { detail: { url: webUrl } }));
+                                window.dispatchEvent(new CustomEvent('on_house_open_web_url', { detail: { url: webUrl, sourceId: msg.id } }));
                               }
                             }}
                             style={{

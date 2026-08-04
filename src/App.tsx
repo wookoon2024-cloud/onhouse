@@ -72,6 +72,17 @@ const extractYouTubeId = (text: string): string | null => {
   return match ? match[1] : null;
 };
 
+// Which message a "보는 중" marker belongs to. Two messages can carry the same link — pasting the
+// same video twice is normal — so matching on the link alone lit up every copy of it. `sourceId` is
+// the id of the message the click actually came from, and it is the sender-assigned id both clients
+// share, so the marker lands on the same bubble on either side.
+//
+// Falls back to the old link-only match when either side has no id: a peer on a build from before
+// this sends none, and a system line carries no msgId. Showing the marker on every copy is the
+// behaviour they had; showing nothing at all would be a regression.
+const isSameMediaSource = (stateSourceId?: string | null, messageSourceId?: string | null): boolean =>
+  !stateSourceId || !messageSourceId || stateSourceId === messageSourceId;
+
 // Helper function to extract non-YouTube Web URLs
 const extractGeneralUrl = (text: string): string | null => {
   if (!text) return null;
@@ -317,7 +328,11 @@ export default function App() {
   const [isChatLogCollapsed, setIsChatLogCollapsed] = useState<boolean>(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const [activeYouTubeVideoId, setActiveYouTubeVideoId] = useState<string | null>(null);
   const [activeWebUrl, setActiveWebUrl] = useState<string | null>(null);
-  const [partnerViewingState, setPartnerViewingState] = useState<{ videoId?: string; webUrl?: string; syncEnabled?: boolean } | null>(null);
+  // The message each open viewer was launched from. Kept apart because a video and a web page can
+  // be open at once, from two different messages — one shared field would drop one of the markers.
+  const [activeYouTubeSourceId, setActiveYouTubeSourceId] = useState<string | null>(null);
+  const [activeWebSourceId, setActiveWebSourceId] = useState<string | null>(null);
+  const [partnerViewingState, setPartnerViewingState] = useState<{ videoId?: string; webUrl?: string; videoSourceId?: string; webSourceId?: string; syncEnabled?: boolean } | null>(null);
   const [isWebSyncActive, setIsWebSyncActive] = useState<boolean>(false);
   const [closedDMPartners, setClosedDMPartners] = useState<Record<string, boolean>>({});
   const activeDMTargetRef = useRef<PlayerState | null>(null);
@@ -329,13 +344,15 @@ export default function App() {
   // This is state, not an event: safeBroadcastChannel drops sends while the channel is down, so a
   // "closed the video" update sent during a reconnect was lost forever and the partner stayed
   // stuck on "보는중". Re-announcing on every successful subscribe makes it self-correcting.
-  const mediaViewingRef = useRef<{ videoId?: string; webUrl?: string; syncEnabled: boolean }>({ syncEnabled: false });
+  const mediaViewingRef = useRef<{ videoId?: string; webUrl?: string; videoSourceId?: string; webSourceId?: string; syncEnabled: boolean }>({ syncEnabled: false });
 
   // Broadcast media viewing updates whenever state changes
   useEffect(() => {
     mediaViewingRef.current = {
       videoId: activeYouTubeVideoId || undefined,
       webUrl: activeWebUrl || undefined,
+      videoSourceId: activeYouTubeSourceId || undefined,
+      webSourceId: activeWebSourceId || undefined,
       syncEnabled: isWebSyncActive
     };
     safeBroadcastChannel('media_viewing_update', {
@@ -343,10 +360,24 @@ export default function App() {
       playerId: localPlayer.id,
       ...mediaViewingRef.current
     });
-  }, [activeYouTubeVideoId, activeWebUrl, isWebSyncActive]);
+  }, [activeYouTubeVideoId, activeWebUrl, activeYouTubeSourceId, activeWebSourceId, isWebSyncActive]);
+
+  // Opened from a specific chat or DM line, so the marker can be pinned to that one line.
+  const openYouTubeFromMessage = (videoId: string, sourceId?: string) => {
+    setActiveYouTubeVideoId(videoId);
+    setActiveYouTubeSourceId(sourceId || null);
+  };
+
+  const openWebUrlFromMessage = (url: string, sourceId?: string) => {
+    setActiveWebUrl(url);
+    setActiveWebSourceId(sourceId || null);
+  };
 
   const handleNavigateWebUrl = (newUrl: string) => {
     setActiveWebUrl(newUrl);
+    // Navigating inside the popup leaves the page the message linked to, so it is no longer that
+    // message that is being viewed.
+    setActiveWebSourceId(null);
     if (isWebSyncActive) {
       safeBroadcastChannel('media_viewing_update', {
         deviceId: deviceId.current,
@@ -360,10 +391,12 @@ export default function App() {
   const handleToggleWebSync = () => {
     setIsWebSyncActive((prev) => {
       const next = !prev;
+      // Whole state, not just the sync flag: sending a partial payload here used to drop the video
+      // id and the source ids, which cleared the partner's markers as a side effect of a toggle.
       safeBroadcastChannel('media_viewing_update', {
         deviceId: deviceId.current,
         playerId: localPlayer.id,
-        webUrl: activeWebUrl || undefined,
+        ...mediaViewingRef.current,
         syncEnabled: next
       });
       return next;
@@ -375,13 +408,13 @@ export default function App() {
     const handleWatchYT = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail && detail.videoId) {
-        setActiveYouTubeVideoId(detail.videoId);
+        openYouTubeFromMessage(detail.videoId, detail.sourceId);
       }
     };
     const handleOpenWebUrl = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail && detail.url) {
-        setActiveWebUrl(detail.url);
+        openWebUrlFromMessage(detail.url, detail.sourceId);
       }
     };
     window.addEventListener('on_house_watch_youtube', handleWatchYT);
@@ -1315,6 +1348,8 @@ export default function App() {
         setPartnerViewingState({
           videoId: payload.videoId,
           webUrl: payload.webUrl,
+          videoSourceId: payload.videoSourceId,
+          webSourceId: payload.webSourceId,
           syncEnabled: payload.syncEnabled
         });
 
@@ -1322,6 +1357,9 @@ export default function App() {
         if (payload.syncEnabled && payload.webUrl) {
           setIsWebSyncActive(true);
           setActiveWebUrl(payload.webUrl);
+          // Follow the partner onto the same message too, so co-browsing reads as "함께 보는 중"
+          // on the line they opened rather than on nothing.
+          setActiveWebSourceId(payload.webSourceId || null);
         }
       })
       .on('broadcast', { event: 'dm_close' }, ({ payload }) => {
@@ -2848,52 +2886,26 @@ export default function App() {
     showToast(`⚡ [${prompt.fromName}] 님에게 똑같이 ${prompt.emoji} 반응을 보냈습니다!`);
   };
 
-  // Open Inbox / Mailbox
+  // Inbox / Mailbox — reports what arrived, and deliberately does not open a conversation.
+  //
+  // Every other route into the messenger goes through 1:1 놀기: a request the other side has to
+  // accept, which is what makes 거절 and 종료 mean anything. This button walked straight past it and
+  // opened a window against whoever wrote last — someone who had no session open, had already
+  // closed theirs, or was not even online, and who therefore never saw that a conversation had been
+  // reopened. The unread badge still tells you a message arrived; you answer it by walking up to
+  // them and asking.
   const handleOpenMailbox = () => {
-    // Find who messaged us recently and open chat with the first one
-    const dms = getDMs();
-    const lastUnread = dms.filter(dm => dm.toId === deviceId.current && !dm.read).pop();
-    
-    if (lastUnread) {
-      // Check if player details exist in memory
-      let targetPlayer = otherPlayers[lastUnread.fromId] || offlinePlayers[lastUnread.fromId];
-      if (!targetPlayer) {
-        // Fallback mockup player state
-        targetPlayer = {
-          id: lastUnread.fromId,
-          nickname: lastUnread.fromName,
-          spriteType: 'ninja_blue',
-          hue: 0,
-          mapId: 'room',
-          x: 0, y: 0, dir: 'down', isMoving: false, isOnline: false,
-          statusMessage: '부재중', lastActive: Date.now()
-        };
-      }
-      setActiveDMTarget(targetPlayer);
-    } else {
-      // No unreads, open chat with anyone if we have history
-      const lastDM = dms.filter(dm => dm.fromId === deviceId.current || dm.toId === deviceId.current).pop();
-      if (lastDM) {
-        const partnerId = lastDM.fromId === deviceId.current ? lastDM.toId : lastDM.fromId;
-        const partnerName = lastDM.fromId === deviceId.current ? '상대방' : lastDM.fromName;
-        let targetPlayer = otherPlayers[partnerId] || offlinePlayers[partnerId];
-        if (!targetPlayer) {
-          targetPlayer = {
-            id: partnerId,
-            nickname: partnerName,
-            spriteType: 'ninja_blue',
-            hue: 0,
-            mapId: 'room',
-            x: 0, y: 0, dir: 'down', isMoving: false, isOnline: false,
-            statusMessage: '부재중', lastActive: Date.now()
-          };
-        }
-        setActiveDMTarget(targetPlayer);
-      } else {
-        alert('받은 쪽지나 이전 대화 내역이 없습니다. 다른 캐릭터를 클릭하여 쪽지를 먼저 보내보세요!');
-      }
-    }
+    const unread = getDMs().filter((dm) => dm.toId === deviceId.current && !dm.read);
     updateUnreadCount();
+
+    if (unread.length === 0) {
+      showToast('📭 새로 받은 쪽지가 없습니다. 대화는 상대 캐릭터를 클릭해 [1:1 놀기]로 시작할 수 있습니다.');
+      return;
+    }
+
+    const senders = Array.from(new Set(unread.map((dm) => dm.fromName || '알 수 없음')));
+    const who = senders.slice(0, 3).join(', ') + (senders.length > 3 ? ` 외 ${senders.length - 3}명` : '');
+    showToast(`📬 [${who}] 님의 안 읽은 쪽지 ${unread.length}개 — 상대 캐릭터를 클릭해 [1:1 놀기]로 열어주세요.`);
   };
 
   // No built-in default maps ship anymore — a brand new house has none until the player adds one.
@@ -3129,11 +3141,13 @@ export default function App() {
           onClose={handleCloseDMChat}
           onSendDM={handleSendDM}
           onReadDM={handleReadDM}
-          onWatchYouTube={(ytId) => setActiveYouTubeVideoId(ytId)}
-          onOpenWebUrl={(url) => setActiveWebUrl(url)}
+          onWatchYouTube={openYouTubeFromMessage}
+          onOpenWebUrl={openWebUrlFromMessage}
           partnerViewingState={partnerViewingState}
           activeYouTubeVideoId={activeYouTubeVideoId}
           activeWebUrl={activeWebUrl}
+          activeYouTubeSourceId={activeYouTubeSourceId}
+          activeWebSourceId={activeWebSourceId}
           isPartnerClosed={!!closedDMPartners[activeDMTarget.id]}
         />
       )}
@@ -3265,13 +3279,15 @@ export default function App() {
                     <span style={{ color: '#a6e3a1', whiteSpace: 'nowrap', flexShrink: 0 }}>{log.senderName} :</span>
                     <span style={{ wordBreak: 'break-word', color: '#e6e9ef' }}>{log.text}</span>
                     {ytId && (() => {
-                      const isPartnerViewing = partnerViewingState?.videoId === ytId;
-                      const isMeViewing = activeYouTubeVideoId === ytId;
+                      // msgId, not log.id: the local id is prefixed per side ('chat_me_' / 'chat_rec_'),
+                      // so only msgId names the same line on both clients.
+                      const isPartnerViewing = partnerViewingState?.videoId === ytId && isSameMediaSource(partnerViewingState?.videoSourceId, log.msgId);
+                      const isMeViewing = activeYouTubeVideoId === ytId && isSameMediaSource(activeYouTubeSourceId, log.msgId);
                       return (
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                           <button
                             type="button"
-                            onClick={() => setActiveYouTubeVideoId(ytId)}
+                            onClick={() => openYouTubeFromMessage(ytId, log.msgId)}
                             style={{
                               background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
                               color: '#ffffff',
@@ -3312,13 +3328,13 @@ export default function App() {
                       );
                     })()}
                     {webUrl && !ytId && (() => {
-                      const isPartnerViewing = partnerViewingState?.webUrl === webUrl;
-                      const isMeViewing = activeWebUrl === webUrl;
+                      const isPartnerViewing = partnerViewingState?.webUrl === webUrl && isSameMediaSource(partnerViewingState?.webSourceId, log.msgId);
+                      const isMeViewing = activeWebUrl === webUrl && isSameMediaSource(activeWebSourceId, log.msgId);
                       return (
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                           <button
                             type="button"
-                            onClick={() => setActiveWebUrl(webUrl)}
+                            onClick={() => openWebUrlFromMessage(webUrl, log.msgId)}
                             style={{
                               background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
                               color: '#ffffff',
@@ -3471,7 +3487,7 @@ export default function App() {
                 background: 'none', border: 'none', color: '#fff', cursor: 'pointer',
                 position: 'relative', display: 'flex', alignItems: 'center', padding: '3px', flexShrink: 0
               }}
-              title="메일함 / DM"
+              title="안 읽은 쪽지 확인 (대화는 상대 캐릭터 클릭 → 1:1 놀기)"
             >
               <Mail size={14} />
               {unreadCount > 0 && (
